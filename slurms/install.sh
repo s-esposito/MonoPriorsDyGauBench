@@ -53,8 +53,11 @@ pip install scipy
 pip install kornia
 
 
+
 pip install lightning
 pip install "jsonargparse[signatures]"
+
+pip install wandb
 
 pip install submodules/diff-gaussian-rasterization
 pip install submodules/simple-knn

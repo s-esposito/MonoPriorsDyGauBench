@@ -33,7 +33,10 @@ which pip
 #pip install lightning
 #pip install "jsonargparse[signatures]"
 
-python main.py fit --print_config
+#pip install tensorboard
+#pip install wandb
+
+python main.py fit --config configs/base.yaml #--print_config
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown
