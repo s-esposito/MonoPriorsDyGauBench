@@ -3,7 +3,7 @@
 #SBATCH -n 1
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
-#SBATCH --partition=gpu-he --gres=gpu:1
+#SBATCH --partition=gpu-he --gres=gpu:2
 #SBATCH --job-name debug
 #SBATCH --output debug.out
 
@@ -36,7 +36,12 @@ which pip
 #pip install tensorboard
 #pip install wandb
 
-python main.py fit --config configs/base.yaml #--print_config
+#pip install submodules/depth-diff-gaussian-rasterization
+#pip install submodules/gaussian_rasterization_ch3
+#pip install submodules/gaussian_rasterization_ch9
+
+
+python main.py fit --config configs/base.yaml #--trainer.strategy FSDP #--print_config
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown

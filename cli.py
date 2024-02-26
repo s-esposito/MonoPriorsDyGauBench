@@ -3,6 +3,16 @@ from callbacks import WandbWatcher
 from typing import Optional, List
 import os
 from jsonargparse import Namespace, lazy_instance
+try:
+    from lightning.fabric.strategies import FSDPStrategy
+except:
+    from lightning.pytorch.strategies import FSDPStrategy
+#import lightning
+#print(lightning.__version__)
+#assert False
+
+#Trainer(accelerator=”gpu”, devices=k, strategy=’ddp’, precision=16)
+
 
 class MyLightningCLI(LightningCLI):
     def add_arguments_to_parser(self, parser: LightningArgumentParser):
@@ -91,7 +101,15 @@ class MyLightningCLI(LightningCLI):
             assert False, "Undefined logger!"
             #logger_config.class_path = config.logger
 
-        config.trainer.logger = logger_config        
+        config.trainer.logger = logger_config    
+
+        # if use FSDP training strategy 
+        # opt to save distributed checkpoint
+        # world size can change before and after save/load!
+        if config.trainer.strategy is not None:
+            assert config.trainer.strategy == "FSDP"
+            strategy = FSDPStrategy(state_dict_type="sharded")
+            config.trainer.strategy = lazy_instance(strategy)
     
     #def instantiate_classes(self) -> None:
     #    super().instantiate_classes()

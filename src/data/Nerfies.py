@@ -41,6 +41,13 @@ class SceneInfo(NamedTuple):
     ply_path: str
     point_cloud_dy: Optional[BasicPointCloud] = None
 
+
+# difference between __init__, prepare_data and setup:
+# init: the same as torch DataLoader
+# prepare_data: for downloading and saving data with single process despite ddp setting
+#   as multiple process downloading would corrupt data
+# setup: operations to perform on every GPU
+
 class NerfiesDataModule(MyDataModuleBaseClass):
     def __init__(self, 
         datadir: str,
@@ -58,7 +65,11 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         self.eval = eval
         self.ratio = ratio
         self.batch_size = batch_size
+        self.save_hyperparameters()
 
+    # stage: separate trainer.{fit,validate,test,predict}
+    def setup(self, stage: str):
+        # if stage == "fit"
         use_bg_points = False
         self.train_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split ="train", eval=eval)
         self.test_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split="test", eval=eval)
@@ -94,7 +105,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
 
         self.camera_extent = nerf_normalization["radius"]
         #assert False, "Pause"
-        self.save_hyperparameters()
+        
         #assert False, "Pause"
 
     def train_dataloader(self):

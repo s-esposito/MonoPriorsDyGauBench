@@ -45,9 +45,24 @@ class FourDGSdataset(Dataset):
                 depth = depth[None, None, ...]
                 depth = kornia.filters.gaussian_blur2d(depth, (self.kernel_size, self.kernel_size), (self.kernel_size/2., self.kernel_size/2.))[0, 0]
         
-        return Camera(colmap_id=index,R=R,T=T,FoVx=FovX,FoVy=FovY,image=image,gt_alpha_mask=None,
-                          image_name=f"{index}",uid=index,data_device=torch.device("cuda"),time=time,
+        camera = Camera(colmap_id=index,R=R,T=T,FoVx=FovX,FoVy=FovY,image=image,gt_alpha_mask=None,
+                          image_name=f"{index}",uid=index, time=time,
                           depth=depth)
+        return {
+            "time": camera.time,
+            "FoVx": camera.FoVx,
+            "FoVy": camera.FoVy,
+            "image_height": camera.image_height,
+            "image_width": camera.image_width,
+            "world_view_transform": camera.world_view_transform,
+            "full_proj_transform": camera.full_proj_transform,
+            "camera_center": camera.camera_center,
+            "original_image": camera.original_image,
+            "depth": camera.depth,
+            'rayo': camera.rayo,
+            "rayd": camera.rayd
+
+        }
     def __len__(self):
         
         return len(self.dataset)
