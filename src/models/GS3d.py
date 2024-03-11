@@ -406,7 +406,7 @@ class GS3d(MyModelBaseClass):
         ssim1 =  ssim(image, gt_image)
         loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1)
         self.log(f"{mode}/loss_L1", Ll1)
-        self.log(f"{mode}/loss_ssim", ssim1)
+        self.log(f"{mode}/loss_ssim", 1.-ssim1)
         self.log(f"{mode}/loss", loss, prog_bar=True)
         return loss
     

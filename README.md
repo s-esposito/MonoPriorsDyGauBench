@@ -13,7 +13,7 @@ wandb init
 paste API key and create first project following instruction
 ```
 
-3. PytorchLightning version was tested on 1.9.x
+3. PytorchLightning version was tested on 2.2.1
 
 ## Usage
 
