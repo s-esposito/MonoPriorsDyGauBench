@@ -13,6 +13,10 @@ import torch
 from torch import nn
 import numpy as np
 from src.utils.graphics_utils import getWorld2View2, getProjectionMatrix
+from kornia import create_meshgrid
+def pix2ndc(v, S):
+    return (v * 2.0 + 1.0) / S - 1.0
+
 
 class TemporalCamera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,

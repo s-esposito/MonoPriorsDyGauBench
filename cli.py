@@ -106,11 +106,11 @@ class MyLightningCLI(LightningCLI):
         # if use FSDP training strategy 
         # opt to save distributed checkpoint
         # world size can change before and after save/load!
-        if config.trainer.strategy is not None:
-            assert config.trainer.strategy == "FSDP"
-            strategy = FSDPStrategy(state_dict_type="sharded")
-            config.trainer.strategy = lazy_instance(strategy)
-    
+        #if config.trainer.strategy is not None:
+        #    assert config.trainer.strategy == "FSDP"
+        #   strategy = FSDPStrategy(state_dict_type="sharded")
+        #    config.trainer.strategy = lazy_instance(strategy)
+        #config.trainer.callbacks += [GlobalStepWatcher()]
     #def instantiate_classes(self) -> None:
     #    super().instantiate_classes()
     #    self.trainer.logger.watch(self.model, log="all")

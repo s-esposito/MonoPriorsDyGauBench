@@ -10,3 +10,4 @@ class WandbWatcher(Callback):
     def on_train_end(self, trainer, pl_module) -> None:
         print("wandb logger is unwatching model!")
         trainer.logger.experiment.unwatch(pl_module) 
+

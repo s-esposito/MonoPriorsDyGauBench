@@ -54,19 +54,21 @@ pip install kornia
 
 
 
-pip install lightning
+pip install lightning=2.2.1
 pip install "jsonargparse[signatures]"
 
 pip install wandb
 
 cd ~/data/yliang51/GaussianDiff
 
-pip install submodules/diff-gaussian-rasterization
+#pip install submodules/diff-gaussian-rasterization
 pip install submodules/depth-diff-gaussian-rasterization
-pip install submodules/gaussian-rasterization_ch3
-pip install submodules/gaussian-rasterization_ch9
+#pip install submodules/gaussian-rasterization_ch3
+#pip install submodules/gaussian-rasterization_ch9
 pip install submodules/simple-knn
 
+
+pip install pytorch-msssim
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown

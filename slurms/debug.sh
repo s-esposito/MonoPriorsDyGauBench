@@ -30,7 +30,8 @@ which python
 which pip
 
 
-#pip install lightning
+#pip uninstall -y lightning
+#pip install lightning==2.2.1
 #pip install "jsonargparse[signatures]"
 
 #pip install tensorboard
@@ -39,8 +40,10 @@ which pip
 #pip install submodules/depth-diff-gaussian-rasterization
 #pip install submodules/gaussian_rasterization_ch3
 #pip install submodules/gaussian_rasterization_ch9
+#pip install kornia
+#pip install pytorch-msssim
 
-
+rm output/base/config.yaml
 python main.py fit --config configs/base.yaml #--trainer.strategy FSDP #--print_config
 
 #cd ~/data/yliang51/Gaussian4D/data

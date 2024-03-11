@@ -7,6 +7,30 @@ logger: 'wandb'
 project: 'base'
 model:
   class_path: src.models.GS3d
+  init_args:
+    sh_degree: 3
+    percent_dense: 0.01
+    warm_up: 3000
+    position_lr_init: 0.00016
+    position_lr_final: 0.0000016
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 30000
+    deform_lr_max_steps: 40000
+    feature_lr: 0.0025
+    opacity_lr: 0.05
+    scaling_lr: 0.001
+    rotation_lr: 0.001
+    lambda_dssim: 0.2
+    densification_interval: 100
+    opacity_reset_interval: 3000
+    densify_from_iter: 500
+    densify_until_iter: 15000
+    densify_grad_threshold: 0.0002
+    white_background: true
+    use_static: false
+    init_mode: "D3G"
+    motion_mode: "MLP"
+
 data:
   class_path: src.data.NerfiesDataModule
   init_args:
@@ -17,53 +41,16 @@ data:
 trainer:
   logger: true
   enable_checkpointing: true
-  callbacks: null
-  default_root_dir: null
-  gradient_clip_val: null
-  gradient_clip_algorithm: null
   num_nodes: 1
-  num_processes: null
-  devices: null
-  gpus: null
-  auto_select_gpus: null
-  tpu_cores: null
-  ipus: null
+  devices: "auto"
   enable_progress_bar: true
-  overfit_batches: 0.0
-  track_grad_norm: -1
-  check_val_every_n_epoch: 1
-  fast_dev_run: false
-  accumulate_grad_batches: null
-  max_epochs: null
-  min_epochs: null
-  max_steps: -1
-  min_steps: null
-  max_time: null
-  limit_train_batches: null
-  limit_val_batches: null
-  limit_test_batches: null
-  limit_predict_batches: null
-  val_check_interval: null
+  max_epochs: 1
+  max_steps: 40000
+  val_check_interval: 1000
   log_every_n_steps: 50
-  accelerator: null
-  strategy: null
-  sync_batchnorm: false
-  precision: 32
+  accelerator: "gpu"
+  strategy: "ddp_find_unused_parameters_true"
+  precision: 32 # cannot set to 16; otherwise ssim bug and https://stackoverflow.com/questions/75969294/assertionerror-no-inf-checks-were-recorded-for-this-optimizer
   enable_model_summary: true
-  num_sanity_val_steps: 2
-  resume_from_checkpoint: null
-  profiler: null
-  benchmark: null
-  deterministic: null
-  reload_dataloaders_every_n_epochs: 0
-  auto_lr_find: false
-  replace_sampler_ddp: true
-  detect_anomaly: false
-  auto_scale_batch_size: false
-  plugins: null
-  amp_backend: null
-  amp_level: null
-  move_metrics_to_cpu: false
-  multiple_trainloader_mode: max_size_cycle
-  inference_mode: true
+  #inference_mode: false
 

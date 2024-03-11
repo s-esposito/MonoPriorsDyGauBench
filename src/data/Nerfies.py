@@ -8,7 +8,23 @@ import numpy as np
 import os
 from typing import NamedTuple, Optional
 from torch.utils.data import DataLoader
+import torch
 
+class InfiniteDataLoader:
+    def __init__(self, data_loader):
+        self.data_loader = data_loader
+        self.data_iter = iter(data_loader)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            data = next(self.data_iter)
+        except StopIteration:
+            self.data_iter = iter(self.data_loader)  # Reset the data loader
+            data = next(self.data_iter)
+        return data
 
 def getNerfppNorm(cam_info):
     def get_center_and_diag(cam_centers):
@@ -70,6 +86,8 @@ class NerfiesDataModule(MyDataModuleBaseClass):
     # stage: separate trainer.{fit,validate,test,predict}
     def setup(self, stage: str):
         # if stage == "fit"
+        datadir = self.datadir
+        ratio = self.ratio
         use_bg_points = False
         self.train_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split ="train", eval=eval)
         self.test_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split="test", eval=eval)
@@ -102,21 +120,35 @@ class NerfiesDataModule(MyDataModuleBaseClass):
 
         self.train_cameras = FourDGSdataset(self.train_cam_infos)
         self.test_cameras = FourDGSdataset(self.test_cam_infos)
+        is_val_train = [idx % len(self.train_cameras) for idx in
+                                           range(5, len(self.train_cameras), 5)]
+        is_val_test = [idx % len(self.test_cameras) for idx in
+                                           range(5, len(self.test_cameras), 5)]
+       
+        val_1 = torch.utils.data.Subset(self.train_cameras, is_val_train)
+        val_2 = torch.utils.data.Subset(self.test_cameras, is_val_test)
 
+
+        self.val_cameras = torch.utils.data.ConcatDataset([val_1, val_2])
+        #assert False, [self.val_cameras[0],
+        #len(self.val_cameras)]
         self.camera_extent = nerf_normalization["radius"]
+        self.spatial_lr_scale = self.camera_extent
         #assert False, "Pause"
         
         #assert False, "Pause"
 
     def train_dataloader(self):
-        return DataLoader(
+        return InfiniteDataLoader(DataLoader(
             self.train_cameras,
             batch_size=self.batch_size
-        )
+        ))
     
     def val_dataloader(self):
-        return self.test_dataloader()
-    
+        return DataLoader(
+            self.val_cameras,
+            batch_size=self.batch_size
+        )
     def test_dataloader(self):
         return DataLoader(
             self.test_cameras,
