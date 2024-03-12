@@ -79,26 +79,28 @@ def strip_symmetric(sym):
     return strip_lowerdiag(sym)
 
 def build_rotation(r):
-    norm = torch.sqrt(r[:,0]*r[:,0] + r[:,1]*r[:,1] + r[:,2]*r[:,2] + r[:,3]*r[:,3])
+    norm = torch.sqrt(r[...,0]*r[...,0] + r[...,1]*r[...,1] + r[...,2]*r[...,2] + r[...,3]*r[...,3])
+    
+    q = r / norm[..., None]
+    if len(list(r.shape)) == 3:
+        R = torch.zeros((q.size(0), q.size(1), 3, 3), device='cuda')
+    else:
+        R = torch.zeros((q.size(0), 3, 3), device='cuda')
 
-    q = r / norm[:, None]
+    r = q[..., 0]
+    x = q[..., 1]
+    y = q[..., 2]
+    z = q[..., 3]
 
-    R = torch.zeros((q.size(0), 3, 3), device='cuda')
-
-    r = q[:, 0]
-    x = q[:, 1]
-    y = q[:, 2]
-    z = q[:, 3]
-
-    R[:, 0, 0] = 1 - 2 * (y*y + z*z)
-    R[:, 0, 1] = 2 * (x*y - r*z)
-    R[:, 0, 2] = 2 * (x*z + r*y)
-    R[:, 1, 0] = 2 * (x*y + r*z)
-    R[:, 1, 1] = 1 - 2 * (x*x + z*z)
-    R[:, 1, 2] = 2 * (y*z - r*x)
-    R[:, 2, 0] = 2 * (x*z - r*y)
-    R[:, 2, 1] = 2 * (y*z + r*x)
-    R[:, 2, 2] = 1 - 2 * (x*x + y*y)
+    R[..., 0, 0] = 1 - 2 * (y*y + z*z)
+    R[..., 0, 1] = 2 * (x*y - r*z)
+    R[..., 0, 2] = 2 * (x*z + r*y)
+    R[..., 1, 0] = 2 * (x*y + r*z)
+    R[..., 1, 1] = 1 - 2 * (x*x + z*z)
+    R[..., 1, 2] = 2 * (y*z - r*x)
+    R[..., 2, 0] = 2 * (x*z - r*y)
+    R[..., 2, 1] = 2 * (y*z + r*x)
+    R[..., 2, 2] = 1 - 2 * (x*x + y*y)
     return R
 
 # adopted from https://github.com/oppo-us-research/SpacetimeGaussians/blob/main/thirdparty/gaussian_splatting/utils/general_utils.py

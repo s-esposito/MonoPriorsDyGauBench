@@ -127,7 +127,8 @@ class GS3d(MyModelBaseClass):
         # create motion representation
         self.deform_model = create_motion_model(
             init_mode=motion_mode,
-            **kwargs)       
+            **kwargs)    
+        self.motion_mode = motion_mode   
 
 
     
@@ -224,6 +225,7 @@ class GS3d(MyModelBaseClass):
 
     def deform(self,
         time: float) -> Dict:
+        
         result = {
                 "means3D": self.get_xyz, 
                 "shs": self.get_features, 
@@ -234,20 +236,30 @@ class GS3d(MyModelBaseClass):
                 "cov3D_precomp": None
              } 
         if self.trainer.global_step < self.warm_up:
-            return result
+            result_ = result
         else:
             d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform_model.forward(
                 result, time
             )
-            return {
-                "means3D": self.get_xyz + d_xyz, 
+            result_ = {
+                "means3D": (self.get_xyz + d_xyz) if (2 == len(list(result["means3D"].shape))) else d_xyz, 
                 "shs": self.get_features + d_feat, 
                 "colors_precomp": None, 
-                "opacity": self.get_opacity + d_opacity, 
-                "scales": self.get_scaling + d_scaling, 
-                "rotations": self.get_rotation + d_rotation, 
+                "opacity": (self.get_opacity + d_opacity) if (2 == len(list(result["opacity"].shape))) else d_opacity, 
+                "scales": (self.get_scaling + d_scaling) if (2 == len(list(result["scales"].shape))) else d_scaling, 
+                "rotations": (self.get_rotation + d_rotation) if (2 == len(list(result["rotations"].shape))) else d_rotation, 
                 "cov3D_precomp": None
-             } 
+            } 
+            
+        if len(list(result_["means3D"].shape)) == 3:
+            result_["means3D"] = self.get_xyz[:, 0, :]
+        if len(list(result_["opacity"].shape)) == 3:
+            result_["opacity"] = self.get_opacity[:, 0, :]
+        if len(list(result_["scales"].shape)) == 3:
+            result_["scales"] = self.get_scaling[:, 0, :]
+        if len(list(result_["rotations"].shape)) == 3:
+            result_["rotations"] = self.get_rotation[:, 0, :]
+        return result_
             
 
     
@@ -437,7 +449,8 @@ class GS3d(MyModelBaseClass):
         
         
         optimizer.zero_grad(set_to_none=True)
-        self.deform_optimizer.zero_grad()
+        if self.deform_optimizer is not None:
+            self.deform_optimizer.zero_grad()
         # Loss
         loss = self.compute_loss(
             render_pkg, batch, mode="train"
@@ -461,7 +474,8 @@ class GS3d(MyModelBaseClass):
                     self.reset_opacity()
         #old_xyz = (self._xyz[:, 0]).detach().clone()
         optimizer.step()
-        self.deform_optimizer.step()
+        if self.deform_optimizer is not None:
+            self.deform_optimizer.step()
         #assert False, torch.any(old_xyz != self._xyz[:, 0])
         #for param_group in self.optimizer.param_groups:
         #    print(param_group["name"], param_group["lr"])
@@ -471,10 +485,11 @@ class GS3d(MyModelBaseClass):
                 lr = self.xyz_scheduler_args(self.trainer.global_step)
                 param_group['lr'] = lr
                 
-        for param_group in self.deform_optimizer.param_groups:
-            if param_group["name"] == "deform":
-                lr = self.deform_scheduler_args(self.trainer.global_step)
-                param_group['lr'] = lr
+        if self.deform_optimizer is not None:
+            for param_group in self.deform_optimizer.param_groups:
+                if param_group["name"] == "deform":
+                    lr = self.deform_scheduler_args(self.trainer.global_step)
+                    param_group['lr'] = lr
                 
     
     def validation_step(self, batch, batch_idx):
@@ -490,7 +505,7 @@ class GS3d(MyModelBaseClass):
         image = torch.clamp(render_pkg["render"], 0.0, 1.0)
         gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
 
-        self.logger.log_image(f"val/{batch_idx}_render", [gt, image], step=self.trainer.global_step)
+        self.logger.log_image(f"val_images/{batch_idx}_render", [gt, image], step=self.trainer.global_step)
 
         #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
         #    image)
@@ -553,13 +568,23 @@ class GS3d(MyModelBaseClass):
                                               torch.max(self.get_scaling,
                                                         dim=1).values > self.percent_dense * scene_extent)
 
-        stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
-        means = torch.zeros((stds.size(0), 3), device="cuda")
-        samples = torch.normal(mean=means, std=stds)
-        rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
-        new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
+        
+        if len(list(self._rotation)) == 2:
+            stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
+            means = torch.zeros((stds.size(0), 3), device="cuda")
+            samples = torch.normal(mean=means, std=stds)
+            rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
+            new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
+            new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
+        else:
+            stds = self.get_scaling[selected_pts_mask].repeat(N*self.get_xyz.shape[1],1)
+            means = torch.zeros((stds.size(0), 3), device="cuda")
+            samples = torch.normal(mean=means, std=stds)
+            rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N,1,1,1).reshape(-1, 3, 3)
+            new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1).unsqueeze(1).reshape(-1, self.get_xyz.shape[1], 3) + self.get_xyz[selected_pts_mask].repeat(N, 1, 1)
+            new_xyz[:, 1:, :] = self.get_xyz[selected_pts_mask].repeat(N, 1, 1)[:, 1:, :]
+            new_rotation = self._rotation[selected_pts_mask].repeat(N,1,1)
         new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask].repeat(N, 1) / (0.8 * N))
-        new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
         new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
         new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
         new_opacity = self._opacity[selected_pts_mask].repeat(N, 1)
