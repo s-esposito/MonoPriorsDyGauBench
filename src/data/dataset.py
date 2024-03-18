@@ -10,9 +10,11 @@ class FourDGSdataset(Dataset):
     def __init__(
         self,
         dataset,
+        split,
         #args,
     ):
         self.dataset = dataset
+        self.split = split # could be train/test
         #self.args = args
         self.kernel_size = 1.
     def __getitem__(self, index):
@@ -58,9 +60,11 @@ class FourDGSdataset(Dataset):
             "full_proj_transform": camera.full_proj_transform,
             "camera_center": camera.camera_center,
             "original_image": camera.original_image,
-            "depth": camera.depth,
+            #"depth": camera.depth,
             'rayo': camera.rayo,
-            "rayd": camera.rayd
+            "rayd": camera.rayd,
+            "image_name": camera.image_name,
+            "split": self.split
 
         }
     def __len__(self):

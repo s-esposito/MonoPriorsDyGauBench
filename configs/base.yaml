@@ -26,7 +26,6 @@ model:
     densify_from_iter: 500
     densify_until_iter: 15000
     densify_grad_threshold: 0.0002
-    white_background: true
     use_static: false
     init_mode: "D3G"
     motion_mode: "MLP"
@@ -37,6 +36,7 @@ data:
     datadir: '/users/yliang51/data/yliang51/Gaussian4D_depre/data/hypernerf/vrig-chicken'
     eval: True
     ratio: 0.25
+    white_background: true
     batch_size: 1
 trainer:
   logger: true

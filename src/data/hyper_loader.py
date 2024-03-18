@@ -16,26 +16,14 @@ from torch.utils.data import Dataset
 import copy
 from typing import Optional
 
-
+from .base import CameraInfo
 from src.data.utils import Camera
 from src.utils.general_utils import PILtoTorch
 # from scene.dataset_readers import 
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 
 
-class CameraInfo(NamedTuple):
-    uid: int
-    R: np.array
-    T: np.array
-    FovY: np.array
-    FovX: np.array
-    image: np.array
-    image_path: str
-    image_name: str
-    width: int
-    height: int
-    time : float
-    depth: Optional[np.array] = None
+
 
 
 class Load_hyper_data(Dataset):

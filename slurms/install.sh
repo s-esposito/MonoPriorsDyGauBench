@@ -58,6 +58,7 @@ pip install lightning=2.2.1
 pip install "jsonargparse[signatures]"
 
 pip install wandb
+pip install lpips
 
 cd ~/data/yliang51/GaussianDiff
 

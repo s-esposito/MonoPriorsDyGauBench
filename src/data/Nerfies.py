@@ -1,7 +1,7 @@
-from .base import MyDataModuleBaseClass
+from .base import MyDataModuleBaseClass, InfiniteDataLoader, getNerfppNorm
 from .hyper_loader import Load_hyper_data, format_hyper_data
-from .dataset import FourDGSdataset
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
+from .dataset import FourDGSdataset
 from src.utils.sh_utils import SH2RGB, RGB2SH
 
 import numpy as np
@@ -9,53 +9,6 @@ import os
 from typing import NamedTuple, Optional
 from torch.utils.data import DataLoader
 import torch
-
-class InfiniteDataLoader:
-    def __init__(self, data_loader):
-        self.data_loader = data_loader
-        self.data_iter = iter(data_loader)
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            data = next(self.data_iter)
-        except StopIteration:
-            self.data_iter = iter(self.data_loader)  # Reset the data loader
-            data = next(self.data_iter)
-        return data
-
-def getNerfppNorm(cam_info):
-    def get_center_and_diag(cam_centers):
-        cam_centers = np.hstack(cam_centers)
-        avg_cam_center = np.mean(cam_centers, axis=1, keepdims=True)
-        center = avg_cam_center
-        dist = np.linalg.norm(cam_centers - center, axis=0, keepdims=True)
-        diagonal = np.max(dist)
-        return center.flatten(), diagonal
-
-    cam_centers = []
-
-    for cam in cam_info:
-        W2C = getWorld2View2(cam.R, cam.T)
-        C2W = np.linalg.inv(W2C)
-        cam_centers.append(C2W[:3, 3:4])
-
-    center, diagonal = get_center_and_diag(cam_centers)
-    radius = diagonal * 1.1
-
-    translate = -center
-
-    return {"translate": translate, "radius": radius}
-
-class SceneInfo(NamedTuple):
-    point_cloud: BasicPointCloud
-    train_cameras: list
-    test_cameras: list
-    nerf_normalization: dict
-    ply_path: str
-    point_cloud_dy: Optional[BasicPointCloud] = None
 
 
 # difference between __init__, prepare_data and setup:
@@ -69,6 +22,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         datadir: str,
         eval: bool,
         ratio: float,
+        white_background: bool,
         batch_size: Optional[int]=1,
         #sample_interval: int,
         #num_pts: int,
@@ -80,6 +34,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         self.datadir = datadir
         self.eval = eval
         self.ratio = ratio
+        self.white_background = white_background
         self.batch_size = batch_size
         self.save_hyperparameters()
 
@@ -118,12 +73,17 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         #                   #maxtime=max_time
         #                   )
 
-        self.train_cameras = FourDGSdataset(self.train_cam_infos)
-        self.test_cameras = FourDGSdataset(self.test_cam_infos)
-        is_val_train = [idx % len(self.train_cameras) for idx in
-                                           range(5, len(self.train_cameras), 5)]
-        is_val_test = [idx % len(self.test_cameras) for idx in
-                                           range(5, len(self.test_cameras), 5)]
+        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train")
+        self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test")
+
+        # evenly sample 5 from train_cameras
+        # evenly sample 5 from test_cameras
+
+        #assert False, "change to 5 train, 5 test; and save image_name somewhere for both DneRF and Nerfies"
+        is_val_train = [idx % len(self.train_cameras) 
+                                           for idx in range(10, 5000, 299)]
+        is_val_test = [idx % len(self.test_cameras) 
+                                           for idx in range(10, 5000, 299)]
        
         val_1 = torch.utils.data.Subset(self.train_cameras, is_val_train)
         val_2 = torch.utils.data.Subset(self.test_cameras, is_val_test)

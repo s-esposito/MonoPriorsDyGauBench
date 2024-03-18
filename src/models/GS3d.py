@@ -3,6 +3,8 @@ from typing import Optional, List, Tuple, Callable, Dict
 import torch
 import torch.nn as nn
 import math
+import lpips
+import os
 from jsonargparse import Namespace
 from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
@@ -11,6 +13,7 @@ from src.models.modules.Deform import create_motion_model
 from src.utils.loss_utils import l1_loss, kl_divergence, ssim
 #from pytorch_msssim import ssim
 from src.utils.image_utils import psnr
+import torchvision
 
 # 3 types of diff-rasterizer to consider
 from diff_gaussian_rasterization_depth import GaussianRasterizationSettings, GaussianRasterizer
@@ -49,10 +52,12 @@ class GS3d(MyModelBaseClass):
         rotation_lr: float,
         warm_up: int,
         lambda_dssim: float,
-        white_background: Optional[bool]=False,
+        #logim_itv_test: int, # how many intervals to save image to wandb
+        #white_background: Optional[bool]=False,
         use_static: Optional[bool]=False,
         init_mode: Optional[str]="D3G",
         motion_mode: Optional[str]="MLP",
+        lpips_mode: Optional[str]="alex",
         **kwargs
     ):
         super().__init__()
@@ -61,13 +66,7 @@ class GS3d(MyModelBaseClass):
         self.automatic_optimization = False        
 
 
-        if white_background:
-            bg_color = [1, 1, 1] 
-        else:
-            bg_color = [0, 0, 0]
-        self.white_background = white_background
-        self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
-
+       
         # Sh degree
         self.active_sh_degree = 0
         self.max_sh_degree = sh_degree
@@ -130,31 +129,51 @@ class GS3d(MyModelBaseClass):
             **kwargs)    
         self.motion_mode = motion_mode   
 
+        #LPIPS evaluation
+        self.lpips_mode = lpips_mode
+        self.lpips = lpips.LPIPS(net=lpips_mode, spatial=False) # if spatial is True, keep dim 
+
+        
+
+    @torch.inference_mode()
+    def compute_lpips(
+        self, image: torch.Tensor, gt: torch.Tensor 
+    ): #image: 3xHxW
+        return self.lpips(image[None], gt[None])[0]
+
 
     
     # have to put create_from_pcd here as need read datamodule info
     def setup(self, stage: str) -> None:
-        if stage == "fit":
-            # this part is the same as what changed in scene = Scene(dataset, gaussians)
-            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities = create_from_pcd_func(
-                self.trainer.datamodule.pcd,
-                spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
-                max_sh_degree=self.max_sh_degree,
-                init_mode=self.init_mode
-            )
-            self.spatial_lr_scale = spatial_lr_scale
-            self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
-            self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
-            self._features_rest = nn.Parameter(features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True))
-            self._scaling = nn.Parameter(scales.requires_grad_(True))
-            self._rotation = nn.Parameter(rots.requires_grad_(True))
-            self._opacity = nn.Parameter(opacities.requires_grad_(True))
-            
-            self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
-            self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
-            self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
+        white_background = self.trainer.datamodule.white_background
+        if white_background:
+            bg_color = [1, 1, 1] 
+        else:
+            bg_color = [0, 0, 0]
+        self.white_background = white_background
+        self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
 
-            self.cameras_extent = self.trainer.datamodule.camera_extent
+        
+        # this part is the same as what changed in scene = Scene(dataset, gaussians)
+        spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities = create_from_pcd_func(
+            self.trainer.datamodule.pcd,
+            spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
+            max_sh_degree=self.max_sh_degree,
+            init_mode=self.init_mode
+        )
+        self.spatial_lr_scale = spatial_lr_scale
+        self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
+        self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
+        self._features_rest = nn.Parameter(features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True))
+        self._scaling = nn.Parameter(scales.requires_grad_(True))
+        self._rotation = nn.Parameter(rots.requires_grad_(True))
+        self._opacity = nn.Parameter(opacities.requires_grad_(True))
+        
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
+        self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
+        self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
+
+        self.cameras_extent = self.trainer.datamodule.camera_extent
 
             
 
@@ -234,8 +253,13 @@ class GS3d(MyModelBaseClass):
                 "scales": self.get_scaling, 
                 "rotations": self.get_rotation, 
                 "cov3D_precomp": None
-             } 
-        if self.trainer.global_step < self.warm_up:
+             }
+        #if the stage is not fit,
+        # then the global_step would always be 0
+        # thus the deformation would be skipped
+        # to circumvent, if testing mode, always activate deformation 
+        # warning: not considering the case when loaded checkpoint is before warm_up ends
+        if self.trainer.global_step < self.warm_up and not self.trainer.testing:
             result_ = result
         else:
             d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform_model.forward(
@@ -426,13 +450,16 @@ class GS3d(MyModelBaseClass):
     
     
     def training_step(self, batch, batch_idx) -> None:
+        
+        
         #have to call this optimizer instead of self.optimizer
         # otherwise self.trainer.global_step would not increment
         optimizer = self.optimizers()
 
-        
+        iteration = self.trainer.global_step  + 1 # has to start from 1 to prevent actions on step=0
+        print(iteration)      
         # Every 1000 its we increase the levels of SH up to a maximum degree
-        if (self.trainer.global_step + 1 ) % 1000 == 0:
+        if iteration % 1000 == 0:
             if self.active_sh_degree < self.max_sh_degree:
                 self.active_sh_degree += 1
 
@@ -460,7 +487,7 @@ class GS3d(MyModelBaseClass):
 
         with torch.no_grad():
             # keep track of stats for adaptive policy
-            iteration = self.trainer.global_step + 1
+            
             if iteration < self.densify_until_iter:
                 self.add_densification_stats(
                     render_pkg["viewspace_points"], 
@@ -491,8 +518,98 @@ class GS3d(MyModelBaseClass):
                     lr = self.deform_scheduler_args(self.trainer.global_step)
                     param_group['lr'] = lr
                 
-    
+    def on_validation_epoch_start(self):
+        self.val_psnr_total_train = 0.0
+        self.val_ssim_total_train = 0.0
+        #self.val_lpips_total_train = 0.0
+        self.num_batches_train = 0
+        self.val_psnr_total_test = 0.0
+        self.val_ssim_total_test = 0.0
+        #self.val_lpips_total_test = 0.0
+        self.num_batches_test = 0
+        torch.cuda.empty_cache()
+
     def validation_step(self, batch, batch_idx):
+        render_rgb, render_flow, time_offset = True, True, 1e-3#self.get_render_mode(eval=True)
+        #print(batch_idx, type(batch))
+        # get normal render
+        try:
+            render_pkg = self.forward(
+                batch=batch,
+                render_rgb=render_rgb,
+                render_flow=render_flow,
+                time_offset=time_offset
+            )        
+            image = torch.clamp(render_pkg["render"], 0.0, 1.0)
+            gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
+
+            split = batch["split"][0]
+            image_name = batch["image_name"][0]
+            assert split in ["train", "test"]
+            if (split == "train") and (self.num_batches_train < 5):
+                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.trainer.global_step)
+            elif (split == "test") and (self.num_batches_test < 5):
+                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.trainer.global_step)
+            
+            #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
+            #    image)
+            
+            self.compute_loss(render_pkg, batch, mode=f"val_{split}")
+            if split == "train":
+                self.val_psnr_total_train += psnr(image[None], gt[None]).mean()
+                self.val_ssim_total_train += ssim(image, gt)
+                #self.val_lpips_total_train += self.compute_lpips(image, gt)
+                self.num_batches_train += 1
+                #assert False, [self.val_psnr_total_train.shape, self.val_ssim_total_train.shape, self.val_lpips_total_train.shape]
+            else:
+                self.val_psnr_total_test += psnr(image[None], gt[None]).mean()
+                self.val_ssim_total_test += ssim(image, gt)
+                #self.val_lpips_total_test += self.compute_lpips(image, gt)
+                self.num_batches_test += 1
+        except:
+            print(f"An illegal memory access is encountered at batch_idx {batch_idx}!")
+            pass
+        
+        #self.log("val/psnr", float(psnr_test))
+    
+    def on_validation_epoch_end(self):
+        self.log("val/total_points", self.get_xyz.shape[0])
+        avg_psnr_train = self.val_psnr_total_train/ (self.num_batches_train + 1e-16)
+        avg_ssim_train = self.val_ssim_total_train / (self.num_batches_train + 1e-16)
+        #avg_lpips_train = self.val_lpips_total_train / (self.num_batches_train + 1e-16)
+        self.log('val/avg_psnr_train', avg_psnr_train)
+        self.log('val/avg_ssim_train', avg_ssim_train)
+        #self.log('val/avg_lpips_train', avg_lpips_train)
+        avg_psnr_test = self.val_psnr_total_test/ (self.num_batches_test + 1e-16)
+        avg_ssim_test = self.val_ssim_total_test / (self.num_batches_test + 1e-16)
+        #avg_lpips_test = self.val_lpips_total_test / (self.num_batches_test + 1e-16)
+        self.log('val/avg_psnr_test', avg_psnr_test)
+        self.log('val/avg_ssim_test', avg_ssim_test)
+        #self.log('val/avg_lpips_test', avg_lpips_test)
+        self.val_psnr_total_train = 0.0
+        self.val_ssim_total_train = 0.0
+        #self.val_lpips_total_train = 0.0
+        self.num_batches_train = 0
+        self.val_psnr_total_test = 0.0
+        self.val_ssim_total_test = 0.0
+        #self.val_lpips_total_test = 0.0
+        self.num_batches_test = 0
+        torch.cuda.empty_cache()
+
+    def on_test_epoch_start(self):
+        self.test_psnr_total = 0.0
+        self.test_ssim_total = 0.0
+        #self.test_lpips_total = 0.0
+        self.test_num_batches = 0
+        print(f"Saving Results based on checkpoint: {self.trainer.ckpt_path}")
+        #assert False
+        # Access the log directory of the experiment and ready to save all test results
+        self.log_dir_test = os.path.join(self.logger.save_dir, "test")
+        self.log_dir_gt = os.path.join(self.logger.save_dir, "gt")
+        os.makedirs(self.log_dir_test, exist_ok=True)
+        os.makedirs(self.log_dir_gt, exist_ok=True)
+
+    def test_step(self, batch, batch_idx):
         render_rgb, render_flow, time_offset = True, True, 1e-3#self.get_render_mode(eval=True)
         #print(batch_idx, type(batch))
         # get normal render
@@ -504,19 +621,100 @@ class GS3d(MyModelBaseClass):
         )        
         image = torch.clamp(render_pkg["render"], 0.0, 1.0)
         gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
+        
+        #run_id = self.logger.experiment.id
+        #print("Run ID:", run_id)
 
-        self.logger.log_image(f"val_images/{batch_idx}_render", [gt, image], step=self.trainer.global_step)
+        
+        
+        #print("Log directory:", log_dir)
+        #self.logger.log_image(f"test_images/{batch_idx}_render", [gt, image], step=self.trainer.global_step)
 
         #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
         #    image)
+        #assert False, "Save image and gt and depth and flow to disk instead of to Wandb"
+        #image_name = batch["image_name"][0]
+        torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
+        torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
         
-        self.compute_loss(render_pkg, batch, mode="val")
-        psnr_test = psnr(image[None], gt[None]).mean()
+        self.compute_loss(render_pkg, batch, mode="test")
+        self.test_psnr_total += psnr(image[None], gt[None]).mean()
+        self.test_ssim_total += ssim(image, gt)
+        #self.test_lpips_total += self.compute_lpips(image, gt)
+        self.test_num_batches += 1
+        #return psnr_test, ssim_test, lpips_test
+    
+    def on_test_epoch_end(self,):
+        avg_psnr = self.test_psnr_total / (self.test_num_batches + 1e-16)
+        avg_ssim = self.test_ssim_total / (self.test_num_batches + 1e-16)
+        #avg_lpips = self.test_lpips_total / (self.test_num_batches + 1e-16)
+        self.log('test/avg_psnr', avg_psnr)
+        self.log('test/avg_ssim', avg_ssim)
+        #self.log('test/avg_lpips', avg_lpips)
+        self.test_psnr_total = 0.0
+        self.test_ssim_total = 0.0
+        #self.test_lpips_total = 0.0
+        self.test_num_batches = 0
 
-        self.log("val/psnr", float(psnr_test))
-        
-    def on_validation_epoch_end(self):
-        self.log("val/total_points", self.get_xyz.shape[0])
+    def on_save_checkpoint(self, checkpoint):
+        '''
+        print([checkpoint['epoch'], checkpoint['global_step'], checkpoint['pytorch-lightning_version']])
+        print("state_dict:")
+        for key in checkpoint['state_dict']:
+            print(key)
+        #'loops', 'callbacks', 
+        print("opt_stat:")
+        for key in checkpoint['optimizer_states']:
+            print(key) 
+        print("lr_schs:")
+        for key in checkpoint['lr_schedulers']:
+            print(key) 
+        print(checkpoint['hparams_name'])
+        print(checkpoint['hyper_parameters']) 
+        print(checkpoint['datamodule_hparams_name']) 
+        print(checkpoint['datamodule_hyper_parameters'])
+        assert False, [key for key in checkpoint]
+        # print state_dict to see what other parameters should be saved
+        # model state_dict may be missing variables we innitialized in setup
+        # optimizer state_dict may be missing what we manually controlled
+        assert False, [key for key in self.state_dict()]
+        '''
+        # store some extra parameters
+        checkpoint["extra_state_dict"] = {
+            "max_radii2D": self.max_radii2D,
+            "xyz_gradient_accum": self.xyz_gradient_accum,
+            "denom": self.denom,
+            "active_sh_degree": self.active_sh_degree,
+            "spatial_lr_scale": self.spatial_lr_scale,
+            "cameras_extent": self.cameras_extent
+        }
+        super().on_save_checkpoint(checkpoint)
+
+    # order:
+    # 1. __init__
+    # 2. setup
+    # 3. on_load_checkpoint
+    # 4. configure_optimizers
+    def on_load_checkpoint(self, checkpoint):
+        #num_gs = checkpoint["extra_state_dict"]["max_radii2D"].shape[0]
+        # have to reload all parameters because shape won't match
+        self._xyz = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_xyz"].shape).requires_grad_(True))
+        self._features_dc = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_features_dc"].shape).requires_grad_(True))
+        self._features_rest = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_features_rest"].shape).requires_grad_(True))
+        self._scaling = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_scaling"].shape).requires_grad_(True))
+        self._rotation = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_rotation"].shape).requires_grad_(True))
+        self._opacity = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_opacity"].shape).requires_grad_(True))
+        # load extra parameters
+        self.max_radii2D = checkpoint["extra_state_dict"]["max_radii2D"].to("cuda")
+        self.xyz_gradient_accum = checkpoint["extra_state_dict"]["xyz_gradient_accum"].to("cuda")
+        self.denom = checkpoint["extra_state_dict"]["denom"].to("cuda")
+        self.active_sh_degree = checkpoint["extra_state_dict"]["active_sh_degree"]
+        try:
+            self.spatial_lr_scale = checkpoint["extra_state_dict"]["spatial_lr_scale"]
+            self.cameras_extent = checkpoint["extra_state_dict"]["cameras_extent"]
+        except:
+            pass
+        super().on_load_checkpoint(checkpoint)
 
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter, :2], dim=-1,
@@ -569,7 +767,7 @@ class GS3d(MyModelBaseClass):
                                                         dim=1).values > self.percent_dense * scene_extent)
 
         
-        if len(list(self._rotation)) == 2:
+        if len(list(self._rotation.shape)) == 2:
             stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
             means = torch.zeros((stds.size(0), 3), device="cuda")
             samples = torch.normal(mean=means, std=stds)

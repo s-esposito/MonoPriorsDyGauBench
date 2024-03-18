@@ -1,4 +1,5 @@
-from lightning.pytorch.cli import LightningCLI, LightningArgumentParser
+from lightning.pytorch.cli import LightningCLI, LightningArgumentParser, SaveConfigCallback
+from lightning.pytorch.callbacks import ModelCheckpoint
 from callbacks import WandbWatcher
 from typing import Optional, List
 import os
@@ -44,6 +45,8 @@ class MyLightningCLI(LightningCLI):
         os.makedirs(output_path, exist_ok=True)
         print("output path: {}".format(output_path))
 
+
+        '''
         # find checkpoint if ckpt_path is set to "last" instead of exact path
         if config.ckpt_path == "last":
             config.ckpt_path = os.path.join(
@@ -67,7 +70,12 @@ class MyLightningCLI(LightningCLI):
                 )    
         if config.ckpt_path: 
             assert (config.ckpt_path.endswith(".ckpt") and os.path.exists(config.ckpt_path)), f"ckpt_path {config.ckpt_path} is not legit" 
-        
+        '''
+       
+        if config.ckpt_path == "last":
+            config.ckpt_path = os.path.join(
+                output_path, "checkpoints", "last.ckpt"
+            )
 
         # build logger
         logger_config = Namespace(
@@ -103,6 +111,17 @@ class MyLightningCLI(LightningCLI):
 
         config.trainer.logger = logger_config    
 
+        #if config.trainer.inference_mode:
+        #    # Set trainer.testing to True
+        #    config.trainer.testing = True
+        
+        # Add Checkpoint Logic
+        #config.trainer.callbacks += [ModelCheckpoint(
+        #        dirpath=os.path.join(output_path, "ckpts"), **config.trainer.checkpoint
+        #    ),]
+        #assert False, config.trainer.callbacks[-1]
+        #config.trainer.checkpoint.dirpath = os.path.join(output_path, "ckpts")
+
         # if use FSDP training strategy 
         # opt to save distributed checkpoint
         # world size can change before and after save/load!
@@ -111,10 +130,43 @@ class MyLightningCLI(LightningCLI):
         #   strategy = FSDPStrategy(state_dict_type="sharded")
         #    config.trainer.strategy = lazy_instance(strategy)
         #config.trainer.callbacks += [GlobalStepWatcher()]
-    #def instantiate_classes(self) -> None:
-    #    super().instantiate_classes()
-    #    self.trainer.logger.watch(self.model, log="all")
+        super().before_instantiate_classes()
 
+        if config.trainer.inference_mode or self.config.subcommand != "fit":
+            self.inference_mode = True
+        else:
+            self.inference_mode = False
+        self.output_path = output_path
+    def instantiate_classes(self) -> None:
+        
+        super().instantiate_classes()
+        
+        # default dirpath is null; override to save checkpoints to root of log_dir
+        os.makedirs(os.path.join(self.output_path, "checkpoints"), exist_ok=True)
+        for cb in self.trainer.callbacks:
+            if isinstance(cb, ModelCheckpoint):
+                new_cb = ModelCheckpoint(
+                    monitor=cb.monitor,
+                    dirpath=os.path.join(self.output_path, "checkpoints"),
+                    filename=cb.filename,
+                    save_top_k=cb.save_top_k,
+                    mode=cb.mode,
+                    save_last=cb.save_last,
+                    every_n_train_steps=None
+                )
+        self.trainer.callbacks = [cb for cb in self.trainer.callbacks if not isinstance(cb, ModelCheckpoint)]
+        self.trainer.callbacks += [new_cb]
+        
+        # Check if we are running test; if yes, do not let overwrite config happens
+        if self.inference_mode:
+            # Remove SaveConfigCallback if running test
+            self.trainer.testing = True
+            self.trainer.callbacks = [cb for cb in self.trainer.callbacks if not isinstance(cb, SaveConfigCallback)]
 
+        #for cb in self.trainer.callbacks:
+        #    print(cb)
+
+        #assert False
+    
 
 
