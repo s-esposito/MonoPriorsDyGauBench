@@ -36,11 +36,18 @@ class GS3d(MyModelBaseClass):
     def __init__(self,
         sh_degree: int,
         percent_dense: float,
+        grid_lr_init: float,
+        grid_lr_final: float,
+        grid_lr_delay_mult: float,
+        grid_lr_max_steps: float,
+        deform_lr_init: float,
+        deform_lr_final: float,
+        deform_lr_delay_mult: float,
+        deform_lr_max_steps: float,
         position_lr_init: float,
         position_lr_final: float,
         position_lr_delay_mult: float,
         position_lr_max_steps: float,
-        deform_lr_max_steps: float,
         densify_from_iter: int,
         densify_until_iter: int,
         densification_interval: int,
@@ -58,6 +65,7 @@ class GS3d(MyModelBaseClass):
         init_mode: Optional[str]="D3G",
         motion_mode: Optional[str]="MLP",
         lpips_mode: Optional[str]="alex",
+        post_act: Optional[bool]=True,
         **kwargs
     ):
         super().__init__()
@@ -65,7 +73,7 @@ class GS3d(MyModelBaseClass):
         # needs manual optimization
         self.automatic_optimization = False        
 
-
+        self.post_act = post_act
        
         # Sh degree
         self.active_sh_degree = 0
@@ -108,11 +116,22 @@ class GS3d(MyModelBaseClass):
         self.opacity_lr = opacity_lr
         self.scaling_lr = scaling_lr
         self.rotation_lr = rotation_lr
+        
         self.position_lr_init = position_lr_init
         self.position_lr_final = position_lr_final
         self.position_lr_delay_mult = position_lr_delay_mult
-        self.deform_lr_max_steps = deform_lr_max_steps
         self.position_lr_max_steps = position_lr_max_steps
+
+        self.grid_lr_init = grid_lr_init
+        self.grid_lr_final = grid_lr_final
+        self.grid_lr_delay_mult = grid_lr_delay_mult
+        self.grid_lr_max_steps = grid_lr_max_steps
+
+        self.deform_lr_init = deform_lr_init
+        self.deform_lr_final = deform_lr_final
+        self.deform_lr_delay_mult = deform_lr_delay_mult
+        self.deform_lr_max_steps = deform_lr_max_steps
+
 
         self.densify_from_iter = densify_from_iter
         self.densify_until_iter = densify_until_iter
@@ -193,13 +212,17 @@ class GS3d(MyModelBaseClass):
                                                     lr_final=self.position_lr_final*self.spatial_lr_scale,
                                                     lr_delay_mult=self.position_lr_delay_mult,
                                                     max_steps=self.position_lr_max_steps)
-        
-        self.deform_optimizer, self.deform_scheduler_args = self.deform_model.train_setting(
-            position_lr_init=self.position_lr_init,
-            position_lr_final=self.position_lr_final,
+        # the second one is a Dict!!!
+        self.deform_optimizer, self.deform_scheduler_args_dict = self.deform_model.train_setting(
             spatial_lr_scale=self.spatial_lr_scale,
-            position_lr_delay_mult=self.position_lr_delay_mult,
-            deform_lr_max_steps=self.deform_lr_max_steps
+            deform_lr_init=self.deform_lr_init,
+            deform_lr_final=self.deform_lr_final,
+            deform_lr_delay_mult=self.deform_lr_delay_mult,
+            deform_lr_max_steps=self.deform_lr_max_steps,
+            grid_lr_init=self.grid_lr_init,
+            grid_lr_final=self.grid_lr_final,
+            grid_lr_delay_mult=self.grid_lr_delay_mult,
+            grid_lr_max_steps=self.grid_lr_max_steps,
         )
 
         return [self.optimizer]
@@ -244,8 +267,11 @@ class GS3d(MyModelBaseClass):
 
     def deform(self,
         time: float) -> Dict:
-        
-        result = {
+        # warning: for 4DGaussians, they originally used
+        # _opacity, _scaling, _rotation instead of our get_xxx version
+        # worth later visit!
+        if self.post_act:
+            result = {
                 "means3D": self.get_xyz, 
                 "shs": self.get_features, 
                 "colors_precomp": None, 
@@ -254,27 +280,73 @@ class GS3d(MyModelBaseClass):
                 "rotations": self.get_rotation, 
                 "cov3D_precomp": None
              }
+        else:
+            result = {
+                "means3D": self.get_xyz, 
+                "shs": self.get_features, 
+                "colors_precomp": None, 
+                "opacity": self._opacity, 
+                "scales": self._scaling, 
+                "rotations": self._rotation, 
+                "cov3D_precomp": None
+            }
         #if the stage is not fit,
         # then the global_step would always be 0
         # thus the deformation would be skipped
         # to circumvent, if testing mode, always activate deformation 
         # warning: not considering the case when loaded checkpoint is before warm_up ends
         if self.trainer.global_step < self.warm_up and not self.trainer.testing:
-            result_ = result
+            if self.post_act:
+                result_ = result
+            else:
+                result_ = {
+                    "means3D": self.get_xyz, 
+                    "shs": self.get_features, 
+                    "colors_precomp": None, 
+                    "opacity": self.get_opacity, 
+                    "scales": self.get_scaling, 
+                    "rotations": self.get_rotation, 
+                    "cov3D_precomp": None
+                }
         else:
             d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform_model.forward(
                 result, time
             )
-            result_ = {
-                "means3D": (self.get_xyz + d_xyz) if (2 == len(list(result["means3D"].shape))) else d_xyz, 
-                "shs": self.get_features + d_feat, 
-                "colors_precomp": None, 
-                "opacity": (self.get_opacity + d_opacity) if (2 == len(list(result["opacity"].shape))) else d_opacity, 
-                "scales": (self.get_scaling + d_scaling) if (2 == len(list(result["scales"].shape))) else d_scaling, 
-                "rotations": (self.get_rotation + d_rotation) if (2 == len(list(result["rotations"].shape))) else d_rotation, 
-                "cov3D_precomp": None
-            } 
-            
+            if self.motion_mode in ["MLP"]:
+                result_ = {
+                    "means3D": self.get_xyz + d_xyz,#) if (2 == len(list(result["means3D"].shape))) else d_xyz, 
+                    "shs": self.get_features + d_feat, 
+                    "colors_precomp": None, 
+                    "opacity": self.get_opacity + d_opacity,#) if (2 == len(list(result["opacity"].shape))) else d_opacity, 
+                    "scales": self.get_scaling + d_scaling,#) if (2 == len(list(result["scales"].shape))) else d_scaling, 
+                    "rotations": self.get_rotation + d_rotation,#) if (2 == len(list(result["rotations"].shape))) else d_rotation, 
+                    "cov3D_precomp": None
+                }
+            elif self.motion_mode in ["EffGS"]:
+                result_ = {
+                    "means3D": d_xyz,
+                    "shs": self.get_features,
+                    "colors_precomp": None,
+                    "opacity": self.get_opacity,
+                    "scales": self.get_scaling,
+                    "rotations": d_rotation,
+                    "cov3D_precomp": None
+                }
+            elif self.motion_mode in ["HexPlane"]:
+                result_ = {
+                    "means3D": d_xyz,
+                    "shs": d_feat,
+                    "colors_precomp": None,
+                    "opacity": self.opacity_activation(d_opacity),
+                    "scales": self.scaling_activation(d_scaling),
+                    "rotations": self.rotation_activation(d_rotation),
+                    "cov3D_precomp": None
+                }
+            else:
+                assert False, f"Unknown motion mode {self.motion_mode}" 
+        # this section is for EffGS-type motion models!
+        # in their case, if warm_up stage, would return all coefficients instead of the first value
+        # so need a query(0)   
         if len(list(result_["means3D"].shape)) == 3:
             result_["means3D"] = self.get_xyz[:, 0, :]
         if len(list(result_["opacity"].shape)) == 3:
@@ -497,7 +569,8 @@ class GS3d(MyModelBaseClass):
                     self.densify_and_prune(self.densify_grad_threshold, 0.005, self.cameras_extent, size_threshold)
 
                 if iteration % self.opacity_reset_interval == 0 or (
-                        self.white_background and iteration == self.densify_from_iter):
+                        self.white_background and iteration == self.densify_from_iter
+                        and (self.motion_mode not in ["4DGS"])):
                     self.reset_opacity()
         #old_xyz = (self._xyz[:, 0]).detach().clone()
         optimizer.step()
@@ -514,8 +587,8 @@ class GS3d(MyModelBaseClass):
                 
         if self.deform_optimizer is not None:
             for param_group in self.deform_optimizer.param_groups:
-                if param_group["name"] == "deform":
-                    lr = self.deform_scheduler_args(self.trainer.global_step)
+                if param_group["name"] in self.deform_scheduler_args_dict:
+                    lr = self.deform_scheduler_args_dict[param_group["name"]](self.trainer.global_step)
                     param_group['lr'] = lr
                 
     def on_validation_epoch_start(self):

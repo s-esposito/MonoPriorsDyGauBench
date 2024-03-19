@@ -29,10 +29,6 @@ class EffModel(nn.Module):
         
 
     def train_setting(self, 
-        position_lr_init: float,
-        position_lr_final: float,
-        spatial_lr_scale: float,
-        position_lr_delay_mult: float,
-        deform_lr_max_steps: float
+        **kwargs
         ):
-        return None, None
+        return None, {}

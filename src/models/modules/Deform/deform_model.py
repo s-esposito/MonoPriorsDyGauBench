@@ -152,24 +152,27 @@ class DeformModel:
         return inp
 
     def train_setting(self, 
-        position_lr_init: float,
-        position_lr_final: float,
         spatial_lr_scale: float,
-        position_lr_delay_mult: float,
-        deform_lr_max_steps: float
+        deform_lr_init: float,
+        deform_lr_final: float,
+        deform_lr_delay_mult: float,
+        deform_lr_max_steps: float,
+        **kwargs,
         ):
         l = [
             {'params': list(self.deform.parameters()),
-             'lr': position_lr_init * spatial_lr_scale,
+             'lr': deform_lr_init * spatial_lr_scale,
              "name": "deform"}
         ]
         deform_optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
 
-        deform_scheduler_args = get_expon_lr_func(lr_init=position_lr_init * spatial_lr_scale,
-                                                       lr_final=position_lr_final,
-                                                       lr_delay_mult=position_lr_delay_mult,
+        deform_scheduler_args = get_expon_lr_func(lr_init=deform_lr_init * spatial_lr_scale,
+                                                       lr_final=deform_lr_final,
+                                                       lr_delay_mult=deform_lr_delay_mult,
                                                        max_steps=deform_lr_max_steps)
-        return deform_optimizer, deform_scheduler_args
+        return deform_optimizer, {
+            "deform": deform_scheduler_args
+        }
     #def save_weights(self, model_path, iteration):
     #    out_weights_path = os.path.join(model_path, "deform/iteration_{}".format(iteration))
     #    os.makedirs(out_weights_path, exist_ok=True)
