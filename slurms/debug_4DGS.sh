@@ -44,7 +44,7 @@ which pip
 #pip install pytorch-msssim
 
 
-rm output/base_4DGS/config.yaml
+#rm output/base_4DGS/config.yaml
 #pip install jsonargparse
 python main.py fit --config configs/base_4DGS.yaml
 python main.py test --config configs/base_4DGS.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config

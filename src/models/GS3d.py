@@ -224,6 +224,8 @@ class GS3d(MyModelBaseClass):
             grid_lr_delay_mult=self.grid_lr_delay_mult,
             grid_lr_max_steps=self.grid_lr_max_steps,
         )
+        if self.deform_optimizer is not None:
+            return [self.optimizer, self.deform_optimizer]
 
         return [self.optimizer]
 
@@ -526,7 +528,11 @@ class GS3d(MyModelBaseClass):
         
         #have to call this optimizer instead of self.optimizer
         # otherwise self.trainer.global_step would not increment
-        optimizer = self.optimizers()
+        try:
+            optimizer, deform_optimizer = self.optimizers()
+        except:
+            optimizer = self.optimizers()
+            deform_optimizer = None
 
         iteration = self.trainer.global_step  + 1 # has to start from 1 to prevent actions on step=0
         print(iteration)      
@@ -548,8 +554,8 @@ class GS3d(MyModelBaseClass):
         
         
         optimizer.zero_grad(set_to_none=True)
-        if self.deform_optimizer is not None:
-            self.deform_optimizer.zero_grad()
+        if deform_optimizer is not None:
+            deform_optimizer.zero_grad()
         # Loss
         loss = self.compute_loss(
             render_pkg, batch, mode="train"
@@ -574,8 +580,8 @@ class GS3d(MyModelBaseClass):
                     self.reset_opacity()
         #old_xyz = (self._xyz[:, 0]).detach().clone()
         optimizer.step()
-        if self.deform_optimizer is not None:
-            self.deform_optimizer.step()
+        if deform_optimizer is not None:
+            deform_optimizer.step()
         #assert False, torch.any(old_xyz != self._xyz[:, 0])
         #for param_group in self.optimizer.param_groups:
         #    print(param_group["name"], param_group["lr"])
@@ -585,8 +591,8 @@ class GS3d(MyModelBaseClass):
                 lr = self.xyz_scheduler_args(self.trainer.global_step)
                 param_group['lr'] = lr
                 
-        if self.deform_optimizer is not None:
-            for param_group in self.deform_optimizer.param_groups:
+        if deform_optimizer is not None:
+            for param_group in deform_optimizer.param_groups:
                 if param_group["name"] in self.deform_scheduler_args_dict:
                     lr = self.deform_scheduler_args_dict[param_group["name"]](self.trainer.global_step)
                     param_group['lr'] = lr
@@ -769,6 +775,7 @@ class GS3d(MyModelBaseClass):
     # 3. on_load_checkpoint
     # 4. configure_optimizers
     def on_load_checkpoint(self, checkpoint):
+        
         #num_gs = checkpoint["extra_state_dict"]["max_radii2D"].shape[0]
         # have to reload all parameters because shape won't match
         self._xyz = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_xyz"].shape).requires_grad_(True))

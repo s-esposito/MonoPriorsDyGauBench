@@ -73,8 +73,16 @@ class MyLightningCLI(LightningCLI):
         '''
        
         if config.ckpt_path == "last":
+            checkpoint_name = sorted(os.listdir(os.path.join(
+                output_path, "checkpoints"
+            ))) 
+            checkpoint_name = [name for name in checkpoint_name if name.startswith("last-v")]
+            if len(checkpoint_name) > 0:
+                name = checkpoint_name[-1]
+            else:
+                name = "last.ckpt"
             config.ckpt_path = os.path.join(
-                output_path, "checkpoints", "last.ckpt"
+                output_path, "checkpoints", name
             )
 
         # build logger

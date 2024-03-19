@@ -26,7 +26,7 @@ model:
     post_act: true
     feature_lr: 0.0025
     opacity_lr: 0.05
-    scaling_lr: 0.001 # for Effgs, to scaling_lr=0.005?
+    scaling_lr: 0.005 # for Effgs, to scaling_lr=0.005?
     rotation_lr: 0.001
     lambda_dssim: 0.2
     densification_interval: 100

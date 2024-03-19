@@ -468,12 +468,12 @@ class deform_network(nn.Module):
         # print(self)
 
         # move everything to cuda
-        self.timenet = self.timenet.cuda()
-        self.deformation_net = self.deformation_net.cuda()
-        self.time_poc = self.time_poc.cuda()
-        self.pos_poc = self.pos_poc.cuda()
-        self.rotation_scaling_poc =  self.rotation_scaling_poc.cuda()
-        self.opacity_poc = self.opacity_poc.cuda()
+        #self.timenet = self.timenet.cuda()
+        #self.deformation_net = self.deformation_net.cuda()
+        #self.time_poc = self.time_poc.cuda()
+        #self.pos_poc = self.pos_poc.cuda()
+        #self.rotation_scaling_poc =  self.rotation_scaling_poc.cuda()
+        #self.opacity_poc = self.opacity_poc.cuda()
 
     def forward(self, point, scales=None, rotations=None, opacity=None, shs=None, times_sel=None):
         return self.forward_dynamic(point, scales, rotations, opacity, shs, times_sel)
@@ -509,9 +509,10 @@ class deform_network(nn.Module):
         return self.deformation_net.get_grid_parameters()
 
 
-class HexPlaneModel:
+class HexPlaneModel(nn.Module):
     def __init__(self,
         **kwargs):
+        super().__init__()
         self._deformation = deform_network(**kwargs)
 
     def forward(self, inp: Dict, time: float):

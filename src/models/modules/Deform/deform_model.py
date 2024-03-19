@@ -131,9 +131,10 @@ class DeformNetwork(nn.Module):
 
         return d_xyz, rotation, scaling
 
-class DeformModel:
+class DeformModel(nn.Module):
     def __init__(self, is_blender=False, is_6dof=False):
-        self.deform = DeformNetwork(is_blender=is_blender, is_6dof=is_6dof).cuda()
+        super().__init__()
+        self.deform = DeformNetwork(is_blender=is_blender, is_6dof=is_6dof)#.cuda()
 
     def forward(self, inp: Dict, time: float):
         N = inp["means3D"].shape[0]
