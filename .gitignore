@@ -3,3 +3,4 @@ output/*
 submodules/*/build/*
 slurms/*.out
 slurms/wandb/*
+slurms/*
