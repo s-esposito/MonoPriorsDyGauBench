@@ -2,3 +2,4 @@ __pycache__/*
 output/*
 submodules/*/build/*
 slurms/*.out
+slurms/wandb/*
