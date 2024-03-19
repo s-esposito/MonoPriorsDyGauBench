@@ -74,7 +74,7 @@ class GS3d(MyModelBaseClass):
         self.automatic_optimization = False        
 
         self.post_act = post_act
-       
+        self.iteration = 0
         # Sh degree
         self.active_sh_degree = 0
         self.max_sh_degree = sh_degree
@@ -292,12 +292,8 @@ class GS3d(MyModelBaseClass):
                 "rotations": self._rotation, 
                 "cov3D_precomp": None
             }
-        #if the stage is not fit,
-        # then the global_step would always be 0
-        # thus the deformation would be skipped
-        # to circumvent, if testing mode, always activate deformation 
-        # warning: not considering the case when loaded checkpoint is before warm_up ends
-        if self.trainer.global_step < self.warm_up and not self.trainer.testing:
+        
+        if self.iteration  < self.warm_up:
             if self.post_act:
                 result_ = result
             else:
@@ -533,8 +529,8 @@ class GS3d(MyModelBaseClass):
         except:
             optimizer = self.optimizers()
             deform_optimizer = None
-
-        iteration = self.trainer.global_step  + 1 # has to start from 1 to prevent actions on step=0
+        
+        iteration = self.iteration  + 1 # has to start from 1 to prevent actions on step=0
         print(iteration)      
         # Every 1000 its we increase the levels of SH up to a maximum degree
         if iteration % 1000 == 0:
@@ -588,14 +584,16 @@ class GS3d(MyModelBaseClass):
         #assert False
         for param_group in optimizer.param_groups:
             if param_group["name"] == "xyz":
-                lr = self.xyz_scheduler_args(self.trainer.global_step)
+                lr = self.xyz_scheduler_args(self.iteration)
                 param_group['lr'] = lr
                 
         if deform_optimizer is not None:
             for param_group in deform_optimizer.param_groups:
                 if param_group["name"] in self.deform_scheduler_args_dict:
-                    lr = self.deform_scheduler_args_dict[param_group["name"]](self.trainer.global_step)
+                    lr = self.deform_scheduler_args_dict[param_group["name"]](self.iteration)
                     param_group['lr'] = lr
+    
+        self.iteration += 1
                 
     def on_validation_epoch_start(self):
         self.val_psnr_total_train = 0.0
@@ -626,9 +624,9 @@ class GS3d(MyModelBaseClass):
             image_name = batch["image_name"][0]
             assert split in ["train", "test"]
             if (split == "train") and (self.num_batches_train < 5):
-                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.trainer.global_step)
+                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
             elif (split == "test") and (self.num_batches_test < 5):
-                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.trainer.global_step)
+                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
             
             #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
             #    image)
@@ -765,7 +763,8 @@ class GS3d(MyModelBaseClass):
             "denom": self.denom,
             "active_sh_degree": self.active_sh_degree,
             "spatial_lr_scale": self.spatial_lr_scale,
-            "cameras_extent": self.cameras_extent
+            "cameras_extent": self.cameras_extent,
+            "iteration": self.iteration
         }
         super().on_save_checkpoint(checkpoint)
 
@@ -789,11 +788,9 @@ class GS3d(MyModelBaseClass):
         self.xyz_gradient_accum = checkpoint["extra_state_dict"]["xyz_gradient_accum"].to("cuda")
         self.denom = checkpoint["extra_state_dict"]["denom"].to("cuda")
         self.active_sh_degree = checkpoint["extra_state_dict"]["active_sh_degree"]
-        try:
-            self.spatial_lr_scale = checkpoint["extra_state_dict"]["spatial_lr_scale"]
-            self.cameras_extent = checkpoint["extra_state_dict"]["cameras_extent"]
-        except:
-            pass
+        self.spatial_lr_scale = checkpoint["extra_state_dict"]["spatial_lr_scale"]
+        self.cameras_extent = checkpoint["extra_state_dict"]["cameras_extent"]
+        self.iteration = checkpoint["extra_state_dict"]["iteration"]
         super().on_load_checkpoint(checkpoint)
 
     def add_densification_stats(self, viewspace_point_tensor, update_filter):

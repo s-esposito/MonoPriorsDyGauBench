@@ -45,6 +45,14 @@ class MyLightningCLI(LightningCLI):
         os.makedirs(output_path, exist_ok=True)
         print("output path: {}".format(output_path))
 
+        if config.model.init_args.motion_mode in ["MLP", "HexPlane"]:
+            config.trainer.max_steps *= 2
+            config.trainer.val_check_interval *= 2
+            config.trainer.log_every_n_steps *= 2
+        elif config.model.init_args.motion_mode in ["EffGS"]:
+            pass
+        else:
+            assert False, f"Unknown motion mode without handling of trainer steps: {config.model.init_args.motion_mode}"
 
         '''
         # find checkpoint if ckpt_path is set to "last" instead of exact path
