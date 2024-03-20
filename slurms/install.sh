@@ -71,6 +71,8 @@ pip install submodules/simple-knn
 
 pip install pytorch-msssim
 
+pip install ninja
+
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown
 #conda install -c conda-forge gdown

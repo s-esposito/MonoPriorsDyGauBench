@@ -6,7 +6,7 @@ import math
 import lpips
 import os
 from jsonargparse import Namespace
-from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation
+from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation, build_rotation_4d, build_scaling_rotation_4d
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
 from src.models.modules.Init import create_from_pcd_func 
 from src.models.modules.Deform import create_motion_model
@@ -15,6 +15,7 @@ from src.utils.loss_utils import l1_loss, kl_divergence, ssim
 from src.utils.image_utils import psnr
 import torchvision
 
+from .diff_gaussian_rasterization import GaussianRasterizationSettings4D, GaussianRasterizer4D
 # 3 types of diff-rasterizer to consider
 from diff_gaussian_rasterization_depth import GaussianRasterizationSettings, GaussianRasterizer
 #from diff_gaussian_rasterization_ch9 import GaussianRasterizationSettings as GaussianRasterizationSettings_ch9
@@ -35,6 +36,7 @@ from diff_gaussian_rasterization_depth import GaussianRasterizationSettings, Gau
 class GS3d(MyModelBaseClass):
     def __init__(self,
         sh_degree: int,
+        sh_degree_t: int,
         percent_dense: float,
         grid_lr_init: float,
         grid_lr_final: float,
@@ -44,6 +46,7 @@ class GS3d(MyModelBaseClass):
         deform_lr_final: float,
         deform_lr_delay_mult: float,
         deform_lr_max_steps: float,
+        position_t_lr_init: float,
         position_lr_init: float,
         position_lr_final: float,
         position_lr_delay_mult: float,
@@ -62,10 +65,11 @@ class GS3d(MyModelBaseClass):
         #logim_itv_test: int, # how many intervals to save image to wandb
         #white_background: Optional[bool]=False,
         use_static: Optional[bool]=False,
-        init_mode: Optional[str]="D3G",
+        init_mode: Optional[str]="default",
         motion_mode: Optional[str]="MLP",
         lpips_mode: Optional[str]="alex",
         post_act: Optional[bool]=True,
+        rot_4d: Optional[bool]=False,
         **kwargs
     ):
         super().__init__()
@@ -77,6 +81,7 @@ class GS3d(MyModelBaseClass):
         self.iteration = 0
         # Sh degree
         self.active_sh_degree = 0
+        self.active_sh_degree_t = 0
         self.max_sh_degree = sh_degree
         # Attributes associated to each Gaussian
         self._xyz = torch.empty(0)
@@ -99,6 +104,21 @@ class GS3d(MyModelBaseClass):
             actual_covariance = L @ L.transpose(1, 2)
             symm = strip_symmetric(actual_covariance)
             return symm
+        def build_covariance_from_scaling_rotation_4d(scaling, scaling_modifier, rotation_l, rotation_r, dt=0.0):
+            L = build_scaling_rotation_4d(scaling_modifier * scaling, rotation_l, rotation_r)
+            actual_covariance = L @ L.transpose(1, 2)
+            cov_11 = actual_covariance[:,:3,:3]
+            cov_12 = actual_covariance[:,0:3,3:4]
+            cov_t = actual_covariance[:,3:4,3:4]
+            current_covariance = cov_11 - cov_12 @ cov_12.transpose(1, 2) / cov_t
+            symm = strip_symmetric(current_covariance)
+            if dt.shape[1] > 1:
+                mean_offset = (cov_12.squeeze(-1) / cov_t.squeeze(-1))[:, None, :] * dt[..., None]
+                mean_offset = mean_offset[..., None]  # [num_pts, num_time, 3, 1]
+            else:
+                mean_offset = cov_12.squeeze(-1) / cov_t.squeeze(-1) * dt
+            return symm, mean_offset.squeeze(-1)
+        
         self.scaling_activation = torch.exp #speical set for visual examples 
         self.scaling_inverse_activation = torch.log #special set for vislual examples
         self.covariance_activation = build_covariance_from_scaling_rotation
@@ -116,6 +136,8 @@ class GS3d(MyModelBaseClass):
         self.opacity_lr = opacity_lr
         self.scaling_lr = scaling_lr
         self.rotation_lr = rotation_lr
+
+        self.position_t_lr_init = position_t_lr_init
         
         self.position_lr_init = position_lr_init
         self.position_lr_final = position_lr_final
@@ -147,6 +169,16 @@ class GS3d(MyModelBaseClass):
             init_mode=motion_mode,
             **kwargs)    
         self.motion_mode = motion_mode   
+        if self.motion_mode == "FourDim":
+            assert self.init_mode == "FourDim"
+            self._t = torch.empty(0)
+            self._scaling_t = torch.empty(0)
+            self._rotation_t = torch.empty(0)
+            self.rot_4d = rot_4d
+            self.max_sh_degree_t = sh_degree_t
+            if self.rot_4d:
+                self.covariance_activation = build_covariance_from_scaling_rotation_4d
+
 
         #LPIPS evaluation
         self.lpips_mode = lpips_mode
@@ -172,14 +204,21 @@ class GS3d(MyModelBaseClass):
         self.white_background = white_background
         self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
 
-        
-        # this part is the same as what changed in scene = Scene(dataset, gaussians)
-        spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities = create_from_pcd_func(
-            self.trainer.datamodule.pcd,
-            spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
-            max_sh_degree=self.max_sh_degree,
-            init_mode=self.init_mode
-        )
+        if self.init_mode not in ["FourDim"]:
+            # this part is the same as what changed in scene = Scene(dataset, gaussians)
+            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities = create_from_pcd_func(
+                self.trainer.datamodule.pcd,
+                spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
+                max_sh_degree=self.max_sh_degree,
+                init_mode=self.init_mode
+            )
+        else:
+            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, fused_times, scales_t, rots_r = create_from_pcd_func(
+                self.trainer.datamodule.pcd,
+                spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
+                max_sh_degree=self.max_sh_degree,
+                init_mode=self.init_mode
+            )
         self.spatial_lr_scale = spatial_lr_scale
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
         self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
@@ -194,7 +233,13 @@ class GS3d(MyModelBaseClass):
 
         self.cameras_extent = self.trainer.datamodule.camera_extent
 
+        if self.init_mode in ["FourDim"]:
+            self._t = nn.Parameter(fused_times.requires_grad_(True))
+            self._scaling_t = nn.Parameter(scales_t.requires_grad_(True))
             
+            if self.rot_4d:
+                self._rotation_r = nn.Parameter(rots_r.requires_grad_(True))
+
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -206,6 +251,12 @@ class GS3d(MyModelBaseClass):
             {'params': [self._scaling], 'lr': self.scaling_lr, "name": "scaling"},
             {'params': [self._rotation], 'lr': self.rotation_lr, "name": "rotation"}
         ]
+        if self.motion_mode in ["FourDim"]:
+            l.append({'params': [self._t], 'lr': self.position_t_lr_init * self.spatial_lr_scale, "name": "t"})
+            l.append({'params': [self._scaling_t], 'lr': self.scaling_lr, "name": "scaling_t"})
+            if self.rot_4d:
+                l.append({'params': [self._rotation_r], 'lr': self.rotation_lr, "name": "rotation_r"})
+
 
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
         self.xyz_scheduler_args = get_expon_lr_func(lr_init=self.position_lr_init*self.spatial_lr_scale,
@@ -243,14 +294,35 @@ class GS3d(MyModelBaseClass):
     @property
     def get_scaling(self):
         return self.scaling_activation(self._scaling)
+    
+    @property
+    def get_scaling_t(self):
+        return self.scaling_activation(self._scaling_t)
+    
+    @property
+    def get_scaling_xyzt(self):
+        return self.scaling_activation(torch.cat([self._scaling, self._scaling_t], dim = 1))
+    
 
     @property
     def get_rotation(self):
         return self.rotation_activation(self._rotation)
 
     @property
+    def get_rotation_r(self):
+        return self.rotation_activation(self._rotation_r)
+
+    @property
     def get_xyz(self):
         return self._xyz
+    
+    @property
+    def get_t(self):
+        return self._t
+    
+    @property
+    def get_xyzt(self):
+        return torch.cat([self._xyz, self._t], dim = 1)
 
     @property
     def get_features(self):
@@ -261,6 +333,19 @@ class GS3d(MyModelBaseClass):
     @property
     def get_opacity(self):
         return self.opacity_activation(self._opacity)
+    
+    def get_cov_t(self, scaling_modifier = 1):
+        if self.rot_4d:
+            L = build_scaling_rotation_4d(scaling_modifier * self.get_scaling_xyzt, self._rotation, self._rotation_r)
+            actual_covariance = L @ L.transpose(1, 2)
+            return actual_covariance[:,3,3].unsqueeze(1)
+        else:
+            return self.get_scaling_t * scaling_modifier
+
+    def get_marginal_t(self, timestamp, scaling_modifier = 1): # Standard
+        sigma = self.get_cov_t(scaling_modifier)
+        return torch.exp(-0.5*(self.get_t-timestamp)**2/sigma) # / torch.sqrt(2*torch.pi*sigma)
+    
 
     def get_covariance(self, scaling_modifier=1):
         return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
@@ -269,6 +354,9 @@ class GS3d(MyModelBaseClass):
 
     def deform(self,
         time: float) -> Dict:
+        if self.motion_mode == "FourDim":
+            assert False, "Not supported for now"
+        
         # warning: for 4DGaussians, they originally used
         # _opacity, _scaling, _rotation instead of our get_xxx version
         # worth later visit!
@@ -281,7 +369,7 @@ class GS3d(MyModelBaseClass):
                 "scales": self.get_scaling, 
                 "rotations": self.get_rotation, 
                 "cov3D_precomp": None
-             }
+            }
         else:
             result = {
                 "means3D": self.get_xyz, 
@@ -292,7 +380,7 @@ class GS3d(MyModelBaseClass):
                 "rotations": self._rotation, 
                 "cov3D_precomp": None
             }
-        
+            
         if self.iteration  < self.warm_up:
             if self.post_act:
                 result_ = result
@@ -354,15 +442,9 @@ class GS3d(MyModelBaseClass):
         if len(list(result_["rotations"].shape)) == 3:
             result_["rotations"] = self.get_rotation[:, 0, :]
         return result_
-            
 
-    
-    def forward(
-        self, 
+    def forward_FourDim(self,
         batch: Dict,
-        render_rgb: Optional[bool]=True,
-        render_flow: Optional[bool]=True,
-        time_offset: Optional[float]=0.0,
         scaling_modifier: Optional[float]=1.0
     ) -> Dict:
         # have to visit each batch one by one for rasterizer
@@ -373,6 +455,113 @@ class GS3d(MyModelBaseClass):
             # Set up rasterization configuration for this camera
             tanfovx = math.tan(batch["FoVx"][idx] * 0.5)
             tanfovy = math.tan(batch["FoVy"][idx] * 0.5)
+        
+            raster_settings = GaussianRasterizationSettings4D(
+                image_height=int(batch["image_height"][idx]),
+                image_width=int(batch["image_width"][idx]),
+                tanfovx=tanfovx,
+                tanfovy=tanfovy,
+                bg=self.bg_color.to(batch["time"].device),
+                scale_modifier=scaling_modifier,
+                viewmatrix=batch["world_view_transform"][idx],
+                projmatrix=batch["full_proj_transform"][idx],
+                sh_degree=self.active_sh_degree,
+                sh_degree_t=self.active_sh_degree_t,
+                campos=batch["camera_center"][idx],
+                timestamp=batch["time"][idx],
+                time_duration=1.,
+                rot_4d=self.rot_4d,
+                gaussian_dim=4,
+                force_sh_3d=False,
+                prefiltered=False,
+                debug=False
+            )
+
+            rasterizer = GaussianRasterizer4D(raster_settings=raster_settings)
+            
+            means3D = self.get_xyz
+            screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=means3D.device) + 0
+            try:
+                screenspace_points.retain_grad()
+            except:
+                pass
+            means2D = screenspace_points
+            opacity = self.get_opacity
+            scales = self.get_scaling
+            rotations = self.get_rotation
+            scales_t = self.get_scaling_t
+            ts = self.get_t
+            rotations_r = None
+            if self.rot_4d:
+                rotations_r = self.get_rotation_r
+            shs = self.get_features
+            flow_2d = torch.zeros_like(self.get_xyz[:,:2])
+            rendered_image, radii, depth, alpha, flow, covs_com = rasterizer(
+                means3D = means3D,
+                means2D = means2D,
+                shs = shs,
+                colors_precomp = None,
+                flow_2d = flow_2d,
+                opacities = opacity,
+                ts = ts,
+                scales = scales,
+                scales_t = scales_t,
+                rotations = rotations,
+                rotations_r = rotations_r,
+                cov3D_precomp = None)
+            result = {
+                "means3D": means3D,#) if (2 == len(list(result["means3D"].shape))) else d_xyz, 
+                "shs": shs, 
+                "colors_precomp": None, 
+                "opacity": opacity,#) if (2 == len(list(result["opacity"].shape))) else d_opacity, 
+                "scales": scales,#) if (2 == len(list(result["scales"].shape))) else d_scaling, 
+                "rotations": rotations,#) if (2 == len(list(result["rotations"].shape))) else d_rotation, 
+                "ts": ts,
+                "scales_t": scales_t,
+                "rotations_r": rotations_r,
+                "cov3D_precomp": None,
+                "render": rendered_image,
+                "viewspace_points": screenspace_points,
+                "visibility_filter": radii > 0,
+                "radii": radii, 
+                "depth": depth,
+                "render_flow": flow
+
+            }
+            if idx == 0:
+                results.update(result) 
+            else:
+                for key in result:
+                    results[key].append(result[key])
+                
+        #for key in results:
+        #    print(key, results[key].shape if results[key] is not None else None)
+        #assert False, "Visualize everything to make sure correct"
+        return results
+    
+    def forward(
+        self, 
+        batch: Dict,
+        render_rgb: Optional[bool]=True,
+        render_flow: Optional[bool]=True,
+        time_offset: Optional[float]=0.0,
+        scaling_modifier: Optional[float]=1.0
+    ) -> Dict:
+        if self.motion_mode == "FourDim":
+            return self.forward_FourDim(
+                batch=batch,
+                scaling_modifier=scaling_modifier
+            )
+        
+        # have to visit each batch one by one for rasterizer
+        batch_size = batch["time"].shape[0] 
+        assert batch_size == 1
+        results = {}
+        for idx in range(batch_size):
+            # Set up rasterization configuration for this camera
+            tanfovx = math.tan(batch["FoVx"][idx] * 0.5)
+            tanfovy = math.tan(batch["FoVy"][idx] * 0.5)
+            
             raster_settings = GaussianRasterizationSettings(
                 image_height=int(batch["image_height"][idx]),
                 image_width=int(batch["image_width"][idx]),
@@ -531,12 +720,14 @@ class GS3d(MyModelBaseClass):
             deform_optimizer = None
         
         iteration = self.iteration  + 1 # has to start from 1 to prevent actions on step=0
-        print(iteration)      
+        print(iteration, self.trainer.global_step)      
         # Every 1000 its we increase the levels of SH up to a maximum degree
         if iteration % 1000 == 0:
             if self.active_sh_degree < self.max_sh_degree:
                 self.active_sh_degree += 1
-
+            if self.motion_mode == "FourDim":
+                if self.active_sh_degree_t < self.max_sh_degree_t:
+                    self.active_sh_degree_t += 1
 
         #self.update_learning_rate_or_sched_or_sh()
         # Render
@@ -685,6 +876,7 @@ class GS3d(MyModelBaseClass):
         self.log_dir_gt = os.path.join(self.logger.save_dir, "gt")
         os.makedirs(self.log_dir_test, exist_ok=True)
         os.makedirs(self.log_dir_gt, exist_ok=True)
+        
 
     def test_step(self, batch, batch_idx):
         render_rgb, render_flow, time_offset = True, True, 1e-3#self.get_render_mode(eval=True)
@@ -762,6 +954,7 @@ class GS3d(MyModelBaseClass):
             "xyz_gradient_accum": self.xyz_gradient_accum,
             "denom": self.denom,
             "active_sh_degree": self.active_sh_degree,
+            "active_sh_degree_t": self.active_sh_degree_t,
             "spatial_lr_scale": self.spatial_lr_scale,
             "cameras_extent": self.cameras_extent,
             "iteration": self.iteration
@@ -783,11 +976,18 @@ class GS3d(MyModelBaseClass):
         self._scaling = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_scaling"].shape).requires_grad_(True))
         self._rotation = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_rotation"].shape).requires_grad_(True))
         self._opacity = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_opacity"].shape).requires_grad_(True))
+        if self.motion_mode == "FourDim":
+            self._t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_t"].shape).requires_grad_(True))
+            self._scaling_t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_scaling_t"].shape).requires_grad_(True))
+            if self.rot_4d:
+                self._rotation_r = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_rotation_r"].shape).requires_grad_(True))
+        
         # load extra parameters
         self.max_radii2D = checkpoint["extra_state_dict"]["max_radii2D"].to("cuda")
         self.xyz_gradient_accum = checkpoint["extra_state_dict"]["xyz_gradient_accum"].to("cuda")
         self.denom = checkpoint["extra_state_dict"]["denom"].to("cuda")
         self.active_sh_degree = checkpoint["extra_state_dict"]["active_sh_degree"]
+        self.active_sh_degree_t = checkpoint["extra_state_dict"]["active_sh_degree_t"]
         self.spatial_lr_scale = checkpoint["extra_state_dict"]["spatial_lr_scale"]
         self.cameras_extent = checkpoint["extra_state_dict"]["cameras_extent"]
         self.iteration = checkpoint["extra_state_dict"]["iteration"]
@@ -830,8 +1030,18 @@ class GS3d(MyModelBaseClass):
         new_scaling = self._scaling[selected_pts_mask]
         new_rotation = self._rotation[selected_pts_mask]
 
+        new_t = None
+        new_scaling_t = None
+        new_rotation_r = None
+        if self.motion_mode == "FourDim":
+            new_t = self._t[selected_pts_mask]
+            new_scaling_t = self._scaling_t[selected_pts_mask]
+            if self.rot_4d:
+                new_rotation_r = self._rotation_r[selected_pts_mask]
+
+
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-                                   new_rotation)
+                                   new_rotation, new_t, new_scaling_t, new_rotation_r)
 
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
@@ -843,28 +1053,56 @@ class GS3d(MyModelBaseClass):
                                               torch.max(self.get_scaling,
                                                         dim=1).values > self.percent_dense * scene_extent)
 
+        if self.motion_mode == "FourDim":
+            new_rotation = self._rotation[selected_pts_mask].repeat(N,1)
         
-        if len(list(self._rotation.shape)) == 2:
-            stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
-            means = torch.zeros((stds.size(0), 3), device="cuda")
-            samples = torch.normal(mean=means, std=stds)
-            rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
-            new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
-            new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
+            if not self.rot_4d:
+                stds = self.get_scaling[selected_pts_mask].repeat(N,1)
+                means = torch.zeros((stds.size(0), 3),device="cuda")
+                samples = torch.normal(mean=means, std=stds)
+                rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N,1,1)
+                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
+                
+                stds_t = self.get_scaling_t[selected_pts_mask].repeat(N,1)
+                means_t = torch.zeros((stds_t.size(0), 1),device="cuda")
+                samples_t = torch.normal(mean=means_t, std=stds_t)
+                new_t = samples_t + self.get_t[selected_pts_mask].repeat(N, 1)
+                new_scaling_t = self.scaling_inverse_activation(self.get_scaling_t[selected_pts_mask].repeat(N,1) / (0.8*N))
+                new_rotation_r = None
+            else:
+                stds = self.get_scaling_xyzt[selected_pts_mask].repeat(N,1)
+                means = torch.zeros((stds.size(0), 4),device="cuda")
+                samples = torch.normal(mean=means, std=stds)
+                rots = build_rotation_4d(self._rotation[selected_pts_mask], self._rotation_r[selected_pts_mask]).repeat(N,1,1)
+                new_xyzt = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyzt[selected_pts_mask].repeat(N, 1)
+                new_xyz = new_xyzt[...,0:3]
+                new_t = new_xyzt[...,3:4]
+                new_scaling_t = self.scaling_inverse_activation(self.get_scaling_t[selected_pts_mask].repeat(N,1) / (0.8*N))
+                new_rotation_r = self._rotation_r[selected_pts_mask].repeat(N,1)
+
+            
         else:
-            stds = self.get_scaling[selected_pts_mask].repeat(N*self.get_xyz.shape[1],1)
-            means = torch.zeros((stds.size(0), 3), device="cuda")
-            samples = torch.normal(mean=means, std=stds)
-            rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N,1,1,1).reshape(-1, 3, 3)
-            new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1).unsqueeze(1).reshape(-1, self.get_xyz.shape[1], 3) + self.get_xyz[selected_pts_mask].repeat(N, 1, 1)
-            new_xyz[:, 1:, :] = self.get_xyz[selected_pts_mask].repeat(N, 1, 1)[:, 1:, :]
-            new_rotation = self._rotation[selected_pts_mask].repeat(N,1,1)
+            if len(list(self._rotation.shape)) == 2:
+                stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
+                means = torch.zeros((stds.size(0), 3), device="cuda")
+                samples = torch.normal(mean=means, std=stds)
+                rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
+                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
+                new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
+            else:
+                stds = self.get_scaling[selected_pts_mask].repeat(N*self.get_xyz.shape[1],1)
+                means = torch.zeros((stds.size(0), 3), device="cuda")
+                samples = torch.normal(mean=means, std=stds)
+                rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N,1,1,1).reshape(-1, 3, 3)
+                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1).unsqueeze(1).reshape(-1, self.get_xyz.shape[1], 3) + self.get_xyz[selected_pts_mask].repeat(N, 1, 1)
+                new_xyz[:, 1:, :] = self.get_xyz[selected_pts_mask].repeat(N, 1, 1)[:, 1:, :]
+                new_rotation = self._rotation[selected_pts_mask].repeat(N,1,1)
         new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask].repeat(N, 1) / (0.8 * N))
         new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
         new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
         new_opacity = self._opacity[selected_pts_mask].repeat(N, 1)
 
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation)
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r)
 
         prune_filter = torch.cat(
             (selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
@@ -885,6 +1123,13 @@ class GS3d(MyModelBaseClass):
 
         self.denom = self.denom[valid_points_mask]
         self.max_radii2D = self.max_radii2D[valid_points_mask]
+
+        if self.motion_mode == "FourDim":
+            self._t = optimizable_tensors['t']
+            self._scaling_t = optimizable_tensors['scaling_t']
+            if self.rot_4d:
+                self._rotation_r = optimizable_tensors['rotation_r']
+            
     
     def _prune_optimizer(self, mask):
         optimizable_tensors = {}
@@ -905,13 +1150,18 @@ class GS3d(MyModelBaseClass):
         return optimizable_tensors
 
     def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-                              new_rotation):
+                              new_rotation, new_t, new_scaling_t, new_rotation_r):
         d = {"xyz": new_xyz,
              "f_dc": new_features_dc,
              "f_rest": new_features_rest,
              "opacity": new_opacities,
              "scaling": new_scaling,
              "rotation": new_rotation}
+        if self.motion_mode == "FourDim":
+            d["t"] = new_t
+            d["scaling_t"] = new_scaling_t
+            if self.rot_4d:
+                d["rotation_r"] = new_rotation_r
 
         optimizable_tensors = self.cat_tensors_to_optimizer(d)
         self._xyz = optimizable_tensors["xyz"]
@@ -924,6 +1174,13 @@ class GS3d(MyModelBaseClass):
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
+
+        if self.motion_mode == "FourDim":
+            self._t = optimizable_tensors['t']
+            self._scaling_t = optimizable_tensors['scaling_t']
+            if self.rot_4d:
+                self._rotation_r = optimizable_tensors['rotation_r']
+            
 
     def cat_tensors_to_optimizer(self, tensors_dict):
         optimizable_tensors = {}

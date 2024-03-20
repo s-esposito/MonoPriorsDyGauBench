@@ -75,7 +75,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
 
         self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train")
         self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test")
-
+        #print([len(self.train_cameras), len(self.test_cameras)])
         # evenly sample 5 from train_cameras
         # evenly sample 5 from test_cameras
 
@@ -97,6 +97,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         #assert False, "Pause"
         
         #assert False, "Pause"
+        #assert False, [len(self.train_cameras), len(self.test_cameras), len(self.val_cameras)]       
 
     def train_dataloader(self):
         return InfiniteDataLoader(DataLoader(
