@@ -47,7 +47,7 @@ class MyLightningCLI(LightningCLI):
 
         if config.model.init_args.motion_mode in ["MLP", "HexPlane"]:
             config.trainer.max_steps *= 2
-        elif config.model.init_args.motion_mode in ["EffGS", "FourDim"]:
+        elif config.model.init_args.motion_mode in ["EffGS", "FourDim", "TRBF"]:
             pass
         else:
             assert False, f"Unknown motion mode without handling of trainer steps: {config.model.init_args.motion_mode}"

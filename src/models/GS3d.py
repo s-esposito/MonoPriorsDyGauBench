@@ -38,6 +38,9 @@ class GS3d(MyModelBaseClass):
         sh_degree: int,
         sh_degree_t: int,
         percent_dense: float,
+        trbfc_lr: float,
+        trbfs_lr: float,
+        trbfslinit: float,
         grid_lr_init: float,
         grid_lr_final: float,
         grid_lr_delay_mult: float,
@@ -137,6 +140,9 @@ class GS3d(MyModelBaseClass):
         self.scaling_lr = scaling_lr
         self.rotation_lr = rotation_lr
 
+        self.trbfc_lr = trbfc_lr
+        self.trbfs_lr = trbfs_lr
+
         self.position_t_lr_init = position_t_lr_init
         
         self.position_lr_init = position_lr_init
@@ -179,6 +185,10 @@ class GS3d(MyModelBaseClass):
             if self.rot_4d:
                 self.covariance_activation = build_covariance_from_scaling_rotation_4d
 
+        if self.motion_mode == "TRBF":
+            self._trbf_center = torch.empty(0)
+            self._trbf_scale = torch.empty(0)
+            self.trbfslinit = trbfslinit
 
         #LPIPS evaluation
         self.lpips_mode = lpips_mode
@@ -204,7 +214,14 @@ class GS3d(MyModelBaseClass):
         self.white_background = white_background
         self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
 
-        if self.init_mode not in ["FourDim"]:
+        if self.motion_mode in ["TRBF"]:
+            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, times = create_from_pcd_func(
+                self.trainer.datamodule.pcd,
+                spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
+                max_sh_degree=self.max_sh_degree,
+                init_mode=self.motion_mode
+            )
+        elif self.init_mode not in ["FourDim"]:
             # this part is the same as what changed in scene = Scene(dataset, gaussians)
             spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities = create_from_pcd_func(
                 self.trainer.datamodule.pcd,
@@ -212,6 +229,7 @@ class GS3d(MyModelBaseClass):
                 max_sh_degree=self.max_sh_degree,
                 init_mode=self.init_mode
             )
+            
         else:
             spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, fused_times, scales_t, rots_r = create_from_pcd_func(
                 self.trainer.datamodule.pcd,
@@ -239,7 +257,10 @@ class GS3d(MyModelBaseClass):
             
             if self.rot_4d:
                 self._rotation_r = nn.Parameter(rots_r.requires_grad_(True))
-
+        if self.motion_mode in ["TRBF"]:
+            self._trbf_center = nn.Parameter(times.contiguous().requires_grad_(True))
+            self._trbf_scale = nn.Parameter(torch.ones((self.get_xyz.shape[0], 1), device="cuda").requires_grad_(True)) 
+            nn.init.constant_(self._trbf_scale, self.trbfslinit) 
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -256,7 +277,9 @@ class GS3d(MyModelBaseClass):
             l.append({'params': [self._scaling_t], 'lr': self.scaling_lr, "name": "scaling_t"})
             if self.rot_4d:
                 l.append({'params': [self._rotation_r], 'lr': self.rotation_lr, "name": "rotation_r"})
-
+        if self.motion_mode in ["TRBF"]:
+            l.append({'params': [self._trbf_center], 'lr': self.trbfc_lr, "name": "trbf_center"})
+            l.append( {'params': [self._trbf_scale], 'lr': self.trbfs_lr, "name": "trbf_scale"})
 
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
         self.xyz_scheduler_args = get_expon_lr_func(lr_init=self.position_lr_init*self.spatial_lr_scale,
@@ -329,6 +352,10 @@ class GS3d(MyModelBaseClass):
         features_dc = self._features_dc
         features_rest = self._features_rest
         return torch.cat((features_dc, features_rest), dim=1)
+    
+    @property
+    def get_features_dc(self):
+        return self._features_dc.view(-1, 3)
 
     @property
     def get_opacity(self):
@@ -380,6 +407,9 @@ class GS3d(MyModelBaseClass):
                 "rotations": self._rotation, 
                 "cov3D_precomp": None
             }
+        if self.motion_mode == "TRBF":
+            result["trbfcenter"] = self._trbf_center
+            result["trbfscale"] = self._trbf_scale
             
         if self.iteration  < self.warm_up:
             if self.post_act:
@@ -409,6 +439,7 @@ class GS3d(MyModelBaseClass):
                     "cov3D_precomp": None
                 }
             elif self.motion_mode in ["EffGS"]:
+                assert False, "Upgrade following TRBF? Merge them?"
                 result_ = {
                     "means3D": d_xyz,
                     "shs": self.get_features,
@@ -418,6 +449,23 @@ class GS3d(MyModelBaseClass):
                     "rotations": d_rotation,
                     "cov3D_precomp": None
                 }
+            elif self.motion_mode in ["TRBF"]:
+                result_ = {
+                    "means3D": d_xyz.float(),
+                    "shs": None,
+                    "colors_precomp": self.get_features_dc.float(),
+                    "opacity": d_opacity.float(),
+                    "scales": self.get_scaling.float(),
+                    "rotations": d_rotation.float(),
+                    "cov3D_precomp": None
+                }
+                #for key in result_:
+                #    if result_[key] is not None:
+                #        print(key, result_[key].dtype)
+                #for key in result:
+                #    if result[key] is not None:
+                #        print(key, result[key].dtype)
+                #assert False
             elif self.motion_mode in ["HexPlane"]:
                 result_ = {
                     "means3D": d_xyz,
@@ -588,7 +636,15 @@ class GS3d(MyModelBaseClass):
                 result_ = self.deform(batch["time"][idx] + time_offset)
                 for key in result_:
                     result[key+"_offset"] = result_[key]
-             
+            '''
+            for key in result:
+                if result[key] is None:
+                    print(key, None)
+                else:
+                    print(key, result[key].dtype, result[key].shape)
+            assert False
+            '''
+            
             if render_rgb:
                 screenspace_points = torch.zeros_like(result["means3D"], dtype=result["means3D"].dtype, requires_grad=True, device=result["means3D"].device) + 0
                 try:
@@ -981,7 +1037,9 @@ class GS3d(MyModelBaseClass):
             self._scaling_t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_scaling_t"].shape).requires_grad_(True))
             if self.rot_4d:
                 self._rotation_r = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_rotation_r"].shape).requires_grad_(True))
-        
+        if self.motion_mode == "TRBF":
+            self._trbf_center = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_trbf_center"].shape).requires_grad_(True))
+            self._trbf_scale = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_trbf_scale"].shape).requires_grad_(True))
         # load extra parameters
         self.max_radii2D = checkpoint["extra_state_dict"]["max_radii2D"].to("cuda")
         self.xyz_gradient_accum = checkpoint["extra_state_dict"]["xyz_gradient_accum"].to("cuda")
@@ -1038,10 +1096,16 @@ class GS3d(MyModelBaseClass):
             new_scaling_t = self._scaling_t[selected_pts_mask]
             if self.rot_4d:
                 new_rotation_r = self._rotation_r[selected_pts_mask]
+        new_trbf_center = None
+        new_trbf_scale = None
+        if self.motion_mode == "TRBF":
+            new_trbf_center =  torch.rand((self._trbf_center[selected_pts_mask].shape[0], 1), device="cuda")  #self._trbf_center[selected_pts_mask]
+            new_trbf_scale = self._trbf_scale[selected_pts_mask]
 
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-                                   new_rotation, new_t, new_scaling_t, new_rotation_r)
+                                   new_rotation, new_t, new_scaling_t, new_rotation_r,
+                                   new_trbf_center, new_trbf_scale)
 
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
@@ -1082,6 +1146,9 @@ class GS3d(MyModelBaseClass):
 
             
         else:
+            new_t = None
+            new_scaling_t = None
+            new_rotation_r = None
             if len(list(self._rotation.shape)) == 2:
                 stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
                 means = torch.zeros((stds.size(0), 3), device="cuda")
@@ -1101,8 +1168,16 @@ class GS3d(MyModelBaseClass):
         new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
         new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
         new_opacity = self._opacity[selected_pts_mask].repeat(N, 1)
+        if self.motion_mode == "TRBF":
+            new_trbf_center = self._trbf_center[selected_pts_mask].repeat(N,1)
+            new_trbf_center = torch.rand_like(new_trbf_center) #between 0 and 1
+            new_trbf_scale = self._trbf_scale[selected_pts_mask].repeat(N,1)
+        else:
+            new_trbf_center = None
+            new_trbf_scale = None
+        
 
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r)
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale)
 
         prune_filter = torch.cat(
             (selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
@@ -1129,7 +1204,10 @@ class GS3d(MyModelBaseClass):
             self._scaling_t = optimizable_tensors['scaling_t']
             if self.rot_4d:
                 self._rotation_r = optimizable_tensors['rotation_r']
-            
+        
+        if self.motion_mode == "TRBF":
+            self._trbf_center = optimizable_tensors["trbf_center"]
+            self._trbf_scale = optimizable_tensors["trbf_scale"]
     
     def _prune_optimizer(self, mask):
         optimizable_tensors = {}
@@ -1150,7 +1228,7 @@ class GS3d(MyModelBaseClass):
         return optimizable_tensors
 
     def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-                              new_rotation, new_t, new_scaling_t, new_rotation_r):
+                              new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale):
         d = {"xyz": new_xyz,
              "f_dc": new_features_dc,
              "f_rest": new_features_rest,
@@ -1162,7 +1240,9 @@ class GS3d(MyModelBaseClass):
             d["scaling_t"] = new_scaling_t
             if self.rot_4d:
                 d["rotation_r"] = new_rotation_r
-
+        if self.motion_mode == "TRBF":
+            d["trbf_center"] = new_trbf_center
+            d["trbf_scale"] = new_trbf_scale
         optimizable_tensors = self.cat_tensors_to_optimizer(d)
         self._xyz = optimizable_tensors["xyz"]
         self._features_dc = optimizable_tensors["f_dc"]
@@ -1180,7 +1260,9 @@ class GS3d(MyModelBaseClass):
             self._scaling_t = optimizable_tensors['scaling_t']
             if self.rot_4d:
                 self._rotation_r = optimizable_tensors['rotation_r']
-            
+        if self.motion_mode == "TRBF":
+            self._trbf_center = optimizable_tensors["trbf_center"]
+            self._trbf_scale = optimizable_tensors["trbf_scale"]  
 
     def cat_tensors_to_optimizer(self, tensors_dict):
         optimizable_tensors = {}

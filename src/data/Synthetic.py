@@ -112,10 +112,13 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         shs = np.random.random((num_pts, 3)) / 255.0
         #pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((num_pts, 3)))
 
+        times = [cam_info.time for cam_info in train_cam_infos]
+        times = np.unique(times)
 
-        
+        #assert False, "change self.pcd based on Nerfies debugged code"
         #shs = np.random.random((xyz.shape[0], 3)) / 255.0
-        self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)))
+        self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)),
+            times=times)
 
 
         #scene_info = SceneInfo(point_cloud=pcd,
