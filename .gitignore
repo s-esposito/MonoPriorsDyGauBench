@@ -1,5 +1,10 @@
 __pycache__/*
 output/*
+data/*
 submodules/*/build/*
 slurms/*.out
 slurms/wandb/*
+slurms_sc/*.out
+slurms_sc/wandb/*
+**/__pycache__/**
+**/*.egg-info/**
