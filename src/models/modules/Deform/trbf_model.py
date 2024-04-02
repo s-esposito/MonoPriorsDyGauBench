@@ -43,8 +43,13 @@ class TRBFModel(nn.Module):
         #means3D = means3D[:, 0, :] +  measn3D[:, 1, :] * tforpoly + pc._motion[:, 3:6] * tforpoly * tforpoly + pc._motion[:, 6:9] * tforpoly *tforpoly * tforpoly
         basis_rot = create_sequence(tforpoly, self.Nq)
         rotations = torch.sum(inp["rotations"][:, :self.Nq+1, :] * basis_rot, dim=1) #Nx4
-        
-        return means3D, rotations, 0., opacities, 0. 
+        # Note: this is invalid when feature is SH! but anyways won't use it if SH
+        if inp["shs"].shape[1] == 9:
+            dfeat = torch.cat([inp["shs"][:, :6],
+                inp["shs"][:, 6:] * tforpoly,], dim=1)
+        else:
+            dfeat = 0.
+        return means3D, rotations, 0., opacities, dfeat 
         
         
 

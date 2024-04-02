@@ -25,3 +25,6 @@ Default usage following PytorchLightning:
 As do not want to customize arguments by subcommand (fit/test), pass the config after the subcommand
 
 ```python main.py [subcommand] --config path/to/config.yaml```
+
+Note: when building extension using pip install, have to run on the cluster where the pytorch is installed.
+After building, can switch to different cluster.

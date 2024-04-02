@@ -10,16 +10,18 @@ from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_sy
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
 from src.models.modules.Init import create_from_pcd_func 
 from src.models.modules.Deform import create_motion_model
+from src.models.modules.Postprocess import getcolormodel
 from src.utils.loss_utils import l1_loss, kl_divergence, ssim
 #from pytorch_msssim import ssim
 from src.utils.image_utils import psnr
 import torchvision
 
 from .diff_gaussian_rasterization import GaussianRasterizationSettings4D, GaussianRasterizer4D
+from .diff_gaussian_rasterization_4dch9 import GaussianRasterizationSettings4D_ch9, GaussianRasterizer4D_ch9
 # 3 types of diff-rasterizer to consider
 from diff_gaussian_rasterization_depth import GaussianRasterizationSettings, GaussianRasterizer
-#from diff_gaussian_rasterization_ch9 import GaussianRasterizationSettings as GaussianRasterizationSettings_ch9
-#from diff_gaussian_rasterization_ch9 import GaussianRasterizer as GaussianRasterizer_ch9
+from diff_gaussian_rasterization_ch9 import GaussianRasterizationSettings as GaussianRasterizationSettings_ch9
+from diff_gaussian_rasterization_ch9 import GaussianRasterizer as GaussianRasterizer_ch9
 #from diff_gaussian_rasterization_ch3 import GaussianRasterizationSettings as GaussianRasterizationSettings_ch3
 #from diff_gaussian_rasterization_ch3 import GaussianRasterizer as GaussianRasterizer_ch3
 
@@ -63,6 +65,7 @@ class GS3d(MyModelBaseClass):
         opacity_lr: float,
         scaling_lr: float,
         rotation_lr: float,
+        decoder_lr: float,
         warm_up: int,
         lambda_dssim: float,
         #logim_itv_test: int, # how many intervals to save image to wandb
@@ -70,6 +73,7 @@ class GS3d(MyModelBaseClass):
         use_static: Optional[bool]=False,
         init_mode: Optional[str]="default",
         motion_mode: Optional[str]="MLP",
+        color_mode: Optional[str]="rgb",
         lpips_mode: Optional[str]="alex",
         post_act: Optional[bool]=True,
         rot_4d: Optional[bool]=False,
@@ -190,6 +194,13 @@ class GS3d(MyModelBaseClass):
             self._trbf_scale = torch.empty(0)
             self.trbfslinit = trbfslinit
 
+        self.color_mode = color_mode
+        if self.color_mode in ["sandwich", "sandwichnoact"]:
+            self.rgbdecoder = getcolormodel(self.color_mode)
+            self.decoder_lr = decoder_lr
+        else:
+            self.rgbdecoder = None
+
         #LPIPS evaluation
         self.lpips_mode = lpips_mode
         self.lpips = lpips.LPIPS(net=lpips_mode, spatial=False) # if spatial is True, keep dim 
@@ -215,7 +226,7 @@ class GS3d(MyModelBaseClass):
         self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
 
         if self.motion_mode in ["TRBF"]:
-            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, times = create_from_pcd_func(
+            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, times, fused_color = create_from_pcd_func(
                 self.trainer.datamodule.pcd,
                 spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
                 max_sh_degree=self.max_sh_degree,
@@ -223,7 +234,7 @@ class GS3d(MyModelBaseClass):
             )
         elif self.init_mode not in ["FourDim"]:
             # this part is the same as what changed in scene = Scene(dataset, gaussians)
-            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities = create_from_pcd_func(
+            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, fused_color = create_from_pcd_func(
                 self.trainer.datamodule.pcd,
                 spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
                 max_sh_degree=self.max_sh_degree,
@@ -231,7 +242,7 @@ class GS3d(MyModelBaseClass):
             )
             
         else:
-            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, fused_times, scales_t, rots_r = create_from_pcd_func(
+            spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, fused_times, scales_t, rots_r, fused_color = create_from_pcd_func(
                 self.trainer.datamodule.pcd,
                 spatial_lr_scale=self.trainer.datamodule.spatial_lr_scale,
                 max_sh_degree=self.max_sh_degree,
@@ -239,10 +250,19 @@ class GS3d(MyModelBaseClass):
             )
         self.spatial_lr_scale = spatial_lr_scale
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
-        self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
-        self._features_rest = nn.Parameter(features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True))
+        
+        if self.rgbdecoder is None:
+            self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
+            self._features_rest = nn.Parameter(features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True))
+        else:
+            features9channel = torch.cat((fused_color, fused_color), dim=1)
+            self._features_dc = nn.Parameter(features9channel.contiguous().requires_grad_(True))
+            fomega = torch.zeros((self._features_dc.shape[0], 3), dtype=torch.float, device="cuda")
+            self._features_rest = nn.Parameter(fomega.contiguous().requires_grad_(True))
+        
         self._scaling = nn.Parameter(scales.requires_grad_(True))
         self._rotation = nn.Parameter(rots.requires_grad_(True))
+        #assert False, len(list(self._rotation.shape))
         self._opacity = nn.Parameter(opacities.requires_grad_(True))
         
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
@@ -280,6 +300,9 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode in ["TRBF"]:
             l.append({'params': [self._trbf_center], 'lr': self.trbfc_lr, "name": "trbf_center"})
             l.append( {'params': [self._trbf_scale], 'lr': self.trbfs_lr, "name": "trbf_scale"})
+        
+        if self.rgbdecoder is not None:
+            l += [{'params': list(self.rgbdecoder.parameters()), 'lr': self.decoder_lr, "name": "decoder"}]
 
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
         self.xyz_scheduler_args = get_expon_lr_func(lr_init=self.position_lr_init*self.spatial_lr_scale,
@@ -351,8 +374,11 @@ class GS3d(MyModelBaseClass):
     def get_features(self):
         features_dc = self._features_dc
         features_rest = self._features_rest
+        #if self.rgbdecoder is not None:
+        #    return torch.cat((features_dc, time * features_rest), dim=1)
+        #else:
         return torch.cat((features_dc, features_rest), dim=1)
-    
+
     @property
     def get_features_dc(self):
         return self._features_dc.view(-1, 3)
@@ -429,6 +455,7 @@ class GS3d(MyModelBaseClass):
                 result, time
             )
             if self.motion_mode in ["MLP"]:
+                assert d_feat == 0
                 result_ = {
                     "means3D": self.get_xyz + d_xyz,#) if (2 == len(list(result["means3D"].shape))) else d_xyz, 
                     "shs": self.get_features + d_feat, 
@@ -439,7 +466,6 @@ class GS3d(MyModelBaseClass):
                     "cov3D_precomp": None
                 }
             elif self.motion_mode in ["EffGS"]:
-                assert False, "Upgrade following TRBF? Merge them?"
                 result_ = {
                     "means3D": d_xyz,
                     "shs": self.get_features,
@@ -450,15 +476,26 @@ class GS3d(MyModelBaseClass):
                     "cov3D_precomp": None
                 }
             elif self.motion_mode in ["TRBF"]:
-                result_ = {
-                    "means3D": d_xyz.float(),
-                    "shs": None,
-                    "colors_precomp": self.get_features_dc.float(),
-                    "opacity": d_opacity.float(),
-                    "scales": self.get_scaling.float(),
-                    "rotations": d_rotation.float(),
-                    "cov3D_precomp": None
-                }
+                if self.rgbdecoder is None:
+                    result_ = {
+                        "means3D": d_xyz.float(),
+                        "shs": None, 
+                        "colors_precomp": self.get_features_dc.float(),
+                        "opacity": d_opacity.float(),
+                        "scales": self.get_scaling.float(),
+                        "rotations": d_rotation.float(),
+                        "cov3D_precomp": None
+                    }
+                else:
+                    result_ = {
+                        "means3D": d_xyz.float(),
+                        "shs": d_feat.float(),
+                        "colors_precomp": None,
+                        "opacity": d_opacity.float(),
+                        "scales": self.get_scaling.float(),
+                        "rotations": d_rotation.float(),
+                        "cov3D_precomp": None
+                    }
                 #for key in result_:
                 #    if result_[key] is not None:
                 #        print(key, result_[key].dtype)
@@ -489,12 +526,20 @@ class GS3d(MyModelBaseClass):
             result_["scales"] = self.get_scaling[:, 0, :]
         if len(list(result_["rotations"].shape)) == 3:
             result_["rotations"] = self.get_rotation[:, 0, :]
+        
+        if self.rgbdecoder is not None:
+            assert result_["shs"] is not None and result_["colors_precomp"] is None
+            result_["colors_precomp"] = result_["shs"]
+            result_["shs"] = None
         return result_
 
     def forward_FourDim(self,
         batch: Dict,
         scaling_modifier: Optional[float]=1.0
     ) -> Dict:
+        #assert self.rgbdecoder is None, "Not supporting feature rendering for now! create another rasterizer by changing NUM_CHANNELS!"
+        #if self.rgbdecoder is not None:
+        #    assert False, "get_features should be changed!"
         # have to visit each batch one by one for rasterizer
         batch_size = batch["time"].shape[0] 
         assert batch_size == 1
@@ -503,30 +548,54 @@ class GS3d(MyModelBaseClass):
             # Set up rasterization configuration for this camera
             tanfovx = math.tan(batch["FoVx"][idx] * 0.5)
             tanfovy = math.tan(batch["FoVy"][idx] * 0.5)
-        
-            raster_settings = GaussianRasterizationSettings4D(
-                image_height=int(batch["image_height"][idx]),
-                image_width=int(batch["image_width"][idx]),
-                tanfovx=tanfovx,
-                tanfovy=tanfovy,
-                bg=self.bg_color.to(batch["time"].device),
-                scale_modifier=scaling_modifier,
-                viewmatrix=batch["world_view_transform"][idx],
-                projmatrix=batch["full_proj_transform"][idx],
-                sh_degree=self.active_sh_degree,
-                sh_degree_t=self.active_sh_degree_t,
-                campos=batch["camera_center"][idx],
-                timestamp=batch["time"][idx],
-                time_duration=1.,
-                rot_4d=self.rot_4d,
-                gaussian_dim=4,
-                force_sh_3d=False,
-                prefiltered=False,
-                debug=False
-            )
-
-            rasterizer = GaussianRasterizer4D(raster_settings=raster_settings)
             
+            if self.rgbdecoder is None:
+                raster_settings = GaussianRasterizationSettings4D(
+                    image_height=int(batch["image_height"][idx]),
+                    image_width=int(batch["image_width"][idx]),
+                    tanfovx=tanfovx,
+                    tanfovy=tanfovy,
+                    bg=self.bg_color.to(batch["time"].device),
+                    scale_modifier=scaling_modifier,
+                    viewmatrix=batch["world_view_transform"][idx],
+                    projmatrix=batch["full_proj_transform"][idx],
+                    sh_degree=self.active_sh_degree,
+                    sh_degree_t=self.active_sh_degree_t,
+                    campos=batch["camera_center"][idx],
+                    timestamp=batch["time"][idx],
+                    time_duration=1.,
+                    rot_4d=self.rot_4d,
+                    gaussian_dim=4,
+                    force_sh_3d=False,
+                    prefiltered=False,
+                    debug=False
+                )
+
+                rasterizer = GaussianRasterizer4D(raster_settings=raster_settings)
+            else:
+                raster_settings = GaussianRasterizationSettings4D_ch9(
+                    image_height=int(batch["image_height"][idx]),
+                    image_width=int(batch["image_width"][idx]),
+                    tanfovx=tanfovx,
+                    tanfovy=tanfovy,
+                    bg=self.bg_color.to(batch["time"].device),
+                    scale_modifier=scaling_modifier,
+                    viewmatrix=batch["world_view_transform"][idx],
+                    projmatrix=batch["full_proj_transform"][idx],
+                    sh_degree=self.active_sh_degree,
+                    sh_degree_t=self.active_sh_degree_t,
+                    campos=batch["camera_center"][idx],
+                    timestamp=batch["time"][idx],
+                    time_duration=1.,
+                    rot_4d=self.rot_4d,
+                    gaussian_dim=4,
+                    force_sh_3d=False,
+                    prefiltered=False,
+                    debug=False
+                )
+
+                rasterizer = GaussianRasterizer4D_ch9(raster_settings=raster_settings)
+                
             means3D = self.get_xyz
             screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=means3D.device) + 0
             try:
@@ -542,13 +611,19 @@ class GS3d(MyModelBaseClass):
             rotations_r = None
             if self.rot_4d:
                 rotations_r = self.get_rotation_r
-            shs = self.get_features
+            if self.rgbdecoder is None:
+                shs = self.get_features()
+                colors_precomp = None
+            else:
+                shs = None
+                colors_precomp = self.get_features()
+
             flow_2d = torch.zeros_like(self.get_xyz[:,:2])
             rendered_image, radii, depth, alpha, flow, covs_com = rasterizer(
                 means3D = means3D,
                 means2D = means2D,
                 shs = shs,
-                colors_precomp = None,
+                colors_precomp = colors_precomp,
                 flow_2d = flow_2d,
                 opacities = opacity,
                 ts = ts,
@@ -557,10 +632,15 @@ class GS3d(MyModelBaseClass):
                 rotations = rotations,
                 rotations_r = rotations_r,
                 cov3D_precomp = None)
+            if self.rgbdecoder is not None:
+                rendered_image = self.postprocess(
+                    rendered_image=rendered_image, 
+                    rays=batch["rays"][idx],
+                )
             result = {
                 "means3D": means3D,#) if (2 == len(list(result["means3D"].shape))) else d_xyz, 
                 "shs": shs, 
-                "colors_precomp": None, 
+                "colors_precomp": colors_precomp, 
                 "opacity": opacity,#) if (2 == len(list(result["opacity"].shape))) else d_opacity, 
                 "scales": scales,#) if (2 == len(list(result["scales"].shape))) else d_scaling, 
                 "rotations": rotations,#) if (2 == len(list(result["rotations"].shape))) else d_rotation, 
@@ -610,21 +690,54 @@ class GS3d(MyModelBaseClass):
             tanfovx = math.tan(batch["FoVx"][idx] * 0.5)
             tanfovy = math.tan(batch["FoVy"][idx] * 0.5)
             
-            raster_settings = GaussianRasterizationSettings(
-                image_height=int(batch["image_height"][idx]),
-                image_width=int(batch["image_width"][idx]),
-                tanfovx=tanfovx,
-                tanfovy=tanfovy,
-                bg=self.bg_color.to(batch["time"].device),
-                scale_modifier=scaling_modifier,
-                viewmatrix=batch["world_view_transform"][idx],
-                projmatrix=batch["full_proj_transform"][idx],
-                sh_degree=self.active_sh_degree,
-                campos=batch["camera_center"][idx],
-                prefiltered=False,
-                debug=False
-            )
-            rasterizer = GaussianRasterizer(raster_settings=raster_settings)
+            if self.rgbdecoder is not None:
+                raster_settings_ch3 = GaussianRasterizationSettings(
+                    image_height=int(batch["image_height"][idx]),
+                    image_width=int(batch["image_width"][idx]),
+                    tanfovx=tanfovx,
+                    tanfovy=tanfovy,
+                    bg=self.bg_color.to(batch["time"].device),
+                    scale_modifier=scaling_modifier,
+                    viewmatrix=batch["world_view_transform"][idx],
+                    projmatrix=batch["full_proj_transform"][idx],
+                    sh_degree=self.active_sh_degree,
+                    campos=batch["camera_center"][idx],
+                    prefiltered=False,
+                    debug=False)
+                raster_settings = GaussianRasterizationSettings_ch9(
+                    image_height=int(batch["image_height"][idx]),
+                    image_width=int(batch["image_width"][idx]),
+                    tanfovx=tanfovx,
+                    tanfovy=tanfovy,
+                    bg=self.bg_color.to(batch["time"].device),
+                    scale_modifier=scaling_modifier,
+                    viewmatrix=batch["world_view_transform"][idx],
+                    projmatrix=batch["full_proj_transform"][idx],
+                    sh_degree=self.active_sh_degree,
+                    campos=batch["camera_center"][idx],
+                    prefiltered=False,
+                   
+                )
+                rasterizer = GaussianRasterizer_ch9(raster_settings=raster_settings)
+                rasterizer_ch3 = GaussianRasterizer(raster_settings=raster_settings_ch3)
+            else:
+                raster_settings = GaussianRasterizationSettings(
+                    image_height=int(batch["image_height"][idx]),
+                    image_width=int(batch["image_width"][idx]),
+                    tanfovx=tanfovx,
+                    tanfovy=tanfovy,
+                    bg=self.bg_color.to(batch["time"].device),
+                    scale_modifier=scaling_modifier,
+                    viewmatrix=batch["world_view_transform"][idx],
+                    projmatrix=batch["full_proj_transform"][idx],
+                    sh_degree=self.active_sh_degree,
+                    campos=batch["camera_center"][idx],
+                    prefiltered=False,
+                    debug=False)
+
+            
+            
+                rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
             # get corresponding Gaussian for render at this time step
             # {
@@ -662,11 +775,10 @@ class GS3d(MyModelBaseClass):
                     rotations=result["rotations"],
                     cov3D_precomp=result["cov3D_precomp"]
                 )
+                
                 rendered_image = self.postprocess(
                     rendered_image=rendered_image, 
-                    rayo=batch["rayo"][idx],
-                    rayd=batch["rayd"][idx],
-                    timestamp=batch["time"][idx],
+                    rays=batch["rays"][idx],
                     )
                 result.update({
                     "render": rendered_image,
@@ -694,16 +806,28 @@ class GS3d(MyModelBaseClass):
                 flow[:, 1] = flow[:, 1] * focal_y / t[:, 2]  + flow[:, 2] * -(focal_y * t[:, 1]) / (t[:, 2]*t[:, 2])
  
                 # Rasterize visible Gaussians to image, obtain their radii (on screen). 
-                rendered_flow, radii_flow, _ = rasterizer(
-                    means3D = result["means3D"].detach(),
-                    means2D = means2D_.detach(),
-                    shs = None,
-                    colors_precomp = flow,
-                    opacities = result["opacity"].detach(),
-                    scales = result["scales"].detach() if result["scales"] is not None else None,
-                    rotations = result["rotations"].detach() if result["rotations"] is not None else None,
-                    cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
-                )
+                if self.rgbdecoder is None:
+                    rendered_flow, radii_flow, _ = rasterizer(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
+                else:
+                    rendered_flow, radii_flow, _ = rasterizer_ch3(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
                 result.update(
                     {
                         "render_flow": rendered_flow,
@@ -727,11 +851,17 @@ class GS3d(MyModelBaseClass):
     # this is for feature -> rgb decoder
     def postprocess(self,
         rendered_image: torch.Tensor,
-        rayo: torch.Tensor,
-        rayd: torch.Tensor,
-        timestamp: torch.Tensor,
+        rays: torch.Tensor,
         ) -> torch.Tensor:
-        return rendered_image # for now not supported
+        if self.rgbdecoder is None:
+            return rendered_image # for now not supported
+        else:
+            return self.rgbdecoder(
+                rendered_image.unsqueeze(0), 
+                rays, 
+            )[0] # 1 , 3
+    
+
 
     
 
@@ -1108,6 +1238,7 @@ class GS3d(MyModelBaseClass):
                                    new_trbf_center, new_trbf_scale)
 
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
+        #(len(list(self._rotation.shape)))
         n_init_points = self.get_xyz.shape[0]
         # Extract points that satisfy the gradient condition
         padded_grad = torch.zeros((n_init_points), device="cuda")
@@ -1165,8 +1296,14 @@ class GS3d(MyModelBaseClass):
                 new_xyz[:, 1:, :] = self.get_xyz[selected_pts_mask].repeat(N, 1, 1)[:, 1:, :]
                 new_rotation = self._rotation[selected_pts_mask].repeat(N,1,1)
         new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask].repeat(N, 1) / (0.8 * N))
-        new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
-        new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
+        
+        if self.rgbdecoder is None:
+            new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
+            new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1, 1)
+        else:
+            #assert False, self._features_dc.shape
+            new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1)
+            new_features_rest = self._features_rest[selected_pts_mask].repeat(N, 1)
         new_opacity = self._opacity[selected_pts_mask].repeat(N, 1)
         if self.motion_mode == "TRBF":
             new_trbf_center = self._trbf_center[selected_pts_mask].repeat(N,1)
@@ -1176,8 +1313,10 @@ class GS3d(MyModelBaseClass):
             new_trbf_center = None
             new_trbf_scale = None
         
-
+        #print(self._features_dc.shape, new_features_dc.shape)
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale)
+        #print(self._features_dc.shape, new_features_dc.shape)
+        
 
         prune_filter = torch.cat(
             (selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
@@ -1212,6 +1351,10 @@ class GS3d(MyModelBaseClass):
     def _prune_optimizer(self, mask):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
+            if group["name"] == "decoder":
+                continue # skip rgbdecoder's param
+            if len(group["params"]) > 1:
+                print(group["name"])
             stored_state = self.optimizer.state.get(group['params'][0], None)
             if stored_state is not None:
                 stored_state["exp_avg"] = stored_state["exp_avg"][mask]
@@ -1267,11 +1410,14 @@ class GS3d(MyModelBaseClass):
     def cat_tensors_to_optimizer(self, tensors_dict):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
-            assert len(group["params"]) == 1
+            if group["name"] == "decoder":
+                continue # skip rgbdecoder's param
+            if len(group["params"]) > 1:
+                print(group["name"])
             extension_tensor = tensors_dict[group["name"]]
             stored_state = self.optimizer.state.get(group['params'][0], None)
             if stored_state is not None:
-
+                #print([stored_state["exp_avg"].shape, extension_tensor.shape, group["name"]])
                 stored_state["exp_avg"] = torch.cat((stored_state["exp_avg"], torch.zeros_like(extension_tensor)),
                                                     dim=0)
                 stored_state["exp_avg_sq"] = torch.cat((stored_state["exp_avg_sq"], torch.zeros_like(extension_tensor)),
