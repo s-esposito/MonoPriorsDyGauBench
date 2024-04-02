@@ -61,8 +61,9 @@ class FourDGSdataset(Dataset):
             "camera_center": camera.camera_center,
             "original_image": camera.original_image,
             #"depth": camera.depth,
-            'rayo': camera.rayo,
-            "rayd": camera.rayd,
+            #'rayo': camera.rayo,
+            #"rayd": camera.rayd,
+            "rays": camera.rays,
             "image_name": camera.image_name,
             "split": self.split
 

@@ -60,7 +60,14 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         xyz = xyz.astype(np.float32)
         
         shs = np.random.random((xyz.shape[0], 3)) / 255.0
-        self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)))
+        
+        times = [cam_info.time for cam_info in train_cam]
+        times = np.unique(times)
+        #assert False, [len(times), times]
+        #times = np.array(set([cam_info.time for cam_info in train_cam]))
+        #assert False, [len(times), np.max(times), np.min(times), times.shape]
+        self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)),
+            times=times)
 
 
         #scene_info = SceneInfo(point_cloud=pcd,

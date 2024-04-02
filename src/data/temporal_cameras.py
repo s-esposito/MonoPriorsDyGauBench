@@ -88,7 +88,7 @@ class TemporalCamera(nn.Module):
         
         self.rayo = self.camera_center.expand(rays_d.shape).permute(2, 0, 1).unsqueeze(0)                                     #rayo.permute(2, 0, 1).unsqueeze(0)
         self.rayd = rays_d.permute(2, 0, 1).unsqueeze(0)
-
+        self.rays = torch.cat([self.rayo, self.rayd], dim=1)#.cuda()
 
 '''
 class MiniCam:
