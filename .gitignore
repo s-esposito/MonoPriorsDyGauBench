@@ -3,3 +3,6 @@ output/*
 submodules/*/build/*
 slurms/*.out
 slurms/wandb/*
+*.pyc
+*.out
+*.code-workspace
