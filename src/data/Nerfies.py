@@ -109,17 +109,18 @@ class NerfiesDataModule(MyDataModuleBaseClass):
     def train_dataloader(self):
         return InfiniteDataLoader(DataLoader(
             self.train_cameras,
-            batch_size=self.batch_size
+            batch_size=self.batch_size,
+            shuffle=True,
         ))
     
     def val_dataloader(self):
         return DataLoader(
             self.val_cameras,
-            batch_size=self.batch_size
+            batch_size=1
         )
     def test_dataloader(self):
         return DataLoader(
             self.test_cameras,
-            batch_size=self.batch_size
+            batch_size=1
         )
 

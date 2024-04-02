@@ -541,6 +541,8 @@ class GS3d(MyModelBaseClass):
         #if self.rgbdecoder is not None:
         #    assert False, "get_features should be changed!"
         # have to visit each batch one by one for rasterizer
+        assert False, "Not debugged for decoder"
+        assert False, "Not debugged for batch training"
         batch_size = batch["time"].shape[0] 
         assert batch_size == 1
         results = {}
@@ -683,7 +685,7 @@ class GS3d(MyModelBaseClass):
         
         # have to visit each batch one by one for rasterizer
         batch_size = batch["time"].shape[0] 
-        assert batch_size == 1
+        #assert batch_size == 1
         results = {}
         for idx in range(batch_size):
             # Set up rasterization configuration for this camera
@@ -836,13 +838,19 @@ class GS3d(MyModelBaseClass):
                         "radii_flow": radii_flow
                         })
             if idx == 0:
-                results.update(result) 
-            else:
+                #results.update(result)
                 for key in result:
+                    results[key] = [result[key]] 
+            else:
+                for key in results:
                     results[key].append(result[key])
-                
         #for key in results:
-        #    print(key, results[key].shape if results[key] is not None else None)
+        #    if results[key][0] is not None:
+        #        if (key == "viewspace_points") or (key == "viewspace_points_flow"):
+        #            continue
+        #        results[key] = torch.stack(results[key], dim=0)        
+        #for key in results:
+        #    print(key, results[key].shape if results[key][0] is not None else None)
         #assert False, "Visualize everything to make sure correct"
         return results
 
@@ -876,19 +884,28 @@ class GS3d(MyModelBaseClass):
         batch: Dict,
         mode: str,
         ):
-        image = render_pkg["render"]
-        assert batch["original_image"].shape[0] == 1
-        gt_image = batch["original_image"][0]
+        images = render_pkg["render"] # a list of 3xHxW
+        #assert batch["original_image"].shape[0] == 1
+        gt_images = batch["original_image"]
         #assert False, [torch.max(image), torch.max(gt_image),
         #    image.shape, gt_image.shape]
         #self.lambda_dssim = 0.
-        Ll1 = l1_loss(image, gt_image)
-        #ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
-        ssim1 =  ssim(image, gt_image)
+        
+        batch_size = gt_images .shape[0]
+        Ll1 = 0.
+        ssim1 = 0.
+        for idx in range(batch_size):
+            Ll1 += l1_loss(images[idx], gt_images[idx][:3]) #for image, gt_image in zip(images, gt_images)) / float(len(images))
+            #ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
+            ssim1 += ssim(images[idx], gt_images[idx][:3])# for image, gt_image in zip(images, gt_images)) / float(len(images))
+        Ll1 /= float(batch_size)
+        ssim1 /= float(batch_size)
         loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1)
+        #assert False, [Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])]
         self.log(f"{mode}/loss_L1", Ll1)
         self.log(f"{mode}/loss_ssim", 1.-ssim1)
         self.log(f"{mode}/loss", loss, prog_bar=True)
+        #print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
         return loss
     
 
@@ -933,16 +950,37 @@ class GS3d(MyModelBaseClass):
         loss = self.compute_loss(
             render_pkg, batch, mode="train"
         )
+        #print(loss)
         self.manual_backward(loss)
 
 
         with torch.no_grad():
             # keep track of stats for adaptive policy
-            
+            #radii = 
+            #visibility_filter = 
+            #viewspace_points = 
+            radii_list = []
+            for radii in render_pkg["radii"]:
+                radii_list.append(radii.unsqueeze(0))
+            #    radii_list.append(radii.unsqueeze(0))
+            #    visibility_filter_list.append(visibility_filter.unsqueeze(0))
+            #    viewspace_point_tensor_list.append(viewspace_point_tensor)
+            viewspace_point_tensor_list = render_pkg["viewspace_points"]
+            viewspace_point_tensor_grad = torch.zeros_like(viewspace_point_tensor_list[0])
+            for idx in range(0, len(viewspace_point_tensor_list)):
+                viewspace_point_tensor_grad = viewspace_point_tensor_grad + viewspace_point_tensor_list[idx].grad
+                  
+            #radii_list = 
+            radii = torch.cat(radii_list, dim=0).max(dim=0).values
+            visibility_filter = torch.max(torch.stack(render_pkg["visibility_filter"], dim=0), dim=0).values > 0.
+            #viewspace_points = render_pkg["viewspace_points"]
+            #assert False, [radii.shape, render_pkg["visibility_filter"][0].shape, visibility_filter.shape, viewspace_point_tensor_grad.shape]
+            self.max_radii2D[visibility_filter] = torch.max(self.max_radii2D[visibility_filter],
+                                                            radii[visibility_filter])
             if iteration < self.densify_until_iter:
                 self.add_densification_stats(
-                    render_pkg["viewspace_points"], 
-                    render_pkg["visibility_filter"])
+                    viewspace_point_tensor_grad, 
+                    visibility_filter)
                 if iteration > self.densify_from_iter and iteration % self.densification_interval == 0:
                     size_threshold = 20 if iteration > self.opacity_reset_interval else None
                     self.densify_and_prune(self.densify_grad_threshold, 0.005, self.cameras_extent, size_threshold)
@@ -994,9 +1032,10 @@ class GS3d(MyModelBaseClass):
                 render_flow=render_flow,
                 time_offset=time_offset
             )        
-            image = torch.clamp(render_pkg["render"], 0.0, 1.0)
+            assert batch["time"].shape[0] == 1
+            image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
             gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
-
+            
             split = batch["split"][0]
             image_name = batch["image_name"][0]
             assert split in ["train", "test"]
@@ -1074,7 +1113,8 @@ class GS3d(MyModelBaseClass):
             render_flow=render_flow,
             time_offset=time_offset
         )        
-        image = torch.clamp(render_pkg["render"], 0.0, 1.0)
+        assert batch["time"].shape[0] == 1, "Batch size must be 1 for testing"
+        image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
         gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
         
         #run_id = self.logger.experiment.id
@@ -1181,8 +1221,8 @@ class GS3d(MyModelBaseClass):
         self.iteration = checkpoint["extra_state_dict"]["iteration"]
         super().on_load_checkpoint(checkpoint)
 
-    def add_densification_stats(self, viewspace_point_tensor, update_filter):
-        self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter, :2], dim=-1,
+    def add_densification_stats(self, viewspace_point_tensor_grad, update_filter):
+        self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor_grad[update_filter, :2], dim=-1,
                                                              keepdim=True)
         self.denom[update_filter] += 1
     
