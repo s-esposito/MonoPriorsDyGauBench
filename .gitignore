@@ -6,3 +6,5 @@ slurms/wandb/*
 *.pyc
 *.out
 *.code-workspace
+**/__pycache__/**
+**/*.egg-info/**

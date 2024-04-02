@@ -1,5 +1,0 @@
-[default]
-entity = lynl7130
-project = base
-base_url = https://api.wandb.ai
-
