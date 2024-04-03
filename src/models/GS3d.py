@@ -68,6 +68,9 @@ class GS3d(MyModelBaseClass):
         decoder_lr: float,
         warm_up: int,
         lambda_dssim: float,
+        time_smoothness_weight: float,
+        l1_time_planes_weight: float,
+        plane_tv_weight: float,
         #logim_itv_test: int, # how many intervals to save image to wandb
         #white_background: Optional[bool]=False,
         use_static: Optional[bool]=False,
@@ -138,6 +141,11 @@ class GS3d(MyModelBaseClass):
         # optimizer arguments
         self.percent_dense = percent_dense
         self.lambda_dssim = lambda_dssim
+
+        self.time_smoothness_weight = time_smoothness_weight
+        self.l1_time_planes_weight = l1_time_planes_weight
+        self.plane_tv_weight = plane_tv_weight
+
         self.warm_up = warm_up
         self.feature_lr = feature_lr
         self.opacity_lr = opacity_lr
@@ -506,7 +514,7 @@ class GS3d(MyModelBaseClass):
             elif self.motion_mode in ["HexPlane"]:
                 result_ = {
                     "means3D": d_xyz,
-                    "shs": d_feat,
+                    "shs": self.get_features,
                     "colors_precomp": None,
                     "opacity": self.opacity_activation(d_opacity),
                     "scales": self.scaling_activation(d_scaling),
@@ -896,17 +904,30 @@ class GS3d(MyModelBaseClass):
         batch_size = gt_images .shape[0]
         Ll1 = 0.
         ssim1 = 0.
+        if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+            tv1 = 0.
         for idx in range(batch_size):
             Ll1 += l1_loss(images[idx], gt_images[idx][:3]) #for image, gt_image in zip(images, gt_images)) / float(len(images))
             #ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
             ssim1 += ssim(images[idx], gt_images[idx][:3])# for image, gt_image in zip(images, gt_images)) / float(len(images))
+            if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+                tv1 += self.deform_model.compute_regulation(
+                    self.time_smoothness_weight,
+                    self.l1_time_planes_weight,
+                    self.plane_tv_weight)
         Ll1 /= float(batch_size)
         ssim1 /= float(batch_size)
         loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1)
+        if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+            tv1 /= float(batch_size)
+            loss += tv1
+        
         #assert False, [Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])]
         self.log(f"{mode}/loss_L1", Ll1)
         self.log(f"{mode}/loss_ssim", 1.-ssim1)
         self.log(f"{mode}/loss", loss, prog_bar=True)
+        if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+            self.log(f"{mode}/loss_tv", tv1)
         #print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
         return loss
     

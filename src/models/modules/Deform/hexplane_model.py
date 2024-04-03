@@ -15,6 +15,15 @@ import time
 import functools
 import numpy as np
 
+def compute_plane_smoothness(t):
+    batch_size, c, h, w = t.shape
+    # Convolve with a second derivative filter, in the time dimension which is dimension 2
+    first_difference = t[..., 1:, :] - t[..., :h-1, :]  # [batch, c, h-1, w]
+    second_difference = first_difference[..., 1:, :] - first_difference[..., :h-2, :]  # [batch, c, h-2, w]
+    # Take the L2 norm of the result
+    return torch.square(second_difference).mean()
+
+
 def get_normalized_directions(directions):
     """SH encoding must be in the range [0, 1]
 
@@ -406,6 +415,7 @@ class Deformation(nn.Module):
         if self.args_no_dshs:
             shs = shs_emb
         else:
+            assert False, "Not allowed for now"
             dshs = self.shs_deform(hidden).reshape([shs_emb.shape[0],16,3])
 
             shs = torch.zeros_like(shs_emb)
@@ -525,6 +535,48 @@ class HexPlaneModel(nn.Module):
             )
         return means3D_final, rotations_final, scales_final, opacity_final, shs_final
 
+    def compute_regulation(self, time_smoothness_weight, l1_time_planes_weight, plane_tv_weight):
+        return plane_tv_weight * self._plane_regulation() + time_smoothness_weight * self._time_regulation() + l1_time_planes_weight * self._l1_regulation()
+
+    def _plane_regulation(self):
+        multi_res_grids = self._deformation.deformation_net.grid.grids
+        total = 0
+        # model.grids is 6 x [1, rank * F_dim, reso, reso]
+        for grids in multi_res_grids:
+            if len(grids) == 3:
+                time_grids = []
+            else:
+                time_grids =  [0,1,3]
+            for grid_id in time_grids:
+                total += compute_plane_smoothness(grids[grid_id])
+        return total
+    def _time_regulation(self):
+        multi_res_grids = self._deformation.deformation_net.grid.grids
+        total = 0
+        # model.grids is 6 x [1, rank * F_dim, reso, reso]
+        for grids in multi_res_grids:
+            if len(grids) == 3:
+                time_grids = []
+            else:
+                time_grids =[2, 4, 5]
+            for grid_id in time_grids:
+                total += compute_plane_smoothness(grids[grid_id])
+        return total
+    def _l1_regulation(self):
+                # model.grids is 6 x [1, rank * F_dim, reso, reso]
+        multi_res_grids = self._deformation.deformation_net.grid.grids
+
+        total = 0.0
+        for grids in multi_res_grids:
+            if len(grids) == 3:
+                continue
+            else:
+                # These are the spatiotemporal grids
+                spatiotemporal_grids = [2, 4, 5]
+            for grid_id in spatiotemporal_grids:
+                total += torch.abs(1 - grids[grid_id]).mean()
+        return total
+        
     def train_setting(self, 
         spatial_lr_scale: float,
         grid_lr_init: float,
