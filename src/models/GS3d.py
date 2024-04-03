@@ -541,10 +541,10 @@ class GS3d(MyModelBaseClass):
         #if self.rgbdecoder is not None:
         #    assert False, "get_features should be changed!"
         # have to visit each batch one by one for rasterizer
-        assert False, "Not debugged for decoder"
-        assert False, "Not debugged for batch training"
+        #assert False, "Not debugged for decoder"
+        #assert False, "Not debugged for batch training"
         batch_size = batch["time"].shape[0] 
-        assert batch_size == 1
+        #assert batch_size == 1
         results = {}
         for idx in range(batch_size):
             # Set up rasterization configuration for this camera
@@ -614,11 +614,11 @@ class GS3d(MyModelBaseClass):
             if self.rot_4d:
                 rotations_r = self.get_rotation_r
             if self.rgbdecoder is None:
-                shs = self.get_features()
+                shs = self.get_features
                 colors_precomp = None
             else:
                 shs = None
-                colors_precomp = self.get_features()
+                colors_precomp = self.get_features
 
             flow_2d = torch.zeros_like(self.get_xyz[:,:2])
             rendered_image, radii, depth, alpha, flow, covs_com = rasterizer(
@@ -659,9 +659,11 @@ class GS3d(MyModelBaseClass):
 
             }
             if idx == 0:
-                results.update(result) 
-            else:
+                #results.update(result)
                 for key in result:
+                    results[key] = [result[key]] 
+            else:
+                for key in results:
                     results[key].append(result[key])
                 
         #for key in results:
