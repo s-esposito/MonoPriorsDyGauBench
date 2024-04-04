@@ -12,9 +12,12 @@ from src.models.modules.Init import create_from_pcd_func
 from src.models.modules.Deform import create_motion_model
 from src.models.modules.Postprocess import getcolormodel
 from src.utils.loss_utils import l1_loss, kl_divergence, ssim
+from src.utils.sh_utils import RGB2SH
+from simple_knn._C import distCUDA2
 #from pytorch_msssim import ssim
 from src.utils.image_utils import psnr
 import torchvision
+import heapq
 
 from .diff_gaussian_rasterization import GaussianRasterizationSettings4D, GaussianRasterizer4D
 from .diff_gaussian_rasterization_4dch9 import GaussianRasterizationSettings4D_ch9, GaussianRasterizer4D_ch9
@@ -71,6 +74,14 @@ class GS3d(MyModelBaseClass):
         time_smoothness_weight: float,
         l1_time_planes_weight: float,
         plane_tv_weight: float,
+        raystart: float,
+        ratioend: float,
+        numperay: int,
+        emsthr: float,
+        emsstartfromiterations: int,
+        selectedlength: int,
+        num_ems: Optional[int]=2,
+        #lasterems_gap: int,
         #logim_itv_test: int, # how many intervals to save image to wandb
         #white_background: Optional[bool]=False,
         use_static: Optional[bool]=False,
@@ -213,6 +224,26 @@ class GS3d(MyModelBaseClass):
         self.lpips_mode = lpips_mode
         self.lpips = lpips.LPIPS(net=lpips_mode, spatial=False) # if spatial is True, keep dim 
 
+
+        self.raystart = raystart
+        self.ratioend = ratioend
+        self.ratioend = ratioend
+        self.numperay = numperay
+        self.emsthr = emsthr
+        self.emsstartfromiterations = emsstartfromiterations
+        self.num_ems = num_ems
+        self.selectedlength = selectedlength
+        #self.lasterems_gap = lasterems_gap
+
+        self.emscnt = 0
+        self.selectedviews = {}
+        self.max_heap = []
+        self.depthdict = {}
+        self.lasterems = 0
+        self.maxz, self.minz =  0.0 , 0.0 
+        self.maxy, self.miny =  0.0 , 0.0 
+        self.maxx, self.minx =  0.0 , 0.0  
+
         
 
     @torch.inference_mode()
@@ -289,6 +320,12 @@ class GS3d(MyModelBaseClass):
             self._trbf_center = nn.Parameter(times.contiguous().requires_grad_(True))
             self._trbf_scale = nn.Parameter(torch.ones((self.get_xyz.shape[0], 1), device="cuda").requires_grad_(True)) 
             nn.init.constant_(self._trbf_scale, self.trbfslinit) 
+        
+        self.maxz, self.minz = torch.amax(self._xyz[:,2]), torch.amin(self._xyz[:,2]) 
+        self.maxy, self.miny = torch.amax(self._xyz[:,1]), torch.amin(self._xyz[:,1]) 
+        self.maxx, self.minx = torch.amax(self._xyz[:,0]), torch.amin(self._xyz[:,0]) 
+        self.maxz = min((self.maxz, 200.0)) # some outliers in the n4d datasets.. 
+        
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -901,15 +938,18 @@ class GS3d(MyModelBaseClass):
         #    image.shape, gt_image.shape]
         #self.lambda_dssim = 0.
         
-        batch_size = gt_images .shape[0]
+        batch_size = gt_images.shape[0]
         Ll1 = 0.
         ssim1 = 0.
+        ssim_list = []
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 = 0.
         for idx in range(batch_size):
             Ll1 += l1_loss(images[idx], gt_images[idx][:3]) #for image, gt_image in zip(images, gt_images)) / float(len(images))
             #ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
-            ssim1 += ssim(images[idx], gt_images[idx][:3])# for image, gt_image in zip(images, gt_images)) / float(len(images))
+            ssim1_ = ssim(images[idx], gt_images[idx][:3])# for image, gt_image in zip(images, gt_images)) / float(len(images))
+            ssim_list.append(ssim1_.item())
+            ssim1 += ssim1_
             if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
                 tv1 += self.deform_model.compute_regulation(
                     self.time_smoothness_weight,
@@ -929,7 +969,7 @@ class GS3d(MyModelBaseClass):
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             self.log(f"{mode}/loss_tv", tv1)
         #print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
-        return loss
+        return loss, ssim_list
     
 
     
@@ -970,7 +1010,7 @@ class GS3d(MyModelBaseClass):
         if deform_optimizer is not None:
             deform_optimizer.zero_grad()
         # Loss
-        loss = self.compute_loss(
+        loss, ssim_list = self.compute_loss(
             render_pkg, batch, mode="train"
         )
         #print(loss)
@@ -1004,14 +1044,155 @@ class GS3d(MyModelBaseClass):
                 self.add_densification_stats(
                     viewspace_point_tensor_grad, 
                     visibility_filter)
+
+                # update selectedviews for guided sampling
+                for idx in range(0, len(viewspace_point_tensor_list)):
+                    value = ssim_list[idx]
+                    key = batch["image_name"][idx]
+                    self.depthdict[key] =  torch.amax(render_pkg["depth"][idx]).item()
+                    
+                    if key in self.selectedviews:
+                        self.selectedviews[key] = value
+                        for i, (heap_value, heap_key) in enumerate(self.max_heap):
+                            if heap_key == key:
+                                self.max_heap[i] = (-value, key)
+                                heapq.heapify(self.max_heap)
+                                break
+                    elif len(self.selectedviews) < self.num_ems:
+                        self.selectedviews[key] = value
+                        heapq.heappush(self.max_heap, (-value, key))
+                    else:
+                        max_value, max_key = heapq.heappop(self.max_heap)
+                        del self.selectedviews[max_key]
+                        self.selectedviews[key] = value
+                        heapq.heappush(self.max_heap, (-value, key))
+
+
+
                 if iteration > self.densify_from_iter and iteration % self.densification_interval == 0:
                     size_threshold = 20 if iteration > self.opacity_reset_interval else None
                     self.densify_and_prune(self.densify_grad_threshold, 0.005, self.cameras_extent, size_threshold)
+                
+                if (self.iteration > self.emsstartfromiterations) and (self.iteration - self.lasterems > 100):
+                    for idx in range(0, len(viewspace_point_tensor_list)):
+                        if self.emscnt >= self.selectedlength:
+                            continue # means if have already performed enough times of addgaussian, skip anyways
+                        image_name = batch["image_name"][idx]
+                        if image_name in self.selectedviews:
+                            print(image_name, self.selectedviews)
+                            self.selectedviews.pop(image_name)
+                            self.max_heap = [(heap_value, heap_key) for heap_value, heap_key in self.max_heap if heap_key != image_name]
+                            self.emscnt += 1
+                            self.lasterems = self.iteration
+                            image = render_pkg["render"][idx]
+                            gt_image = batch["original_image"][idx][:3]
+                            imageadjust = image /(torch.mean(image)+0.01) # 
+                            gtadjust = gt_image / (torch.mean(gt_image)+0.01)
+                            diff = torch.abs(imageadjust   - gtadjust)
+                            diff = torch.sum(diff,        dim=0) # h, w
+                            diff_sorted, _ = torch.sort(diff.reshape(-1)) 
+                            numpixels = diff.shape[0] * diff.shape[1]
+                            threshold = diff_sorted[int(numpixels * self.emsthr)].item()
+                            outmask = diff > threshold#  
+                            kh, kw = 16, 16 # kernel size
+                            dh, dw = 16, 16 # stride
+                            idealh, idealw = int(image.shape[1] / dh  + 1) * kw, int(image.shape[2] / dw + 1) * kw # compute padding  
+                            outmask = torch.nn.functional.pad(outmask, (0, idealw - outmask.shape[1], 0, idealh - outmask.shape[0]), mode='constant', value=0)
+                            patches = outmask.unfold(0, kh, dh).unfold(1, kw, dw)
+                            dummypatch = torch.ones_like(patches)
+                            patchessum = patches.sum(dim=(2,3)) 
+                            patchesmusk = patchessum  >  kh * kh * 0.85
+                            patchesmusk = patchesmusk.unsqueeze(2).unsqueeze(3).repeat(1,1,kh,kh).float()
+                            patches = dummypatch * patchesmusk
 
-                if iteration % self.opacity_reset_interval == 0 or (
+                            depth = render_pkg["depth"][idx]
+                            depth = depth.squeeze(0)
+                            idealdepthh, idealdepthw = int(depth.shape[0] / dh  + 1) * kw, int(depth.shape[1] / dw + 1) * kw # compute padding for depth
+
+                            depth = torch.nn.functional.pad(depth, (0, idealdepthw - depth.shape[1], 0, idealdepthh - depth.shape[0]), mode='constant', value=0)
+
+                            depthpaches = depth.unfold(0, kh, dh).unfold(1, kw, dw)
+                            dummydepthpatches =  torch.ones_like(depthpaches)
+                            a,b,c,d = depthpaches.shape
+                            depthpaches = depthpaches.reshape(a,b,c*d)
+                            mediandepthpatch = torch.median(depthpaches, dim=(2))[0]
+                            depthpaches = dummydepthpatches * (mediandepthpatch.unsqueeze(2).unsqueeze(3))
+                            unfold_depth_shape = dummydepthpatches.size()
+                            output_depth_h = unfold_depth_shape[0] * unfold_depth_shape[2]
+                            output_depth_w = unfold_depth_shape[1] * unfold_depth_shape[3]
+
+                            patches_depth_orig = depthpaches.view(unfold_depth_shape)
+                            patches_depth_orig = patches_depth_orig.permute(0, 2, 1, 3).contiguous()
+                            patches_depth = patches_depth_orig.view(output_depth_h, output_depth_w).float() # 1 for error, 0 for no error
+
+                            depth = patches_depth[:image.shape[1], :image.shape[2]]
+                            depth = depth.unsqueeze(0)
+
+                            midpatch = torch.ones_like(patches)
+
+                            for i in range(0, kh,  2):
+                                for j in range(0, kw, 2):
+                                    midpatch[:,:, i, j] = 0.0  
+        
+                            centerpatches = patches * midpatch
+
+                            unfold_shape = patches.size()
+                            patches_orig = patches.view(unfold_shape)
+                            centerpatches_orig = centerpatches.view(unfold_shape)
+
+                            output_h = unfold_shape[0] * unfold_shape[2]
+                            output_w = unfold_shape[1] * unfold_shape[3]
+                            patches_orig = patches_orig.permute(0, 2, 1, 3).contiguous()
+                            centerpatches_orig = centerpatches_orig.permute(0, 2, 1, 3).contiguous()
+                            centermask = centerpatches_orig.view(output_h, output_w).float() # H * W  mask, # 1 for error, 0 for no error
+                            centermask = centermask[:image.shape[1], :image.shape[2]] # reverse back
+                            
+                            errormask = patches_orig.view(output_h, output_w).float() # H * W  mask, # 1 for error, 0 for no error
+                            errormask = errormask[:image.shape[1], :image.shape[2]] # reverse back
+
+                            H, W = centermask.shape
+
+                            offsetH = int(H/10)
+                            offsetW = int(W/10)
+
+                            centermask[0:offsetH, :] = 0.0
+                            centermask[:, 0:offsetW] = 0.0
+
+                            centermask[-offsetH:, :] = 0.0
+                            centermask[:, -offsetW:] = 0.0
+
+                            depth = render_pkg["depth"][idx]
+                            #depthmap = torch.cat((depth, depth, depth), dim=0)
+                            #invaliddepthmask = (depth == 15.0)
+                            #depthmap = depthmap / torch.amax(depthmap)
+                            #invalideptmap = torch.cat((invaliddepthmask, invaliddepthmask, invaliddepthmask), dim=0).float()  
+
+                            badindices = centermask.nonzero()
+                            
+                            diff_sorted , _ = torch.sort(depth.reshape(-1)) 
+                            N = diff_sorted.shape[0]
+                            mediandepth = int(0.7 * N)
+                            mediandepth = diff_sorted[mediandepth]
+
+                            depth = torch.where(depth>mediandepth, depth,mediandepth )
+
+                            camera2world = batch["world_view_transform"][idx].T.inverse()
+                            projectinverse = batch["full_proj_transform"][idx].T.inverse()
+                            self.addgaussians(badindices, depth, gt_image, 
+                                camera2world, projectinverse, batch["camera_center"][idx],
+                                batch["image_height"][idx], batch["image_width"][idx],
+                                self.depthdict[image_name])
+
+                            
+
+                if (iteration % self.opacity_reset_interval == 0) or (
                         self.white_background and iteration == self.densify_from_iter
                         and (self.motion_mode not in ["4DGS"])):
-                    self.reset_opacity()
+                    #if self.iteration > self.warm_up + 1:
+                        self.reset_opacity()
+
+                
+
         #old_xyz = (self._xyz[:, 0]).detach().clone()
         optimizer.step()
         if deform_optimizer is not None:
@@ -1206,7 +1387,12 @@ class GS3d(MyModelBaseClass):
             "active_sh_degree_t": self.active_sh_degree_t,
             "spatial_lr_scale": self.spatial_lr_scale,
             "cameras_extent": self.cameras_extent,
-            "iteration": self.iteration
+            "iteration": self.iteration,
+            "emscnt": self.emscnt,
+            "selectedviews": self.selectedviews, 
+            "max_heap": self.max_heap,
+            "lasterems": self.lasterems,
+            "depthdict": self.depthdict
         }
         super().on_save_checkpoint(checkpoint)
 
@@ -1242,6 +1428,11 @@ class GS3d(MyModelBaseClass):
         self.spatial_lr_scale = checkpoint["extra_state_dict"]["spatial_lr_scale"]
         self.cameras_extent = checkpoint["extra_state_dict"]["cameras_extent"]
         self.iteration = checkpoint["extra_state_dict"]["iteration"]
+        self.emscnt = checkpoint["extra_state_dict"]["emscnt"]
+        self.selectedviews = checkpoint["extra_state_dict"]["selectedviews"]
+        self.max_heap = checkpoint["extra_state_dict"]["max_heap"]
+        self.lasterems = checkpoint["extra_state_dict"]["lasterems"]
+        self.depthdict = checkpoint["extra_state_dict"]["depthdict"]
         super().on_load_checkpoint(checkpoint)
 
     def add_densification_stats(self, viewspace_point_tensor_grad, update_filter):
@@ -1249,6 +1440,140 @@ class GS3d(MyModelBaseClass):
                                                              keepdim=True)
         self.denom[update_filter] += 1
     
+    def addgaussians(self, baduvidx, depthmap, gt_image, 
+        camera2world, projectinverse, camera_center,
+        image_height, image_width, depthmax):
+        assert self.motion_mode != "FourDim", "RTGS does not support this!"
+        def pix2ndc(v, S):
+            return (v * 2.0 + 1.0) / S - 1.0
+        ratiaolist = torch.linspace(self.raystart, self.ratioend, self.numperay) 
+        rgbs = gt_image[:, baduvidx[:,0], baduvidx[:,1]]
+        rgbs = rgbs.permute(1,0)
+        if self.rgbdecoder is not None:
+            featuredc = torch.cat((rgbs, torch.zeros_like(rgbs)), dim=1).cuda()# should we add the feature dc with non zero values?  # Nx6
+        else:
+            featuredc = RGB2SH(rgb.cuda().float())[:, :, None] # Nx3x1
+            #featuredc = torch.zeros((fused_color.shape[0], 3), device="cuda")
+
+        depths = depthmap[:, baduvidx[:,0], baduvidx[:,1]]
+        depths = depths.permute(1,0)
+
+        depths = torch.ones_like(depths) * depthmax
+
+        u = baduvidx[:,0] # hight y
+        v = baduvidx[:,1] # weidth  x 
+        Npoints = u.shape[0]
+
+        new_xyz = []
+        #new_scaling = []
+        #new_rotation = []
+        new_features_dc = []
+        new_features_rest = []
+        #new_opacity = []
+        new_trbf_center = []
+        new_trbf_scale = []
+        #new_motion = []
+        #new_omega = []
+        #new_featuret = []
+
+        maxz, minz = self.maxz, self.minz 
+        maxy, miny = self.maxy, self.miny 
+        maxx, minx = self.maxx, self.minx 
+
+        for zscale in ratiaolist:
+            ndcu, ndcv = pix2ndc(u, image_height), pix2ndc(v, image_width)
+            randomdepth = torch.rand_like(depths) - 0.5
+            targetPz = (depths + depths/10*(randomdepth)) *zscale
+        
+            ndcu = ndcu.unsqueeze(1)
+            ndcv = ndcv.unsqueeze(1)
+
+            ndccamera = torch.cat((ndcv, ndcu,   torch.ones_like(ndcu) * (1.0) , torch.ones_like(ndcu)), 1) # N,4 ...
+            
+            localpointuv = ndccamera @ projectinverse.T 
+
+            diretioninlocal = localpointuv / localpointuv[:,3:] # ray direction in camera space 
+
+
+            rate = targetPz / diretioninlocal[:, 2:3] #  
+            
+            localpoint = diretioninlocal * rate
+
+            localpoint[:, -1] = 1
+
+            worldpointH = localpoint @ camera2world.T  #myproduct4x4batch(localpoint, camera2wold) # 
+            worldpoint = worldpointH / worldpointH[:, 3:] #  
+
+            xyz = worldpoint[:, :3] 
+            distancetocameracenter = camera_center - xyz
+            distancetocameracenter = torch.norm(distancetocameracenter, dim=1)
+
+            xmask = torch.logical_and(xyz[:, 0] > minx, xyz[:, 0] < maxx )
+            selectedmask = torch.logical_or(xmask, torch.logical_not(xmask))  #torch.logical_and(xmask, ymask)
+            new_xyz.append(xyz[selectedmask]) 
+
+            new_features_dc.append(featuredc[selectedmask])
+            
+
+            selectnumpoints = torch.sum(selectedmask).item()
+            
+            if self.motion_mode == "TRBF":
+                new_trbf_center.append(torch.rand((selectnumpoints, 1)).cuda())
+                new_trbf_scale.append(self.trbfslinit * torch.ones((selectnumpoints, 1), device="cuda"))
+            if self.rgbdecoder is not None:
+                new_features_rest.append(torch.zeros((selectnumpoints, 3), device="cuda"))
+            else:
+                new_features_rest.append(torch.zeros((selectnumpoints, 3, ((self.max_sh_degree + 1) ** 2)-1), device="cuda"))
+
+
+
+        new_xyz = torch.cat(new_xyz, dim=0)
+        if self.motion_mode in ["TRBF", "EffGS"]:
+            new_xyz = torch.cat([new_xyz[:, None, :],
+                torch.zeros((new_xyz.shape[0], self._xyz.shape[1]-1, 3), device="cuda")], dim=1)
+       
+            new_rotation = torch.zeros((new_xyz.shape[0], self._rotation.shape[1], 4), device="cuda")
+            new_rotation[:, 0, 0]= 1
+        else:
+            new_rotation = torch.zeros((new_xyz.shape[0],4), device="cuda")
+            new_rotation[:, 0]= 1
+
+        tmpxyz = torch.cat((new_xyz, self._xyz), dim=0)
+        if len(list(tmpxyz.shape)) == 3:
+            assert tmpxyz.shape[-1] == 3
+            tmpxyz = tmpxyz[:, 0, :]
+        dist2 = torch.clamp_min(distCUDA2(tmpxyz), 0.0000001)
+        dist2 = dist2[:new_xyz.shape[0]]
+        scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 3)
+        scales = torch.clamp(scales, -10, 1.0)
+        new_scaling = scales 
+
+        new_opacity = inverse_sigmoid(0.1 *torch.ones((new_xyz.shape[0], 1), device="cuda"))
+        if self.motion_mode == "TRBF":
+            new_trbf_center = torch.cat(new_trbf_center, dim=0)
+            new_trbf_scale = torch.cat(new_trbf_scale, dim=0)
+        else:
+            new_trbf_center = None
+            new_trbf_scale = None
+        new_features_dc = torch.cat(new_features_dc, dim=0)
+        new_features_rest = torch.cat(new_features_rest, dim=0)
+        new_t = None
+        new_scaling_t = None
+        new_rotation_r = None
+        #print(
+        #    new_xyz.shape, 
+        #    new_features_dc.shape, new_features_rest.shape,
+        #    new_opacity.shape, new_scaling.shape, new_rotation.shape,)
+            #new_trbf_center.shape, new_trbf_scale.shape)
+        
+        self.densification_postfix(
+            new_xyz, new_features_dc, new_features_rest, 
+            new_opacity, new_scaling, new_rotation, 
+            new_t, new_scaling_t, new_rotation_r, 
+            new_trbf_center, new_trbf_scale)
+        
+
+
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0

@@ -110,6 +110,7 @@ class MyLightningCLI(LightningCLI):
             setattr(logger_config.init_args, "name", config.name)
             setattr(logger_config.init_args, "project", config.project)
             setattr(logger_config.init_args, "group", config.group)
+            setattr(logger_config.init_args, "mode", "online")
             #setattr(logger_config.init_args, "log_model", "all")
             if config.trainer.callbacks is None:
                 config.trainer.callbacks = []
