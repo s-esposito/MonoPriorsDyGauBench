@@ -7,8 +7,8 @@ from lightning.pytorch import seed_everything
 class MyDataModuleBaseClass(LightningDataModule):
     def __init__(self, seed: Optional[int]) -> None:
         super().__init__()
-        assert seed is not None, "seed must be provided"
-        seed_everything(seed, workers=True)
+        if seed is not None:
+            seed_everything(seed, workers=True)
 
 
 class InfiniteDataLoader:
