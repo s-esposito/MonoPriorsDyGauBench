@@ -24,12 +24,13 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         ratio: float,
         white_background: bool,
         batch_size: Optional[int]=1,
+        seed: Optional[int]=None,
         #sample_interval: int,
         #num_pts: int,
         #num_pts_stat: int, 
         #num_pts_stat_extra: int
     ) -> None:
-        super().__init__()
+        super().__init__(seed=seed)
 
         self.datadir = datadir
         self.eval = eval

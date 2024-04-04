@@ -2,11 +2,13 @@ from lightning import LightningDataModule
 import numpy as np
 from typing import NamedTuple, Optional
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
-
+from lightning.pytorch import seed_everything
 
 class MyDataModuleBaseClass(LightningDataModule):
-    def __init__(self) -> None:
+    def __init__(self, seed: Optional[int]) -> None:
         super().__init__()
+        assert seed is not None, "seed must be provided"
+        seed_everything(seed, workers=True)
 
 
 class InfiniteDataLoader:

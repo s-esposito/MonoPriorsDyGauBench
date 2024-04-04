@@ -4,9 +4,9 @@
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
 #SBATCH --partition=3090-gcondo --gres=gpu:1
-#SBATCH --job-name debug_D3Gfeat_batch_guided2
-#SBATCH --output debug_D3Gfeat_batch_guided2.out
-#SBATCH --nodelist=gpu2506
+#SBATCH --job-name debug_effgsfeat_batch_guided1
+#SBATCH --output debug_effgsfeat_batch_guided1.out
+
 
 module load gcc/10.1.0-mojgbn
 module load cmake/3.26.3-xi6h36u
@@ -33,8 +33,8 @@ which python
 which pip
 
 
-python main.py fit --config configs/base_D3Gfeat_batch_guided2.yaml
-python main.py test --config configs/base_D3Gfeat_batch_guided2.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
+python main.py fit --config configs/base_effgsfeat_batch_guided1.yaml
+python main.py test --config configs/base_effgsfeat_batch_guided1.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown

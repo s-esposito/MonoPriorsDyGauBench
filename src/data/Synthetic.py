@@ -69,8 +69,9 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         ratio: float,
         white_background: bool,
         batch_size: Optional[int]=1,
+        seed: Optional[int]=None,
         ) -> None:
-        super().__init__()
+        super().__init__(seed=seed)
 
         self.datadir = datadir
         self.eval = eval

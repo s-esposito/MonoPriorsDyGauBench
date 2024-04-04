@@ -1115,7 +1115,10 @@ class GS3d(MyModelBaseClass):
                             dummydepthpatches =  torch.ones_like(depthpaches)
                             a,b,c,d = depthpaches.shape
                             depthpaches = depthpaches.reshape(a,b,c*d)
-                            mediandepthpatch = torch.median(depthpaches, dim=(2))[0]
+                            #mediandepthpatch = torch.median(depthpaches, dim=(2))[0]
+                            # rewrite above line to determinstic quantile
+                            mediandepthpatch = torch.quantile(depthpaches, 0.5, dim=(2))
+
                             depthpaches = dummydepthpatches * (mediandepthpatch.unsqueeze(2).unsqueeze(3))
                             unfold_depth_shape = dummydepthpatches.size()
                             output_depth_h = unfold_depth_shape[0] * unfold_depth_shape[2]
@@ -1194,8 +1197,10 @@ class GS3d(MyModelBaseClass):
                 
 
         #old_xyz = (self._xyz[:, 0]).detach().clone()
+        
         optimizer.step()
         if deform_optimizer is not None:
+            self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
             deform_optimizer.step()
         #assert False, torch.any(old_xyz != self._xyz[:, 0])
         #for param_group in self.optimizer.param_groups:
@@ -1452,7 +1457,7 @@ class GS3d(MyModelBaseClass):
         if self.rgbdecoder is not None:
             featuredc = torch.cat((rgbs, torch.zeros_like(rgbs)), dim=1).cuda()# should we add the feature dc with non zero values?  # Nx6
         else:
-            featuredc = RGB2SH(rgb.cuda().float())[:, :, None] # Nx3x1
+            featuredc = RGB2SH(rgbs.cuda().float())[:, None, :] # Nx1x3
             #featuredc = torch.zeros((fused_color.shape[0], 3), device="cuda")
 
         depths = depthmap[:, baduvidx[:,0], baduvidx[:,1]]
@@ -1523,7 +1528,7 @@ class GS3d(MyModelBaseClass):
             if self.rgbdecoder is not None:
                 new_features_rest.append(torch.zeros((selectnumpoints, 3), device="cuda"))
             else:
-                new_features_rest.append(torch.zeros((selectnumpoints, 3, ((self.max_sh_degree + 1) ** 2)-1), device="cuda"))
+                new_features_rest.append(torch.zeros((selectnumpoints, ((self.max_sh_degree + 1) ** 2)-1, 3), device="cuda"))
 
 
 
