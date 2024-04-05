@@ -13,8 +13,10 @@ from src.models.modules.Deform import create_motion_model
 from src.models.modules.Postprocess import getcolormodel
 from src.utils.loss_utils import l1_loss, kl_divergence, ssim, l2_loss
 from src.utils.sh_utils import RGB2SH
+import src.utils.imutils as imutils
+from src.utils.flow_viz import flow_to_image
 from simple_knn._C import distCUDA2
-#from pytorch_msssim import ssim
+from pytorch_msssim import ms_ssim
 from src.utils.image_utils import psnr
 import torchvision
 import heapq
@@ -225,7 +227,7 @@ class GS3d(MyModelBaseClass):
 
         #LPIPS evaluation
         self.lpips_mode = lpips_mode
-        self.lpips = lpips.LPIPS(net=lpips_mode, spatial=False) # if spatial is True, keep dim 
+        self.lpips = lpips.LPIPS(net=lpips_mode) # if spatial is True, keep dim 
 
 
         self.raystart = raystart
@@ -249,11 +251,11 @@ class GS3d(MyModelBaseClass):
 
         
 
-    @torch.inference_mode()
-    def compute_lpips(
-        self, image: torch.Tensor, gt: torch.Tensor 
-    ): #image: 3xHxW
-        return self.lpips(image[None], gt[None])[0]
+    #@torch.inference_mode()
+    #def compute_lpips(
+    #    self, image: torch.Tensor, gt: torch.Tensor 
+    #): #image: 3xHxW
+    #    return self.lpips(image[None], gt[None])[0]
 
 
     
@@ -1305,29 +1307,46 @@ class GS3d(MyModelBaseClass):
         torch.cuda.empty_cache()
 
     def on_test_epoch_start(self):
-        self.test_psnr_total = 0.0
-        self.test_ssim_total = 0.0
-        #self.test_lpips_total = 0.0
+        
+        self.test_image_name = []
+        self.test_times = []
+        self.test_render_time = []
+        self.test_psnr_total = []
+        self.test_ssim_total = []
+        self.test_msssim_total = []
+        self.test_lpips_total = []
         self.test_num_batches = 0
         print(f"Saving Results based on checkpoint: {self.trainer.ckpt_path}")
         #assert False
         # Access the log directory of the experiment and ready to save all test results
         self.log_dir_test = os.path.join(self.logger.save_dir, "test")
         self.log_dir_gt = os.path.join(self.logger.save_dir, "gt")
+        self.log_dir_depth = os.path.join(self.logger.save_dir, "depth")
+        self.log_dir_flow = os.path.join(self.logger.save_dir, "flow")
         os.makedirs(self.log_dir_test, exist_ok=True)
         os.makedirs(self.log_dir_gt, exist_ok=True)
-        
+        os.makedirs(self.log_dir_depth, exist_ok=True)
+        os.makedirs(self.log_dir_flow, exist_ok=True)
+        self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
 
     def test_step(self, batch, batch_idx):
         render_rgb, render_flow, time_offset = True, True, 1e-3#self.get_render_mode(eval=True)
         #print(batch_idx, type(batch))
         # get normal render
+        
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+
+        start.record()
         render_pkg = self.forward(
             batch=batch,
             render_rgb=render_rgb,
             render_flow=render_flow,
             time_offset=time_offset
-        )        
+        )    
+        end.record()
+        torch.cuda.synchronize()
+        self.test_render_time.append(start.elapsed_time(end)/1000.0/2.) # rendered twice for render and render_flow    
         assert batch["time"].shape[0] == 1, "Batch size must be 1 for testing"
         image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
         gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
@@ -1335,8 +1354,18 @@ class GS3d(MyModelBaseClass):
         #run_id = self.logger.experiment.id
         #print("Run ID:", run_id)
 
-        
-        
+        depth = render_pkg["depth"][0]
+        depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
+        depth = torch.from_numpy(depth).permute(2, 0, 1)
+
+        rendered_flow = render_pkg["render_flow"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+        try:
+            rendered_flow = flow_to_image(rendered_flow)
+            rendered_flow = torch.from_numpy(rendered_flow).permute(2, 0, 1) / 255.
+        except:
+            rendered_flow = torch.zeros_like(depth)
+
+
         #print("Log directory:", log_dir)
         #self.logger.log_image(f"test_images/{batch_idx}_render", [gt, image], step=self.trainer.global_step)
 
@@ -1346,25 +1375,62 @@ class GS3d(MyModelBaseClass):
         #image_name = batch["image_name"][0]
         torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
         torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
-        
+        torchvision.utils.save_image(depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
+        torchvision.utils.save_image(rendered_flow[None], os.path.join(self.log_dir_flow, "%05d.png" % batch_idx))
+
         self.compute_loss(render_pkg, batch, mode="test")
-        self.test_psnr_total += psnr(image[None], gt[None]).mean()
-        self.test_ssim_total += ssim(image, gt)
+        _psnr = psnr(image[None], gt[None]).mean()
+        _ssim = ssim(image, gt)
+        _msssim = ms_ssim(image[None], gt[None], data_range=1, size_average=False).item()
+        _lpips = self.lpips(image[None]*2.-1., gt[None]*2. - 1.).item()
+        
+        self.test_psnr_total.append(_psnr)
+        self.test_ssim_total.append(_ssim)
+        self.test_msssim_total.append(_msssim)
+        self.test_lpips_total.append(_lpips)
+
+        self.test_image_name.append(batch["image_name"][0])
+        self.test_times.append(batch["time"][0].item())
+
+        
         #self.test_lpips_total += self.compute_lpips(image, gt)
         self.test_num_batches += 1
         #return psnr_test, ssim_test, lpips_test
     
     def on_test_epoch_end(self,):
-        avg_psnr = self.test_psnr_total / (self.test_num_batches + 1e-16)
-        avg_ssim = self.test_ssim_total / (self.test_num_batches + 1e-16)
-        #avg_lpips = self.test_lpips_total / (self.test_num_batches + 1e-16)
+        
+        avg_render_time = sum(self.test_render_time) / (self.test_num_batches + 1e-16)
+        avg_psnr = sum(self.test_psnr_total) / (self.test_num_batches + 1e-16)
+        avg_ssim = sum(self.test_ssim_total) / (self.test_num_batches + 1e-16)
+        avg_msssim = sum(self.test_msssim_total) / (self.test_num_batches + 1e-16)
+        avg_lpips = sum(self.test_lpips_total) / (self.test_num_batches + 1e-16)
+        
+        with open(self.log_txt, "w") as f:
+            f.write("image_name, time, render_time, psnr, ssim, msssim, lpips\n")
+            for i in range(len(self.test_image_name)):
+                f.write(f"{self.test_image_name[i]}, {self.test_times[i]}, {self.test_render_time[i]}, {self.test_psnr_total[i]}, {self.test_ssim_total[i]}, {self.test_msssim_total[i]}, {self.test_lpips_total[i]}\n")
+            f.write("\n")
+            f.write(f"Average Render Time: {avg_render_time}\n")
+            f.write(f"Average PSNR: {avg_psnr}\n")        
+            f.write(f"Average SSIM: {avg_ssim}\n")
+            f.write(f"Average MS-SSIM: {avg_msssim}\n")
+            f.write(f"Average LPIPS: {avg_lpips}\n")
+
+        
         self.log('test/avg_psnr', avg_psnr)
         self.log('test/avg_ssim', avg_ssim)
-        #self.log('test/avg_lpips', avg_lpips)
-        self.test_psnr_total = 0.0
-        self.test_ssim_total = 0.0
-        #self.test_lpips_total = 0.0
+        self.log('test/avg_msssim', avg_msssim)
+        self.log('test/avg_lpips', avg_lpips)
+        
+        self.test_image_name = []
+        self.test_times = []
+        self.test_render_time = []
+        self.test_psnr_total = []
+        self.test_ssim_total = []
+        self.test_msssim_total = []
+        self.test_lpips_total = []
         self.test_num_batches = 0
+
 
     def on_save_checkpoint(self, checkpoint):
         '''

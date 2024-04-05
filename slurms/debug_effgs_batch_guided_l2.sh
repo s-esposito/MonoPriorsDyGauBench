@@ -33,7 +33,7 @@ which python
 which pip
 
 
-python main.py fit --config configs/base_effgs_batch_guided_l2.yaml
+#python main.py fit --config configs/base_effgs_batch_guided_l2.yaml
 python main.py test --config configs/base_effgs_batch_guided_l2.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
 
 #cd ~/data/yliang51/Gaussian4D/data
