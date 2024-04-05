@@ -11,7 +11,7 @@ from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, Basic
 from src.models.modules.Init import create_from_pcd_func 
 from src.models.modules.Deform import create_motion_model
 from src.models.modules.Postprocess import getcolormodel
-from src.utils.loss_utils import l1_loss, kl_divergence, ssim
+from src.utils.loss_utils import l1_loss, kl_divergence, ssim, l2_loss
 from src.utils.sh_utils import RGB2SH
 from simple_knn._C import distCUDA2
 #from pytorch_msssim import ssim
@@ -61,6 +61,7 @@ class GS3d(MyModelBaseClass):
         position_lr_max_steps: float,
         densify_from_iter: int,
         densify_until_iter: int,
+        l1_l2_switch: int,
         densification_interval: int,
         opacity_reset_interval: int,
         densify_grad_threshold: float,
@@ -189,6 +190,8 @@ class GS3d(MyModelBaseClass):
         self.densification_interval = densification_interval
         self.opacity_reset_interval = opacity_reset_interval
         self.densify_grad_threshold = densify_grad_threshold
+
+        self.l1_l2_switch = l1_l2_switch
 
         #this is for mode selection of create_from_pcd
         self.init_mode = init_mode
@@ -945,7 +948,10 @@ class GS3d(MyModelBaseClass):
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 = 0.
         for idx in range(batch_size):
-            Ll1 += l1_loss(images[idx], gt_images[idx][:3]) #for image, gt_image in zip(images, gt_images)) / float(len(images))
+            if self.iteration < self.l1_l2_switch:
+                Ll1 += l2_loss(images[idx], gt_images[idx][:3])
+            else:    
+                Ll1 += l1_loss(images[idx], gt_images[idx][:3]) #for image, gt_image in zip(images, gt_images)) / float(len(images))
             #ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
             ssim1_ = ssim(images[idx], gt_images[idx][:3])# for image, gt_image in zip(images, gt_images)) / float(len(images))
             ssim_list.append(ssim1_.item())
