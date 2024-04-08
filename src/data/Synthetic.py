@@ -116,6 +116,9 @@ class SyntheticDataModule(MyDataModuleBaseClass):
 
         times = [cam_info.time for cam_info in train_cam_infos]
         times = np.unique(times)
+        # record time interval for potential AST
+        assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]" 
+        self.time_interval = 1. / float(len(times))
 
         #assert False, "change self.pcd based on Nerfies debugged code"
         #shs = np.random.random((xyz.shape[0], 3)) / 255.0

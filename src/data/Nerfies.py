@@ -73,6 +73,11 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         times = [cam_info.time for cam_info in train_cam]
         times = np.unique(times)
         
+        # record time interval for potential AST
+        assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]" 
+        self.time_interval = 1. / float(len(times))
+
+
         if self.num_pts:
             num_pts = self.num_pts
             mean_xyz = np.mean(xyz, axis=0)

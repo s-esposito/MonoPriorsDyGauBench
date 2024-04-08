@@ -6,7 +6,7 @@ import math
 import lpips
 import os
 from jsonargparse import Namespace
-from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation, build_rotation_4d, build_scaling_rotation_4d
+from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation, build_rotation_4d, build_scaling_rotation_4d, get_linear_noise_func
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
 from src.models.modules.Init import create_from_pcd_func 
 from src.models.modules.Deform import create_motion_model
@@ -66,6 +66,7 @@ class GS3d(MyModelBaseClass):
         densify_from_iter: int,
         densify_until_iter: int,
         l1_l2_switch: int,
+        use_AST: bool,
         densification_interval: int,
         opacity_reset_interval: int,
         densify_grad_threshold: float,
@@ -257,7 +258,11 @@ class GS3d(MyModelBaseClass):
         if self.use_static:
             self.isstatic = torch.empty(0)
             assert self.motion_mode in ["MLP", "HexPlane"], f"Not supporting static for {self.motion_mode} right now"
-            
+        
+        self.use_AST = use_AST
+        if self.use_AST:
+            self.smooth_term = get_linear_noise_func(lr_init=0.1, lr_final=1e-15, lr_delay_mult=0.01, max_steps=20000)
+    
     #@torch.inference_mode()
     #def compute_lpips(
     #    self, image: torch.Tensor, gt: torch.Tensor 
@@ -616,7 +621,8 @@ class GS3d(MyModelBaseClass):
 
     def forward_FourDim(self,
         batch: Dict,
-        scaling_modifier: Optional[float]=1.0
+        scaling_modifier: Optional[float]=1.0,
+        ast_noise: Optional[float]=0.0
     ) -> Dict:
         #assert self.rgbdecoder is None, "Not supporting feature rendering for now! create another rasterizer by changing NUM_CHANNELS!"
         #if self.rgbdecoder is not None:
@@ -645,7 +651,7 @@ class GS3d(MyModelBaseClass):
                     sh_degree=self.active_sh_degree,
                     sh_degree_t=self.active_sh_degree_t,
                     campos=batch["camera_center"][idx],
-                    timestamp=batch["time"][idx],
+                    timestamp=batch["time"][idx] + ast_noise,
                     time_duration=1.,
                     rot_4d=self.rot_4d,
                     gaussian_dim=4,
@@ -668,7 +674,7 @@ class GS3d(MyModelBaseClass):
                     sh_degree=self.active_sh_degree,
                     sh_degree_t=self.active_sh_degree_t,
                     campos=batch["camera_center"][idx],
-                    timestamp=batch["time"][idx],
+                    timestamp=batch["time"][idx] + ast_noise,
                     time_duration=1.,
                     rot_4d=self.rot_4d,
                     gaussian_dim=4,
@@ -754,16 +760,23 @@ class GS3d(MyModelBaseClass):
     
     def forward(
         self, 
+        render_mode: bool,
         batch: Dict,
         render_rgb: Optional[bool]=True,
         render_flow: Optional[bool]=True,
         time_offset: Optional[float]=0.0,
         scaling_modifier: Optional[float]=1.0
     ) -> Dict:
+        if self.use_AST and (not render_mode):
+            ast_noise = self.trainer.datamodule.time_interval * self.smooth_term(self.iteration)
+        else:
+            ast_noise = 0.0
+
         if self.motion_mode == "FourDim":
             return self.forward_FourDim(
                 batch=batch,
-                scaling_modifier=scaling_modifier
+                scaling_modifier=scaling_modifier,
+                ast_noise=ast_noise
             )
         
         # have to visit each batch one by one for rasterizer
@@ -828,10 +841,10 @@ class GS3d(MyModelBaseClass):
             # {
             #    means3D, shs, colors_precomp, opacities, scales, rotations, cov3D_precomp
             # } 
-            result = self.deform(batch["time"][idx]) 
+            result = self.deform(batch["time"][idx] + ast_noise) 
             # result would contain two sets of deformation results if time_offset is not 0.0
             if time_offset != 0.:
-                result_ = self.deform(batch["time"][idx] + time_offset)
+                result_ = self.deform(batch["time"][idx] + ast_noise + time_offset)
                 for key in result_:
                     result[key+"_offset"] = result_[key]
             '''
@@ -1040,6 +1053,7 @@ class GS3d(MyModelBaseClass):
         # Render
         render_rgb, render_flow, time_offset = True, False, 0.#self.get_render_mode()
         render_pkg = self.forward(
+            render_mode=False,
             batch=batch,
             render_rgb=render_rgb,
             render_flow=render_flow,
@@ -1280,6 +1294,7 @@ class GS3d(MyModelBaseClass):
         # get normal render
         try:
             render_pkg = self.forward(
+                render_mode=True,
                 batch=batch,
                 render_rgb=render_rgb,
                 render_flow=render_flow,
@@ -1379,6 +1394,7 @@ class GS3d(MyModelBaseClass):
 
         start.record()
         render_pkg = self.forward(
+            render_mode=True,
             batch=batch,
             render_rgb=render_rgb,
             render_flow=render_flow,
