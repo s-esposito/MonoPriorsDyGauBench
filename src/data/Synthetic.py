@@ -68,6 +68,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         eval: bool,
         ratio: float,
         white_background: bool,
+        num_pts_ratio: float,
         batch_size: Optional[int]=1,
         seed: Optional[int]=None,
         ) -> None:

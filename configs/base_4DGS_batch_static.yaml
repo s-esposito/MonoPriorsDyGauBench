@@ -1,13 +1,14 @@
 seed_everything: false
-name: 'base_FourDimfeat_batch'
+name: 'base_4DGS_batch_static'
 ckpt_path: null
 output: './output'
-group: 'FourDimfeat_batch'
+group: '4DGS_batch_static'
 logger: 'wandb'
 project: 'base'
 model:
   class_path: src.models.GS3d
   init_args:
+    log_image_interval: 1000
     sh_degree: 3
     sh_degree_t: 2
     percent_dense: 0.01
@@ -51,20 +52,22 @@ model:
     num_ems: 2
     emsstartfromiterations: 500000 # disable guided
     selectedlength: 5000
-    use_static: false
-    init_mode: "FourDim"
-    motion_mode: "FourDim"
-    color_mode: "sandwich"
+    use_static: true
+    init_mode: "default"
+    motion_mode: "HexPlane"
+    color_mode: "rgb"
     rot_4d: true
 data:
   class_path: src.data.NerfiesDataModule
   init_args:
     seed: null
-    datadir: '/users/yliang51/data/yliang51/Gaussian4D_depre/data/hypernerf/vrig-chicken'
+    datadir: '/users/yliang51/data/yliang51/Gaussian4D_depre/data/hypernerf/broom2'
     eval: True
     ratio: 0.25
     white_background: true
     batch_size: 2
+    num_pts_ratio: 10.0
+    num_pts: 0
 trainer:
   logger: true
   enable_checkpointing: true
@@ -85,9 +88,8 @@ trainer:
         monitor: 'val/avg_ssim_train'
         dirpath: null
         filename: 'model-{step:06d}-{val/avg_ssim_train:.2f}'
-        save_top_k: 3
+        save_top_k: 0
         mode: 'max'
         save_last: true
         save_on_train_epoch_end: true
   
-

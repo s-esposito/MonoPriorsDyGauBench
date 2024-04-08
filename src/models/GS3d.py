@@ -20,6 +20,7 @@ from pytorch_msssim import ms_ssim
 from src.utils.image_utils import psnr
 import torchvision
 import heapq
+import time
 
 from .diff_gaussian_rasterization import GaussianRasterizationSettings4D, GaussianRasterizer4D
 from .diff_gaussian_rasterization_4dch9 import GaussianRasterizationSettings4D_ch9, GaussianRasterizer4D_ch9
@@ -42,6 +43,7 @@ from diff_gaussian_rasterization_ch9 import GaussianRasterizer as GaussianRaster
 
 class GS3d(MyModelBaseClass):
     def __init__(self,
+        log_image_interval: int,
         sh_degree: int,
         sh_degree_t: int,
         percent_dense: float,
@@ -101,6 +103,7 @@ class GS3d(MyModelBaseClass):
         # needs manual optimization
         self.automatic_optimization = False        
 
+        self.log_image_interval = log_image_interval
         self.post_act = post_act
         self.iteration = 0
         # Sh degree
@@ -114,10 +117,7 @@ class GS3d(MyModelBaseClass):
         self._scaling = torch.empty(0)
         self._rotation = torch.empty(0)
         self._opacity = torch.empty(0)
-        # if use_static is true, have additional attribute isstatic
-        self.use_static = use_static
-        if self.use_static:
-            self.isstatic = torch.empty(0)
+        
         # densification required tracker
         self.max_radii2D = torch.empty(0)
         self.xyz_gradient_accum = torch.empty(0)
@@ -250,7 +250,14 @@ class GS3d(MyModelBaseClass):
         self.maxx, self.minx =  0.0 , 0.0  
 
         
+        self.start_time = None
 
+        # if use_static is true, have additional attribute isstatic
+        self.use_static = use_static
+        if self.use_static:
+            self.isstatic = torch.empty(0)
+            assert self.motion_mode in ["MLP", "HexPlane"], f"Not supporting static for {self.motion_mode} right now"
+            
     #@torch.inference_mode()
     #def compute_lpips(
     #    self, image: torch.Tensor, gt: torch.Tensor 
@@ -268,6 +275,11 @@ class GS3d(MyModelBaseClass):
             bg_color = [0, 0, 0]
         self.white_background = white_background
         self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
+        if self.use_static:
+            assert self.trainer.datamodule.num_pts == 0, "Not supporting static for random initialization"
+            assert self.trainer.datamodule.num_pts_ratio > 0, "must have extra random point for dynamic point cloud"
+            num_static = self.trainer.datamodule.num_static
+            
 
         if self.motion_mode in ["TRBF"]:
             spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, times, fused_color = create_from_pcd_func(
@@ -331,6 +343,9 @@ class GS3d(MyModelBaseClass):
         self.maxx, self.minx = torch.amax(self._xyz[:,0]), torch.amin(self._xyz[:,0]) 
         self.maxz = min((self.maxz, 200.0)) # some outliers in the n4d datasets.. 
         
+        if self.use_static:
+            self.isstatic = torch.zeros((self._xyz.shape[0],1), device="cuda").float()
+            self.isstatic[:num_static] = 1.0
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -577,6 +592,22 @@ class GS3d(MyModelBaseClass):
         if len(list(result_["rotations"].shape)) == 3:
             result_["rotations"] = self.get_rotation[:, 0, :]
         
+        if self.use_static:
+            assert self.motion_mode in ["MLP", "HexPlane"], f"Not supporting static for {self.motion_mode} right now"
+            #print([self.isstatic.shape, result_["means3D"].shape])
+            result_["means3D"] = (1.-self.isstatic) * result_["means3D"] + self.isstatic * self.get_xyz 
+            if self.rgbdecoder is None:
+                result_["shs"] = (1.-self.isstatic)[..., None] * result_["shs"] + self.isstatic[..., None] * self.get_features
+            else:
+                result_["shs"] = (1.-self.isstatic) * result_["shs"] + self.isstatic * self.get_features
+            #result_["colors_precomp"] = (1.-self.isstatic) * result_["colors_precomp"] + self.isstatic * self.get_features_dc
+            result_["opacity"] = (1.-self.isstatic) * result_["opacity"] + self.isstatic * self.get_opacity
+            result_["scales"] = (1.-self.isstatic) * result_["scales"] + self.isstatic * self.get_scaling
+            result_["rotations"] = (1.-self.isstatic) * result_["rotations"] + self.isstatic * self.get_rotation
+
+
+        # if rgbdecoder is not None
+        # then need to switch colors_precomp and shs
         if self.rgbdecoder is not None:
             assert result_["shs"] is not None and result_["colors_precomp"] is None
             result_["colors_precomp"] = result_["shs"]
@@ -979,7 +1010,9 @@ class GS3d(MyModelBaseClass):
         #print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
         return loss, ssim_list
     
-
+    def on_train_epoch_start(self) -> None:
+        if self.start_time is None:
+            self.start_time = time.time()
     
     
     def training_step(self, batch, batch_idx) -> None:
@@ -1226,6 +1259,9 @@ class GS3d(MyModelBaseClass):
                     param_group['lr'] = lr
     
         self.iteration += 1
+
+        step_time = time.time() - self.start_time
+        self.log("step_time", step_time)
                 
     def on_validation_epoch_start(self):
         self.val_psnr_total_train = 0.0
@@ -1257,9 +1293,13 @@ class GS3d(MyModelBaseClass):
             image_name = batch["image_name"][0]
             assert split in ["train", "test"]
             if (split == "train") and (self.num_batches_train < 5):
-                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
+                #print(self.iteration)
+                #assert False, self.iteration
+                if (self.iteration % self.log_image_interval) == 0:
+                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
             elif (split == "test") and (self.num_batches_test < 5):
-                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
+                if (self.iteration % self.log_image_interval) == 0:
+                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
             
             #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
             #    image)
@@ -1277,8 +1317,8 @@ class GS3d(MyModelBaseClass):
                 #self.val_lpips_total_test += self.compute_lpips(image, gt)
                 self.num_batches_test += 1
         except:
-            print(f"An illegal memory access is encountered at batch_idx {batch_idx}!")
-            pass
+           print(f"An illegal memory access is encountered at batch_idx {batch_idx}!")
+           pass
         
         #self.log("val/psnr", float(psnr_test))
     
@@ -1469,8 +1509,11 @@ class GS3d(MyModelBaseClass):
             "selectedviews": self.selectedviews, 
             "max_heap": self.max_heap,
             "lasterems": self.lasterems,
-            "depthdict": self.depthdict
+            "depthdict": self.depthdict,
+            "start_time": self.start_time
         }
+        if self.use_static:
+            checkpoint["extra_state_dict"]["isstatic"] = self.isstatic
         super().on_save_checkpoint(checkpoint)
 
     # order:
@@ -1510,6 +1553,9 @@ class GS3d(MyModelBaseClass):
         self.max_heap = checkpoint["extra_state_dict"]["max_heap"]
         self.lasterems = checkpoint["extra_state_dict"]["lasterems"]
         self.depthdict = checkpoint["extra_state_dict"]["depthdict"]
+        self.start_time = checkpoint["extra_state_dict"]["start_time"]
+        if self.use_static:
+            self.isstatic = checkpoint["extra_state_dict"]["isstatic"].to("cuda")
         super().on_load_checkpoint(checkpoint)
 
     def add_densification_stats(self, viewspace_point_tensor_grad, update_filter):
@@ -1637,6 +1683,11 @@ class GS3d(MyModelBaseClass):
         new_t = None
         new_scaling_t = None
         new_rotation_r = None
+        
+        if self.use_static:
+            new_isstatic = (torch.rand((new_xyz.shape[0],1)).cuda() < 0.5).float()
+        else:
+            new_isstatic = None
         #print(
         #    new_xyz.shape, 
         #    new_features_dc.shape, new_features_rest.shape,
@@ -1647,7 +1698,7 @@ class GS3d(MyModelBaseClass):
             new_xyz, new_features_dc, new_features_rest, 
             new_opacity, new_scaling, new_rotation, 
             new_t, new_scaling_t, new_rotation_r, 
-            new_trbf_center, new_trbf_scale)
+            new_trbf_center, new_trbf_scale, new_isstatic)
         
 
 
@@ -1682,6 +1733,7 @@ class GS3d(MyModelBaseClass):
         new_opacities = self._opacity[selected_pts_mask]
         new_scaling = self._scaling[selected_pts_mask]
         new_rotation = self._rotation[selected_pts_mask]
+        
 
         new_t = None
         new_scaling_t = None
@@ -1697,10 +1749,14 @@ class GS3d(MyModelBaseClass):
             new_trbf_center =  torch.rand((self._trbf_center[selected_pts_mask].shape[0], 1), device="cuda")  #self._trbf_center[selected_pts_mask]
             new_trbf_scale = self._trbf_scale[selected_pts_mask]
 
+        if self.use_static:
+            new_isstatic = self.isstatic[selected_pts_mask]
+        else:
+            new_isstatic = None
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
                                    new_rotation, new_t, new_scaling_t, new_rotation_r,
-                                   new_trbf_center, new_trbf_scale)
+                                   new_trbf_center, new_trbf_scale, new_isstatic)
 
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         #(len(list(self._rotation.shape)))
@@ -1778,8 +1834,13 @@ class GS3d(MyModelBaseClass):
             new_trbf_center = None
             new_trbf_scale = None
         
+        if self.use_static:
+            new_isstatic = self.isstatic[selected_pts_mask].repeat(N, 1)
+        else:
+            new_isstatic = None
+        
         #print(self._features_dc.shape, new_features_dc.shape)
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale)
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic)
         #print(self._features_dc.shape, new_features_dc.shape)
         
 
@@ -1812,6 +1873,10 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             self._trbf_center = optimizable_tensors["trbf_center"]
             self._trbf_scale = optimizable_tensors["trbf_scale"]
+        
+        if self.use_static:
+            self.isstatic = self.isstatic[valid_points_mask]
+        
     
     def _prune_optimizer(self, mask):
         optimizable_tensors = {}
@@ -1836,7 +1901,7 @@ class GS3d(MyModelBaseClass):
         return optimizable_tensors
 
     def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-                              new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale):
+                              new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic):
         d = {"xyz": new_xyz,
              "f_dc": new_features_dc,
              "f_rest": new_features_rest,
@@ -1871,6 +1936,9 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             self._trbf_center = optimizable_tensors["trbf_center"]
             self._trbf_scale = optimizable_tensors["trbf_scale"]  
+        
+        if self.use_static:
+            self.isstatic = torch.cat([self.isstatic, new_isstatic], dim=0) 
 
     def cat_tensors_to_optimizer(self, tensors_dict):
         optimizable_tensors = {}

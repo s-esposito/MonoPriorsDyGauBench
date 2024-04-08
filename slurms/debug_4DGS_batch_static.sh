@@ -4,8 +4,8 @@
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
 #SBATCH --partition=3090-gcondo --gres=gpu:1
-#SBATCH --job-name debug_FourDimfeat_batch
-#SBATCH --output debug_FourDimfeat_batch.out
+#SBATCH --job-name debug_4DGS_batch_static
+#SBATCH --output debug_4DGS_batch_static.out
 
 
 module load gcc/10.1.0-mojgbn
@@ -33,8 +33,10 @@ which python
 which pip
 
 
-#python main.py fit --config configs/base_FourDimfeat_batch.yaml
-python main.py test --config configs/base_FourDimfeat_batch.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
+#python main.py fit --config configs/base_4DGS_batch_static.yaml
+python main.py test --config configs/base_4DGS_batch_static.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
+
+rm -rf output/base_4DGS_batch_static/wandb
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown

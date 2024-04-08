@@ -1,8 +1,8 @@
 seed_everything: false
-name: 'base_FourDimfeat_batch'
+name: 'base_FourDimfeat_batch_extrainit'
 ckpt_path: null
 output: './output'
-group: 'FourDimfeat_batch'
+group: 'FourDimfeat_batch_extrainit'
 logger: 'wandb'
 project: 'base'
 model:
@@ -60,11 +60,12 @@ data:
   class_path: src.data.NerfiesDataModule
   init_args:
     seed: null
-    datadir: '/users/yliang51/data/yliang51/Gaussian4D_depre/data/hypernerf/vrig-chicken'
+    datadir: '/users/yliang51/data/yliang51/Gaussian4D_depre/data/hypernerf/broom2'
     eval: True
     ratio: 0.25
     white_background: true
     batch_size: 2
+    num_pts_ratio: 0.1
 trainer:
   logger: true
   enable_checkpointing: true
@@ -85,7 +86,7 @@ trainer:
         monitor: 'val/avg_ssim_train'
         dirpath: null
         filename: 'model-{step:06d}-{val/avg_ssim_train:.2f}'
-        save_top_k: 3
+        save_top_k: 0
         mode: 'max'
         save_last: true
         save_on_train_epoch_end: true

@@ -415,7 +415,7 @@ class Deformation(nn.Module):
         if self.args_no_dshs:
             shs = shs_emb
         else:
-            assert False, "Not allowed for now"
+            assert False, "Not allowed for now as decoder version is not set"
             dshs = self.shs_deform(hidden).reshape([shs_emb.shape[0],16,3])
 
             shs = torch.zeros_like(shs_emb)
