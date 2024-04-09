@@ -26,6 +26,10 @@ class FourDGSdataset(Dataset):
             FovX = focal2fov(self.dataset.focal[0], image.shape[2])
             FovY = focal2fov(self.dataset.focal[0], image.shape[1])
             depth = None
+            fwd_flow = None 
+            fwd_flow_mask = None
+            bwd_flow = None 
+            bwd_flow_mask = None
         except:
             caminfo = self.dataset[index]
             image = caminfo.image
@@ -35,6 +39,10 @@ class FourDGSdataset(Dataset):
             FovY = caminfo.FovY
             time = caminfo.time
             depth = caminfo.depth
+            fwd_flow = caminfo.fwd_flow
+            fwd_flow_mask = caminfo.fwd_flow_mask
+            bwd_flow = caminfo.bwd_flow 
+            bwd_flow_mask = caminfo.bwd_flow_mask
         #assert False, [type(image), image.shape]
         if self.kernel_size > 1.:
             image = image.unsqueeze(0)
@@ -49,8 +57,10 @@ class FourDGSdataset(Dataset):
         
         camera = Camera(colmap_id=index,R=R,T=T,FoVx=FovX,FoVy=FovY,image=image,gt_alpha_mask=None,
                           image_name=f"{index}",uid=index, time=time,
-                          depth=depth)
-        return {
+                          depth=depth,
+                          fwd_flow=fwd_flow, fwd_flow_mask=fwd_flow_mask,
+                          bwd_flow=bwd_flow, bwd_flow_mask=bwd_flow_mask,)
+        result = {
             "time": camera.time,
             "FoVx": camera.FoVx,
             "FoVy": camera.FoVy,
@@ -68,6 +78,20 @@ class FourDGSdataset(Dataset):
             "split": self.split
 
         }
+       
+        if fwd_flow is not None:
+            #if (fwd_flow_mask is None) or (bwd_flow_mask is None) or (bwd_flow is None):
+            #    print(camera.image_name)
+            #    assert False, [fwd_flow_mask, bwd_flow_mask, bwd_flow]
+            #else:
+            #assert False, camera.image_name        
+            result.update({
+                "fwd_flow": camera.fwd_flow, 
+                "fwd_flow_mask": camera.fwd_flow_mask,
+                "bwd_flow": camera.bwd_flow, 
+                "bwd_flow_mask": camera.bwd_flow_mask
+                })
+        return result
     def __len__(self):
         
         return len(self.dataset)

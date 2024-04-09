@@ -14,6 +14,43 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from math import exp
 
+def compute_depth_loss(pred_depth, gt_depth):   
+    # pred_depth_e = NDC2Euclidean(pred_depth_ndc)
+    t_pred = torch.median(pred_depth)
+    s_pred = torch.mean(torch.abs(pred_depth - t_pred))
+
+    t_gt = torch.median(gt_depth)
+    s_gt = torch.mean(torch.abs(gt_depth - t_gt))
+
+    pred_depth_n = (pred_depth - t_pred)/s_pred
+    gt_depth_n = (gt_depth - t_gt)/s_gt
+
+    # return torch.mean(torch.abs(pred_depth_n - gt_depth_n))
+    return torch.mean(torch.pow(pred_depth_n - gt_depth_n, 2))
+
+def compute_flow_loss(
+    render_flow_fwd, render_flow_bwd,
+    fwd_flow, bwd_flow,
+    fwd_flow_mask, bwd_flow_mask
+    ):
+    flow_loss = 0.
+
+    fwd_flow = fwd_flow.permute(2, 0, 1)
+    render_flow_fwd = render_flow_fwd[:2, ...]
+    fwd_flow = fwd_flow / (torch.max(torch.sqrt(torch.square(fwd_flow).sum(-1))) + 1e-5)
+    render_flow_fwd = render_flow_fwd / (torch.max(torch.sqrt(torch.square(render_flow_fwd).sum(-1))) + 1e-5)
+    M = fwd_flow_mask.unsqueeze(0)
+    fwd_flow_loss = torch.sum(torch.abs(fwd_flow - render_flow_fwd) * M) / (torch.sum(M) + 1e-8) / fwd_flow.shape[-1]
+    flow_loss += fwd_flow_loss
+
+    bwd_flow = bwd_flow.permute(2, 0, 1)
+    render_flow_bwd = render_flow_bwd[:2, ...]
+    bwd_flow = bwd_flow / (torch.max(torch.sqrt(torch.square(bwd_flow).sum(-1))) + 1e-5)
+    render_flow_bwd = render_flow_bwd / (torch.max(torch.sqrt(torch.square(render_flow_bwd).sum(-1))) + 1e-5)
+    M = bwd_flow_mask.unsqueeze(0)
+    bwd_flow_loss = torch.sum(torch.abs(bwd_flow - render_flow_bwd) * M) / (torch.sum(M) + 1e-8) / bwd_flow.shape[-1]
+    flow_loss += bwd_flow_loss
+    return flow_loss
 
 def l1_loss(network_output, gt):
     return torch.abs((network_output - gt)).mean()

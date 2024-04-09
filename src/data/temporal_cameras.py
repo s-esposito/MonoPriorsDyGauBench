@@ -21,13 +21,25 @@ def pix2ndc(v, S):
 class TemporalCamera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
                  image_name, uid, time, depth,
-                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0
+                 fwd_flow=None, fwd_flow_mask=None,
+                 bwd_flow=None, bwd_flow_mask=None, 
+                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0,
                  ):
         super(TemporalCamera, self).__init__()
 
         self.uid = uid
         self.time = time
         self.depth = depth
+        
+        self.fwd_flow=fwd_flow
+        self.fwd_flow_mask=fwd_flow_mask
+        self.bwd_flow=bwd_flow
+        self.bwd_flow_mask=bwd_flow_mask
+        #assert (fwd_flow is not None), "fwd_flow should not be None"
+        #assert (fwd_flow_mask is not None), "fwd_flow_mask should not be None"
+        #assert (bwd_flow is not None), "bwd_flow should not be None"
+        #assert (bwd_flow_mask is not None), "bwd_flow_mask should not be None"
+
         self.colmap_id = colmap_id
         self.R = R
         self.T = T
