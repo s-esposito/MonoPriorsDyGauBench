@@ -23,19 +23,30 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         eval: bool,
         ratio: float,
         white_background: bool,
+        num_pts_ratio: float,
+        num_pts: int,
+        M: Optional[int] = 0,
         batch_size: Optional[int]=1,
+        seed: Optional[int]=None,
         #sample_interval: int,
         #num_pts: int,
         #num_pts_stat: int, 
         #num_pts_stat_extra: int
     ) -> None:
-        super().__init__()
+        super().__init__(seed=seed)
 
         self.datadir = datadir
         self.eval = eval
         self.ratio = ratio
         self.white_background = white_background
         self.batch_size = batch_size
+        self.num_pts_ratio = num_pts_ratio
+        self.num_pts = num_pts
+        self.M = M
+        if num_pts > 0:
+            assert self.num_pts_ratio == 0
+        if num_pts_ratio > 0:
+            assert num_pts == 0
         self.save_hyperparameters()
 
     # stage: separate trainer.{fit,validate,test,predict}
@@ -63,11 +74,42 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         
         times = [cam_info.time for cam_info in train_cam]
         times = np.unique(times)
+        
+        # record time interval for potential AST
+        assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]" 
+        self.time_interval = 1. / float(len(times))
+
+
+        if self.num_pts:
+            num_pts = self.num_pts
+            mean_xyz = np.mean(xyz, axis=0)
+            min_rand_xyz = mean_xyz - np.array([0.5, 0.5, 0.5])
+            max_rand_xyz = mean_xyz + np.array([0.5, 2.0, 0.5])
+            xyz = np.random.random((num_pts, 3)) * (max_rand_xyz - min_rand_xyz) + min_rand_xyz 
+                              
+            shs = np.random.random((num_pts, 3)) / 255.0
+
+        if self.num_pts_ratio > 0:
+            self.num_static = xyz.shape[0]
+            num_pts = int(self.num_pts_ratio * xyz.shape[0])
+            mean_xyz = np.mean(xyz, axis=0)
+            min_rand_xyz = mean_xyz - np.array([0.5, 0.5, 0.5])
+            max_rand_xyz = mean_xyz + np.array([0.5, 2.0, 0.5])
+            xyz = np.concatenate([xyz, 
+                              np.random.random((num_pts, 3)) * (max_rand_xyz - min_rand_xyz) + min_rand_xyz], 
+                              axis=0)
+            shs = np.concatenate([shs, 
+                              np.random.random((num_pts, 3)) / 255.0], 
+                              axis=0)
+            
+            
         #assert False, [len(times), times]
         #times = np.array(set([cam_info.time for cam_info in train_cam]))
         #assert False, [len(times), np.max(times), np.min(times), times.shape]
+        
+        #times = np.linspace
         self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)),
-            times=times)
+            times=np.linspace(0., 1., self.M))
 
 
         #scene_info = SceneInfo(point_cloud=pcd,
@@ -109,17 +151,18 @@ class NerfiesDataModule(MyDataModuleBaseClass):
     def train_dataloader(self):
         return InfiniteDataLoader(DataLoader(
             self.train_cameras,
-            batch_size=self.batch_size
+            batch_size=self.batch_size,
+            shuffle=True,
         ))
     
     def val_dataloader(self):
         return DataLoader(
             self.val_cameras,
-            batch_size=self.batch_size
+            batch_size=1
         )
     def test_dataloader(self):
         return DataLoader(
             self.test_cameras,
-            batch_size=self.batch_size
+            batch_size=1
         )
 

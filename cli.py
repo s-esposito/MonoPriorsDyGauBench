@@ -1,5 +1,6 @@
 from lightning.pytorch.cli import LightningCLI, LightningArgumentParser, SaveConfigCallback
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch import seed_everything
 from callbacks import WandbWatcher
 from typing import Optional, List
 import os
@@ -39,6 +40,15 @@ class MyLightningCLI(LightningCLI):
         config = getattr(self.config, self.config.subcommand)
         assert config.name is not None, "Experiment must have a name for saving and logging!"
         assert config.output is not None, "Experiment must have a base output path!"
+        
+        '''
+        seed_everything(config.seed_everything, workers=True)
+        data_config = getattr(config, "data")
+        data_init_args = getattr(data_config, "init_args")
+        # this would also affect parent configs
+        setattr(data_init_args, "seed", config.seed_everything) 
+        '''
+        
         
         # build output path
         output_path = os.path.join(config.output, config.name)
@@ -110,6 +120,7 @@ class MyLightningCLI(LightningCLI):
             setattr(logger_config.init_args, "name", config.name)
             setattr(logger_config.init_args, "project", config.project)
             setattr(logger_config.init_args, "group", config.group)
+            setattr(logger_config.init_args, "mode", "online")
             #setattr(logger_config.init_args, "log_model", "all")
             if config.trainer.callbacks is None:
                 config.trainer.callbacks = []

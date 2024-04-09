@@ -2,11 +2,13 @@ from lightning import LightningDataModule
 import numpy as np
 from typing import NamedTuple, Optional
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
-
+from lightning.pytorch import seed_everything
 
 class MyDataModuleBaseClass(LightningDataModule):
-    def __init__(self) -> None:
+    def __init__(self, seed: Optional[int]) -> None:
         super().__init__()
+        if seed is not None:
+            seed_everything(seed, workers=True)
 
 
 class InfiniteDataLoader:
@@ -40,6 +42,10 @@ class CameraInfo(NamedTuple):
     height: int
     time : float
     depth: Optional[np.array] = None
+    fwd_flow: Optional[np.array] = None
+    fwd_flow_mask: Optional[np.array] = None
+    bwd_flow: Optional[np.array] = None
+    bwd_flow_mask: Optional[np.array] = None
 
 
 def getNerfppNorm(cam_info):

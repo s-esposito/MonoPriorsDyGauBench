@@ -6,15 +6,21 @@ import math
 import lpips
 import os
 from jsonargparse import Namespace
-from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation, build_rotation_4d, build_scaling_rotation_4d
+from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation, build_rotation_4d, build_scaling_rotation_4d, get_linear_noise_func
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
 from src.models.modules.Init import create_from_pcd_func 
 from src.models.modules.Deform import create_motion_model
 from src.models.modules.Postprocess import getcolormodel
-from src.utils.loss_utils import l1_loss, kl_divergence, ssim
-#from pytorch_msssim import ssim
+from src.utils.loss_utils import l1_loss, kl_divergence, ssim, l2_loss, compute_depth_loss, compute_flow_loss
+from src.utils.sh_utils import RGB2SH
+import src.utils.imutils as imutils
+from src.utils.flow_viz import flow_to_image
+from simple_knn._C import distCUDA2
+from pytorch_msssim import ms_ssim
 from src.utils.image_utils import psnr
 import torchvision
+import heapq
+import time
 
 from .diff_gaussian_rasterization import GaussianRasterizationSettings4D, GaussianRasterizer4D
 from .diff_gaussian_rasterization_4dch9 import GaussianRasterizationSettings4D_ch9, GaussianRasterizer4D_ch9
@@ -37,6 +43,7 @@ from diff_gaussian_rasterization_ch9 import GaussianRasterizer as GaussianRaster
 
 class GS3d(MyModelBaseClass):
     def __init__(self,
+        log_image_interval: int,
         sh_degree: int,
         sh_degree_t: int,
         percent_dense: float,
@@ -58,6 +65,8 @@ class GS3d(MyModelBaseClass):
         position_lr_max_steps: float,
         densify_from_iter: int,
         densify_until_iter: int,
+        l1_l2_switch: int,
+        use_AST: bool,
         densification_interval: int,
         opacity_reset_interval: int,
         densify_grad_threshold: float,
@@ -68,6 +77,18 @@ class GS3d(MyModelBaseClass):
         decoder_lr: float,
         warm_up: int,
         lambda_dssim: float,
+        lambda_flow: float,
+        time_smoothness_weight: float,
+        l1_time_planes_weight: float,
+        plane_tv_weight: float,
+        raystart: float,
+        ratioend: float,
+        numperay: int,
+        emsthr: float,
+        emsstartfromiterations: int,
+        selectedlength: int,
+        num_ems: Optional[int]=2,
+        #lasterems_gap: int,
         #logim_itv_test: int, # how many intervals to save image to wandb
         #white_background: Optional[bool]=False,
         use_static: Optional[bool]=False,
@@ -84,6 +105,7 @@ class GS3d(MyModelBaseClass):
         # needs manual optimization
         self.automatic_optimization = False        
 
+        self.log_image_interval = log_image_interval
         self.post_act = post_act
         self.iteration = 0
         # Sh degree
@@ -97,10 +119,7 @@ class GS3d(MyModelBaseClass):
         self._scaling = torch.empty(0)
         self._rotation = torch.empty(0)
         self._opacity = torch.empty(0)
-        # if use_static is true, have additional attribute isstatic
-        self.use_static = use_static
-        if self.use_static:
-            self.isstatic = torch.empty(0)
+        
         # densification required tracker
         self.max_radii2D = torch.empty(0)
         self.xyz_gradient_accum = torch.empty(0)
@@ -138,6 +157,11 @@ class GS3d(MyModelBaseClass):
         # optimizer arguments
         self.percent_dense = percent_dense
         self.lambda_dssim = lambda_dssim
+
+        self.time_smoothness_weight = time_smoothness_weight
+        self.l1_time_planes_weight = l1_time_planes_weight
+        self.plane_tv_weight = plane_tv_weight
+
         self.warm_up = warm_up
         self.feature_lr = feature_lr
         self.opacity_lr = opacity_lr
@@ -171,6 +195,8 @@ class GS3d(MyModelBaseClass):
         self.opacity_reset_interval = opacity_reset_interval
         self.densify_grad_threshold = densify_grad_threshold
 
+        self.l1_l2_switch = l1_l2_switch
+
         #this is for mode selection of create_from_pcd
         self.init_mode = init_mode
         
@@ -203,20 +229,56 @@ class GS3d(MyModelBaseClass):
 
         #LPIPS evaluation
         self.lpips_mode = lpips_mode
-        self.lpips = lpips.LPIPS(net=lpips_mode, spatial=False) # if spatial is True, keep dim 
+        self.lpips = lpips.LPIPS(net=lpips_mode) # if spatial is True, keep dim 
+
+
+        self.raystart = raystart
+        self.ratioend = ratioend
+        self.ratioend = ratioend
+        self.numperay = numperay
+        self.emsthr = emsthr
+        self.emsstartfromiterations = emsstartfromiterations
+        self.num_ems = num_ems
+        self.selectedlength = selectedlength
+        #self.lasterems_gap = lasterems_gap
+
+        self.emscnt = 0
+        self.selectedviews = {}
+        self.max_heap = []
+        self.depthdict = {}
+        self.lasterems = 0
+        self.maxz, self.minz =  0.0 , 0.0 
+        self.maxy, self.miny =  0.0 , 0.0 
+        self.maxx, self.minx =  0.0 , 0.0  
 
         
+        self.start_time = None
 
-    @torch.inference_mode()
-    def compute_lpips(
-        self, image: torch.Tensor, gt: torch.Tensor 
-    ): #image: 3xHxW
-        return self.lpips(image[None], gt[None])[0]
+        # if use_static is true, have additional attribute isstatic
+        self.use_static = use_static
+        if self.use_static:
+            self.isstatic = torch.empty(0)
+            assert self.motion_mode in ["MLP", "HexPlane"], f"Not supporting static for {self.motion_mode} right now"
+        
+        self.use_AST = use_AST
+        if self.use_AST:
+            self.smooth_term = get_linear_noise_func(lr_init=0.1, lr_final=1e-15, lr_delay_mult=0.01, max_steps=20000)
+    
+        self.lambda_flow = lambda_flow
+        if self.lambda_flow > 0.0:
+            assert self.motion_mode not in "FourDim", "RTGS flow rendering not implemented for now"
+    #@torch.inference_mode()
+    #def compute_lpips(
+    #    self, image: torch.Tensor, gt: torch.Tensor 
+    #): #image: 3xHxW
+    #    return self.lpips(image[None], gt[None])[0]
 
 
     
     # have to put create_from_pcd here as need read datamodule info
     def setup(self, stage: str) -> None:
+        
+        
         white_background = self.trainer.datamodule.white_background
         if white_background:
             bg_color = [1, 1, 1] 
@@ -224,6 +286,11 @@ class GS3d(MyModelBaseClass):
             bg_color = [0, 0, 0]
         self.white_background = white_background
         self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
+        if self.use_static:
+            assert self.trainer.datamodule.num_pts == 0, "Not supporting static for random initialization"
+            assert self.trainer.datamodule.num_pts_ratio > 0, "must have extra random point for dynamic point cloud"
+            num_static = self.trainer.datamodule.num_static
+            
 
         if self.motion_mode in ["TRBF"]:
             spatial_lr_scale, fused_point_cloud, features, scales, rots, opacities, times, fused_color = create_from_pcd_func(
@@ -281,6 +348,15 @@ class GS3d(MyModelBaseClass):
             self._trbf_center = nn.Parameter(times.contiguous().requires_grad_(True))
             self._trbf_scale = nn.Parameter(torch.ones((self.get_xyz.shape[0], 1), device="cuda").requires_grad_(True)) 
             nn.init.constant_(self._trbf_scale, self.trbfslinit) 
+        
+        self.maxz, self.minz = torch.amax(self._xyz[:,2]), torch.amin(self._xyz[:,2]) 
+        self.maxy, self.miny = torch.amax(self._xyz[:,1]), torch.amin(self._xyz[:,1]) 
+        self.maxx, self.minx = torch.amax(self._xyz[:,0]), torch.amin(self._xyz[:,0]) 
+        self.maxz = min((self.maxz, 200.0)) # some outliers in the n4d datasets.. 
+        
+        if self.use_static:
+            self.isstatic = torch.zeros((self._xyz.shape[0],1), device="cuda").float()
+            self.isstatic[:num_static] = 1.0
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -506,7 +582,7 @@ class GS3d(MyModelBaseClass):
             elif self.motion_mode in ["HexPlane"]:
                 result_ = {
                     "means3D": d_xyz,
-                    "shs": d_feat,
+                    "shs": self.get_features,
                     "colors_precomp": None,
                     "opacity": self.opacity_activation(d_opacity),
                     "scales": self.scaling_activation(d_scaling),
@@ -527,6 +603,22 @@ class GS3d(MyModelBaseClass):
         if len(list(result_["rotations"].shape)) == 3:
             result_["rotations"] = self.get_rotation[:, 0, :]
         
+        if self.use_static:
+            assert self.motion_mode in ["MLP", "HexPlane"], f"Not supporting static for {self.motion_mode} right now"
+            #print([self.isstatic.shape, result_["means3D"].shape])
+            result_["means3D"] = (1.-self.isstatic) * result_["means3D"] + self.isstatic * self.get_xyz 
+            if self.rgbdecoder is None:
+                result_["shs"] = (1.-self.isstatic)[..., None] * result_["shs"] + self.isstatic[..., None] * self.get_features
+            else:
+                result_["shs"] = (1.-self.isstatic) * result_["shs"] + self.isstatic * self.get_features
+            #result_["colors_precomp"] = (1.-self.isstatic) * result_["colors_precomp"] + self.isstatic * self.get_features_dc
+            result_["opacity"] = (1.-self.isstatic) * result_["opacity"] + self.isstatic * self.get_opacity
+            result_["scales"] = (1.-self.isstatic) * result_["scales"] + self.isstatic * self.get_scaling
+            result_["rotations"] = (1.-self.isstatic) * result_["rotations"] + self.isstatic * self.get_rotation
+
+
+        # if rgbdecoder is not None
+        # then need to switch colors_precomp and shs
         if self.rgbdecoder is not None:
             assert result_["shs"] is not None and result_["colors_precomp"] is None
             result_["colors_precomp"] = result_["shs"]
@@ -535,14 +627,17 @@ class GS3d(MyModelBaseClass):
 
     def forward_FourDim(self,
         batch: Dict,
-        scaling_modifier: Optional[float]=1.0
+        scaling_modifier: Optional[float]=1.0,
+        ast_noise: Optional[float]=0.0
     ) -> Dict:
         #assert self.rgbdecoder is None, "Not supporting feature rendering for now! create another rasterizer by changing NUM_CHANNELS!"
         #if self.rgbdecoder is not None:
         #    assert False, "get_features should be changed!"
         # have to visit each batch one by one for rasterizer
+        #assert False, "Not debugged for decoder"
+        #assert False, "Not debugged for batch training"
         batch_size = batch["time"].shape[0] 
-        assert batch_size == 1
+        #assert batch_size == 1
         results = {}
         for idx in range(batch_size):
             # Set up rasterization configuration for this camera
@@ -562,7 +657,7 @@ class GS3d(MyModelBaseClass):
                     sh_degree=self.active_sh_degree,
                     sh_degree_t=self.active_sh_degree_t,
                     campos=batch["camera_center"][idx],
-                    timestamp=batch["time"][idx],
+                    timestamp=batch["time"][idx] + ast_noise,
                     time_duration=1.,
                     rot_4d=self.rot_4d,
                     gaussian_dim=4,
@@ -585,7 +680,7 @@ class GS3d(MyModelBaseClass):
                     sh_degree=self.active_sh_degree,
                     sh_degree_t=self.active_sh_degree_t,
                     campos=batch["camera_center"][idx],
-                    timestamp=batch["time"][idx],
+                    timestamp=batch["time"][idx] + ast_noise,
                     time_duration=1.,
                     rot_4d=self.rot_4d,
                     gaussian_dim=4,
@@ -612,11 +707,11 @@ class GS3d(MyModelBaseClass):
             if self.rot_4d:
                 rotations_r = self.get_rotation_r
             if self.rgbdecoder is None:
-                shs = self.get_features()
+                shs = self.get_features
                 colors_precomp = None
             else:
                 shs = None
-                colors_precomp = self.get_features()
+                colors_precomp = self.get_features
 
             flow_2d = torch.zeros_like(self.get_xyz[:,:2])
             rendered_image, radii, depth, alpha, flow, covs_com = rasterizer(
@@ -653,13 +748,16 @@ class GS3d(MyModelBaseClass):
                 "visibility_filter": radii > 0,
                 "radii": radii, 
                 "depth": depth,
-                "render_flow": flow
+                "render_flow_fwd": flow,
+                "render_flow_bwd": flow
 
             }
             if idx == 0:
-                results.update(result) 
-            else:
+                #results.update(result)
                 for key in result:
+                    results[key] = [result[key]] 
+            else:
+                for key in results:
                     results[key].append(result[key])
                 
         #for key in results:
@@ -669,21 +767,28 @@ class GS3d(MyModelBaseClass):
     
     def forward(
         self, 
+        render_mode: bool,
         batch: Dict,
         render_rgb: Optional[bool]=True,
         render_flow: Optional[bool]=True,
         time_offset: Optional[float]=0.0,
         scaling_modifier: Optional[float]=1.0
     ) -> Dict:
+        if self.use_AST and (not render_mode):
+            ast_noise = self.trainer.datamodule.time_interval * self.smooth_term(self.iteration)
+        else:
+            ast_noise = 0.0
+
         if self.motion_mode == "FourDim":
             return self.forward_FourDim(
                 batch=batch,
-                scaling_modifier=scaling_modifier
+                scaling_modifier=scaling_modifier,
+                ast_noise=ast_noise
             )
         
         # have to visit each batch one by one for rasterizer
         batch_size = batch["time"].shape[0] 
-        assert batch_size == 1
+        #assert batch_size == 1
         results = {}
         for idx in range(batch_size):
             # Set up rasterization configuration for this camera
@@ -743,12 +848,14 @@ class GS3d(MyModelBaseClass):
             # {
             #    means3D, shs, colors_precomp, opacities, scales, rotations, cov3D_precomp
             # } 
-            result = self.deform(batch["time"][idx]) 
+            result = self.deform(batch["time"][idx] + ast_noise) 
             # result would contain two sets of deformation results if time_offset is not 0.0
             if time_offset != 0.:
-                result_ = self.deform(batch["time"][idx] + time_offset)
-                for key in result_:
-                    result[key+"_offset"] = result_[key]
+                result_fwd = self.deform(batch["time"][idx] + ast_noise + time_offset)
+                result_bwd = self.deform(batch["time"][idx] + ast_noise - time_offset)
+                for key in result_fwd:
+                    result[key+"_fwd"] = result_fwd[key]
+                    result[key+"_bwd"] = result_bwd[key]
             '''
             for key in result:
                 if result[key] is None:
@@ -795,34 +902,57 @@ class GS3d(MyModelBaseClass):
                 except:
                     pass
                 means2D_ = screenspace_points_
-                flow = result["means3D_offset"] - result["means3D"].detach()
+                flow_fwd = result["means3D_fwd"] - result["means3D"].detach()
+                flow_bwd = result["means3D_bwd"] - result["means3D"].detach()
                 focal_y = int(batch["image_height"][idx]) / (2.0 * tanfovy)
                 focal_x = int(batch["image_width"][idx]) / (2.0 * tanfovx)
                 tx, ty, tz = batch["world_view_transform"][idx][3, :3]
                 viewmatrix = batch["world_view_transform"][idx]#.cuda()
                 t = result["means3D"] * viewmatrix[0, :3]  + result["means3D"] * viewmatrix[1, :3] + result["means3D"] * viewmatrix[2, :3] + viewmatrix[3, :3]
                 t = t.detach()
-                flow[:, 0] = flow[:, 0] * focal_x / t[:, 2]  + flow[:, 2] * -(focal_x * t[:, 0]) / (t[:, 2]*t[:, 2])
-                flow[:, 1] = flow[:, 1] * focal_y / t[:, 2]  + flow[:, 2] * -(focal_y * t[:, 1]) / (t[:, 2]*t[:, 2])
+                flow_fwd[:, 0] = flow_fwd[:, 0] * focal_x / t[:, 2]  + flow_fwd[:, 2] * -(focal_x * t[:, 0]) / (t[:, 2]*t[:, 2])
+                flow_fwd[:, 1] = flow_fwd[:, 1] * focal_y / t[:, 2]  + flow_fwd[:, 2] * -(focal_y * t[:, 1]) / (t[:, 2]*t[:, 2])
+                flow_bwd[:, 0] = flow_bwd[:, 0] * focal_x / t[:, 2]  + flow_bwd[:, 2] * -(focal_x * t[:, 0]) / (t[:, 2]*t[:, 2])
+                flow_bwd[:, 1] = flow_bwd[:, 1] * focal_y / t[:, 2]  + flow_bwd[:, 2] * -(focal_y * t[:, 1]) / (t[:, 2]*t[:, 2])
  
                 # Rasterize visible Gaussians to image, obtain their radii (on screen). 
                 if self.rgbdecoder is None:
-                    rendered_flow, radii_flow, _ = rasterizer(
+                    rendered_flow_fwd, _, _ = rasterizer(
                         means3D = result["means3D"].detach(),
                         means2D = means2D_.detach(),
                         shs = None,
-                        colors_precomp = flow,
+                        colors_precomp = flow_fwd,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
+                    rendered_flow_bwd, _, _ = rasterizer(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow_bwd,
                         opacities = result["opacity"].detach(),
                         scales = result["scales"].detach() if result["scales"] is not None else None,
                         rotations = result["rotations"].detach() if result["rotations"] is not None else None,
                         cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
                     )
                 else:
-                    rendered_flow, radii_flow, _ = rasterizer_ch3(
+                    rendered_flow_fwd, _, _ = rasterizer_ch3(
                         means3D = result["means3D"].detach(),
                         means2D = means2D_.detach(),
                         shs = None,
-                        colors_precomp = flow,
+                        colors_precomp = flow_fwd,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
+                    rendered_flow_bwd, _, _ = rasterizer_ch3(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow_bwd,
                         opacities = result["opacity"].detach(),
                         scales = result["scales"].detach() if result["scales"] is not None else None,
                         rotations = result["rotations"].detach() if result["rotations"] is not None else None,
@@ -830,19 +960,26 @@ class GS3d(MyModelBaseClass):
                     )
                 result.update(
                     {
-                        "render_flow": rendered_flow,
-                        "viewspace_points_flow": screenspace_points_,
-                        "visibility_filter_flow" : radii_flow > 0,
-                        "radii_flow": radii_flow
+                        "render_flow_fwd": rendered_flow_fwd,
+                        "render_flow_bwd": rendered_flow_bwd,
+                        #"viewspace_points_flow": screenspace_points_,
+                        #"visibility_filter_flow" : radii_flow > 0,
+                        #"radii_flow": radii_flow
                         })
             if idx == 0:
-                results.update(result) 
-            else:
+                #results.update(result)
                 for key in result:
+                    results[key] = [result[key]] 
+            else:
+                for key in results:
                     results[key].append(result[key])
-                
         #for key in results:
-        #    print(key, results[key].shape if results[key] is not None else None)
+        #    if results[key][0] is not None:
+        #        if (key == "viewspace_points") or (key == "viewspace_points_flow"):
+        #            continue
+        #        results[key] = torch.stack(results[key], dim=0)        
+        #for key in results:
+        #    print(key, results[key].shape if results[key][0] is not None else None)
         #assert False, "Visualize everything to make sure correct"
         return results
 
@@ -876,22 +1013,89 @@ class GS3d(MyModelBaseClass):
         batch: Dict,
         mode: str,
         ):
-        image = render_pkg["render"]
-        assert batch["original_image"].shape[0] == 1
-        gt_image = batch["original_image"][0]
+        images = render_pkg["render"] # a list of 3xHxW
+        #assert batch["original_image"].shape[0] == 1
+        gt_images = batch["original_image"]
         #assert False, [torch.max(image), torch.max(gt_image),
         #    image.shape, gt_image.shape]
         #self.lambda_dssim = 0.
-        Ll1 = l1_loss(image, gt_image)
-        #ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
-        ssim1 =  ssim(image, gt_image)
+        
+        batch_size = gt_images.shape[0]
+        Ll1 = 0.
+        ssim1 = 0.
+        ssim_list = []
+        if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+            tv1 = 0.
+        if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+            flow_loss = 0.
+            fwd_flows = batch["fwd_flow"] 
+            fwd_flow_masks = batch["fwd_flow_mask"]
+            bwd_flows = batch["bwd_flow"] 
+            bwd_flow_masks = batch["bwd_flow_mask"]
+            render_flow_fwds = render_pkg["render_flow_fwd"]
+            render_flow_bwds = render_pkg["render_flow_bwd"]
+
+
+        for idx in range(batch_size):
+            if self.iteration < self.l1_l2_switch:
+                Ll1 += l2_loss(images[idx], gt_images[idx][:3])
+            else:    
+                Ll1 += l1_loss(images[idx], gt_images[idx][:3]) #for image, gt_image in zip(images, gt_images)) / float(len(images))
+            #ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
+            ssim1_ = ssim(images[idx], gt_images[idx][:3])# for image, gt_image in zip(images, gt_images)) / float(len(images))
+            ssim_list.append(ssim1_.item())
+            ssim1 += ssim1_
+            if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+                tv1 += self.deform_model.compute_regulation(
+                    self.time_smoothness_weight,
+                    self.l1_time_planes_weight,
+                    self.plane_tv_weight)
+            if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+                
+                fwd_flow = fwd_flows[idx] 
+                fwd_flow_mask = fwd_flow_masks[idx]
+                bwd_flow = bwd_flows[idx]
+                bwd_flow_mask = bwd_flow_masks[idx]
+                render_flow_fwd = render_flow_fwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_fwds[idx]).sum(-1))) + 1e-5)
+                render_flow_bwd = render_flow_bwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_bwds[idx]).sum(-1))) + 1e-5)
+                flow_loss += compute_flow_loss(
+                    render_flow_fwd, render_flow_bwd,
+                    fwd_flow, bwd_flow,
+                    fwd_flow_mask, bwd_flow_mask
+                )
+                '''
+                M_fwd = fwd_flow_mask[idx:idx+1]
+                M_bwd = bwd_flow_mask[idx:idx+1]
+                fwd_flow_loss = torch.sum(torch.abs(fwd_flow - render_flow_fwd) * M_fwd) / (torch.sum(M) + 1e-8) / fwd_flow.shape[-1]
+                bwd_flow_loss = torch.sum(torch.abs(bwd_flow - render_flow_bwd) * M_bwd) / (torch.sum(M) + 1e-8) / bwd_flow.shape[-1]
+                flow_loss += (fwd_flow_loss + bwd_flow_loss)
+                '''
+
+
+        Ll1 /= float(batch_size)
+        ssim1 /= float(batch_size)
         loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1)
+        if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+            tv1 /= float(batch_size)
+            loss += tv1
+        if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+            flow_loss /= float(batch_size)
+            loss += self.lambda_flow * flow_loss 
+
+        #assert False, [Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])]
         self.log(f"{mode}/loss_L1", Ll1)
         self.log(f"{mode}/loss_ssim", 1.-ssim1)
         self.log(f"{mode}/loss", loss, prog_bar=True)
-        return loss
+        if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
+            self.log(f"{mode}/loss_tv", tv1)
+        if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+            self.log(f"{mode}/loss_flow", flow_loss)
+        #print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
+        return loss, ssim_list
     
-
+    def on_train_epoch_start(self) -> None:
+        if self.start_time is None:
+            self.start_time = time.time()
     
     
     def training_step(self, batch, batch_idx) -> None:
@@ -917,8 +1121,13 @@ class GS3d(MyModelBaseClass):
 
         #self.update_learning_rate_or_sched_or_sh()
         # Render
-        render_rgb, render_flow, time_offset = True, False, 0.#self.get_render_mode()
+        if (self.lambda_flow > 0.0) and (iteration > self.warm_up + 1): 
+            assert "fwd_flow" in batch, "Need to have flow data for flow loss"
+            render_rgb, render_flow, time_offset = True, True, self.trainer.datamodule.time_interval
+        else:
+            render_rgb, render_flow, time_offset = True, False, 0.#self.get_render_mode()
         render_pkg = self.forward(
+            render_mode=False,
             batch=batch,
             render_rgb=render_rgb,
             render_flow=render_flow,
@@ -930,30 +1139,197 @@ class GS3d(MyModelBaseClass):
         if deform_optimizer is not None:
             deform_optimizer.zero_grad()
         # Loss
-        loss = self.compute_loss(
+        loss, ssim_list = self.compute_loss(
             render_pkg, batch, mode="train"
         )
+        #print(loss)
         self.manual_backward(loss)
 
 
         with torch.no_grad():
             # keep track of stats for adaptive policy
-            
+            #radii = 
+            #visibility_filter = 
+            #viewspace_points = 
+            radii_list = []
+            for radii in render_pkg["radii"]:
+                radii_list.append(radii.unsqueeze(0))
+            #    radii_list.append(radii.unsqueeze(0))
+            #    visibility_filter_list.append(visibility_filter.unsqueeze(0))
+            #    viewspace_point_tensor_list.append(viewspace_point_tensor)
+            viewspace_point_tensor_list = render_pkg["viewspace_points"]
+            viewspace_point_tensor_grad = torch.zeros_like(viewspace_point_tensor_list[0])
+            for idx in range(0, len(viewspace_point_tensor_list)):
+                viewspace_point_tensor_grad = viewspace_point_tensor_grad + viewspace_point_tensor_list[idx].grad
+                  
+            #radii_list = 
+            radii = torch.cat(radii_list, dim=0).max(dim=0).values
+            visibility_filter = torch.max(torch.stack(render_pkg["visibility_filter"], dim=0), dim=0).values > 0.
+            #viewspace_points = render_pkg["viewspace_points"]
+            #assert False, [radii.shape, render_pkg["visibility_filter"][0].shape, visibility_filter.shape, viewspace_point_tensor_grad.shape]
+            self.max_radii2D[visibility_filter] = torch.max(self.max_radii2D[visibility_filter],
+                                                            radii[visibility_filter])
             if iteration < self.densify_until_iter:
                 self.add_densification_stats(
-                    render_pkg["viewspace_points"], 
-                    render_pkg["visibility_filter"])
+                    viewspace_point_tensor_grad, 
+                    visibility_filter)
+
+                # update selectedviews for guided sampling
+                for idx in range(0, len(viewspace_point_tensor_list)):
+                    value = ssim_list[idx]
+                    key = batch["image_name"][idx]
+                    self.depthdict[key] =  torch.amax(render_pkg["depth"][idx]).item()
+                    
+                    if key in self.selectedviews:
+                        self.selectedviews[key] = value
+                        for i, (heap_value, heap_key) in enumerate(self.max_heap):
+                            if heap_key == key:
+                                self.max_heap[i] = (-value, key)
+                                heapq.heapify(self.max_heap)
+                                break
+                    elif len(self.selectedviews) < self.num_ems:
+                        self.selectedviews[key] = value
+                        heapq.heappush(self.max_heap, (-value, key))
+                    else:
+                        max_value, max_key = heapq.heappop(self.max_heap)
+                        del self.selectedviews[max_key]
+                        self.selectedviews[key] = value
+                        heapq.heappush(self.max_heap, (-value, key))
+
+
+
                 if iteration > self.densify_from_iter and iteration % self.densification_interval == 0:
                     size_threshold = 20 if iteration > self.opacity_reset_interval else None
                     self.densify_and_prune(self.densify_grad_threshold, 0.005, self.cameras_extent, size_threshold)
+                
+                if (self.iteration > self.emsstartfromiterations) and (self.iteration - self.lasterems > 100):
+                    for idx in range(0, len(viewspace_point_tensor_list)):
+                        if self.emscnt >= self.selectedlength:
+                            continue # means if have already performed enough times of addgaussian, skip anyways
+                        image_name = batch["image_name"][idx]
+                        if image_name in self.selectedviews:
+                            print(image_name, self.selectedviews)
+                            self.selectedviews.pop(image_name)
+                            self.max_heap = [(heap_value, heap_key) for heap_value, heap_key in self.max_heap if heap_key != image_name]
+                            self.emscnt += 1
+                            self.lasterems = self.iteration
+                            image = render_pkg["render"][idx]
+                            gt_image = batch["original_image"][idx][:3]
+                            imageadjust = image /(torch.mean(image)+0.01) # 
+                            gtadjust = gt_image / (torch.mean(gt_image)+0.01)
+                            diff = torch.abs(imageadjust   - gtadjust)
+                            diff = torch.sum(diff,        dim=0) # h, w
+                            diff_sorted, _ = torch.sort(diff.reshape(-1)) 
+                            numpixels = diff.shape[0] * diff.shape[1]
+                            threshold = diff_sorted[int(numpixels * self.emsthr)].item()
+                            outmask = diff > threshold#  
+                            kh, kw = 16, 16 # kernel size
+                            dh, dw = 16, 16 # stride
+                            idealh, idealw = int(image.shape[1] / dh  + 1) * kw, int(image.shape[2] / dw + 1) * kw # compute padding  
+                            outmask = torch.nn.functional.pad(outmask, (0, idealw - outmask.shape[1], 0, idealh - outmask.shape[0]), mode='constant', value=0)
+                            patches = outmask.unfold(0, kh, dh).unfold(1, kw, dw)
+                            dummypatch = torch.ones_like(patches)
+                            patchessum = patches.sum(dim=(2,3)) 
+                            patchesmusk = patchessum  >  kh * kh * 0.85
+                            patchesmusk = patchesmusk.unsqueeze(2).unsqueeze(3).repeat(1,1,kh,kh).float()
+                            patches = dummypatch * patchesmusk
 
-                if iteration % self.opacity_reset_interval == 0 or (
+                            depth = render_pkg["depth"][idx]
+                            depth = depth.squeeze(0)
+                            idealdepthh, idealdepthw = int(depth.shape[0] / dh  + 1) * kw, int(depth.shape[1] / dw + 1) * kw # compute padding for depth
+
+                            depth = torch.nn.functional.pad(depth, (0, idealdepthw - depth.shape[1], 0, idealdepthh - depth.shape[0]), mode='constant', value=0)
+
+                            depthpaches = depth.unfold(0, kh, dh).unfold(1, kw, dw)
+                            dummydepthpatches =  torch.ones_like(depthpaches)
+                            a,b,c,d = depthpaches.shape
+                            depthpaches = depthpaches.reshape(a,b,c*d)
+                            #mediandepthpatch = torch.median(depthpaches, dim=(2))[0]
+                            # rewrite above line to determinstic quantile
+                            mediandepthpatch = torch.quantile(depthpaches, 0.5, dim=(2))
+
+                            depthpaches = dummydepthpatches * (mediandepthpatch.unsqueeze(2).unsqueeze(3))
+                            unfold_depth_shape = dummydepthpatches.size()
+                            output_depth_h = unfold_depth_shape[0] * unfold_depth_shape[2]
+                            output_depth_w = unfold_depth_shape[1] * unfold_depth_shape[3]
+
+                            patches_depth_orig = depthpaches.view(unfold_depth_shape)
+                            patches_depth_orig = patches_depth_orig.permute(0, 2, 1, 3).contiguous()
+                            patches_depth = patches_depth_orig.view(output_depth_h, output_depth_w).float() # 1 for error, 0 for no error
+
+                            depth = patches_depth[:image.shape[1], :image.shape[2]]
+                            depth = depth.unsqueeze(0)
+
+                            midpatch = torch.ones_like(patches)
+
+                            for i in range(0, kh,  2):
+                                for j in range(0, kw, 2):
+                                    midpatch[:,:, i, j] = 0.0  
+        
+                            centerpatches = patches * midpatch
+
+                            unfold_shape = patches.size()
+                            patches_orig = patches.view(unfold_shape)
+                            centerpatches_orig = centerpatches.view(unfold_shape)
+
+                            output_h = unfold_shape[0] * unfold_shape[2]
+                            output_w = unfold_shape[1] * unfold_shape[3]
+                            patches_orig = patches_orig.permute(0, 2, 1, 3).contiguous()
+                            centerpatches_orig = centerpatches_orig.permute(0, 2, 1, 3).contiguous()
+                            centermask = centerpatches_orig.view(output_h, output_w).float() # H * W  mask, # 1 for error, 0 for no error
+                            centermask = centermask[:image.shape[1], :image.shape[2]] # reverse back
+                            
+                            errormask = patches_orig.view(output_h, output_w).float() # H * W  mask, # 1 for error, 0 for no error
+                            errormask = errormask[:image.shape[1], :image.shape[2]] # reverse back
+
+                            H, W = centermask.shape
+
+                            offsetH = int(H/10)
+                            offsetW = int(W/10)
+
+                            centermask[0:offsetH, :] = 0.0
+                            centermask[:, 0:offsetW] = 0.0
+
+                            centermask[-offsetH:, :] = 0.0
+                            centermask[:, -offsetW:] = 0.0
+
+                            depth = render_pkg["depth"][idx]
+                            #depthmap = torch.cat((depth, depth, depth), dim=0)
+                            #invaliddepthmask = (depth == 15.0)
+                            #depthmap = depthmap / torch.amax(depthmap)
+                            #invalideptmap = torch.cat((invaliddepthmask, invaliddepthmask, invaliddepthmask), dim=0).float()  
+
+                            badindices = centermask.nonzero()
+                            
+                            diff_sorted , _ = torch.sort(depth.reshape(-1)) 
+                            N = diff_sorted.shape[0]
+                            mediandepth = int(0.7 * N)
+                            mediandepth = diff_sorted[mediandepth]
+
+                            depth = torch.where(depth>mediandepth, depth,mediandepth )
+
+                            camera2world = batch["world_view_transform"][idx].T.inverse()
+                            projectinverse = batch["full_proj_transform"][idx].T.inverse()
+                            self.addgaussians(badindices, depth, gt_image, 
+                                camera2world, projectinverse, batch["camera_center"][idx],
+                                batch["image_height"][idx], batch["image_width"][idx],
+                                self.depthdict[image_name])
+
+                            
+
+                if (iteration % self.opacity_reset_interval == 0) or (
                         self.white_background and iteration == self.densify_from_iter
                         and (self.motion_mode not in ["4DGS"])):
-                    self.reset_opacity()
+                    #if self.iteration > self.warm_up + 1:
+                        self.reset_opacity()
+
+                
+
         #old_xyz = (self._xyz[:, 0]).detach().clone()
+        
         optimizer.step()
         if deform_optimizer is not None:
+            self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
             deform_optimizer.step()
         #assert False, torch.any(old_xyz != self._xyz[:, 0])
         #for param_group in self.optimizer.param_groups:
@@ -971,6 +1347,9 @@ class GS3d(MyModelBaseClass):
                     param_group['lr'] = lr
     
         self.iteration += 1
+
+        step_time = time.time() - self.start_time
+        self.log("step_time", step_time)
                 
     def on_validation_epoch_start(self):
         self.val_psnr_total_train = 0.0
@@ -984,26 +1363,45 @@ class GS3d(MyModelBaseClass):
         torch.cuda.empty_cache()
 
     def validation_step(self, batch, batch_idx):
-        render_rgb, render_flow, time_offset = True, True, 1e-3#self.get_render_mode(eval=True)
+        render_rgb, render_flow, time_offset = True, True, self.trainer.datamodule.time_interval#self.get_render_mode(eval=True)
         #print(batch_idx, type(batch))
         # get normal render
         try:
             render_pkg = self.forward(
+                render_mode=True,
                 batch=batch,
                 render_rgb=render_rgb,
                 render_flow=render_flow,
                 time_offset=time_offset
             )        
-            image = torch.clamp(render_pkg["render"], 0.0, 1.0)
+            assert batch["time"].shape[0] == 1
+            image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
             gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
+            
+            rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+            rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+            try:
+                rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
+                rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.
+                rendered_flow_bwd = flow_to_image(rendered_flow_bwd)
+                rendered_flow_bwd = torch.from_numpy(rendered_flow_bwd).permute(2, 0, 1) / 255.
+            except:
+                rendered_flow_fwd = torch.zeros_like(depth)
+                rendered_flow_bwd = torch.zeros_like(depth)
 
             split = batch["split"][0]
             image_name = batch["image_name"][0]
             assert split in ["train", "test"]
             if (split == "train") and (self.num_batches_train < 5):
-                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
+                #print(self.iteration)
+                #assert False, self.iteration
+                if (self.iteration % self.log_image_interval) == 0:
+                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, rendered_flow_fwd, rendered_flow_bwd])
+                    # visualize fwd flow and bwd flow
+                    #self.logger.log_image(f"val_flow_fwd_{split}/{image_name}", [rendered_flow_fwd], step=self.iteration)
             elif (split == "test") and (self.num_batches_test < 5):
-                self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image], step=self.iteration)
+                if (self.iteration % self.log_image_interval) == 0:
+                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, rendered_flow_fwd, rendered_flow_bwd])
             
             #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
             #    image)
@@ -1020,9 +1418,11 @@ class GS3d(MyModelBaseClass):
                 self.val_ssim_total_test += ssim(image, gt)
                 #self.val_lpips_total_test += self.compute_lpips(image, gt)
                 self.num_batches_test += 1
-        except:
-            print(f"An illegal memory access is encountered at batch_idx {batch_idx}!")
-            pass
+        except Exception as e:
+           #rint(f"An illegal memory access is encountered at batch_idx {batch_idx}!")
+           print("An exception occurred:")
+           print(str(e))
+           pass
         
         #self.log("val/psnr", float(psnr_test))
     
@@ -1051,37 +1451,71 @@ class GS3d(MyModelBaseClass):
         torch.cuda.empty_cache()
 
     def on_test_epoch_start(self):
-        self.test_psnr_total = 0.0
-        self.test_ssim_total = 0.0
-        #self.test_lpips_total = 0.0
+        
+        self.test_image_name = []
+        self.test_times = []
+        self.test_render_time = []
+        self.test_psnr_total = []
+        self.test_ssim_total = []
+        self.test_msssim_total = []
+        self.test_lpips_total = []
         self.test_num_batches = 0
         print(f"Saving Results based on checkpoint: {self.trainer.ckpt_path}")
         #assert False
         # Access the log directory of the experiment and ready to save all test results
         self.log_dir_test = os.path.join(self.logger.save_dir, "test")
         self.log_dir_gt = os.path.join(self.logger.save_dir, "gt")
+        self.log_dir_depth = os.path.join(self.logger.save_dir, "depth")
+        self.log_dir_flow = os.path.join(self.logger.save_dir, "flow")
         os.makedirs(self.log_dir_test, exist_ok=True)
         os.makedirs(self.log_dir_gt, exist_ok=True)
-        
+        os.makedirs(self.log_dir_depth, exist_ok=True)
+        os.makedirs(self.log_dir_flow, exist_ok=True)
+        self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
 
     def test_step(self, batch, batch_idx):
-        render_rgb, render_flow, time_offset = True, True, 1e-3#self.get_render_mode(eval=True)
+        render_rgb, render_flow, time_offset = True, True, self.trainer.datamodule.time_interval#self.get_render_mode(eval=True)
         #print(batch_idx, type(batch))
         # get normal render
+        
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+
+        start.record()
         render_pkg = self.forward(
+            render_mode=True,
             batch=batch,
             render_rgb=render_rgb,
             render_flow=render_flow,
             time_offset=time_offset
-        )        
-        image = torch.clamp(render_pkg["render"], 0.0, 1.0)
+        )    
+        end.record()
+        torch.cuda.synchronize()
+        self.test_render_time.append(start.elapsed_time(end)/1000.0/2.) # rendered twice for render and render_flow    
+        assert batch["time"].shape[0] == 1, "Batch size must be 1 for testing"
+        image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
         gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
         
         #run_id = self.logger.experiment.id
         #print("Run ID:", run_id)
 
-        
-        
+        depth = render_pkg["depth"][0]
+        depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
+        depth = torch.from_numpy(depth).permute(2, 0, 1)
+
+        rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+        rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+        try:
+            rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
+            rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.
+            rendered_flow_bwd = flow_to_image(rendered_flow_bwd)
+            rendered_flow_bwd = torch.from_numpy(rendered_flow_bwd).permute(2, 0, 1) / 255.
+        except:
+            rendered_flow_fwd = torch.zeros_like(depth)
+            rendered_flow_bwd = torch.zeros_like(depth)
+
+
+
         #print("Log directory:", log_dir)
         #self.logger.log_image(f"test_images/{batch_idx}_render", [gt, image], step=self.trainer.global_step)
 
@@ -1091,25 +1525,63 @@ class GS3d(MyModelBaseClass):
         #image_name = batch["image_name"][0]
         torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
         torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
-        
+        torchvision.utils.save_image(depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
+        torchvision.utils.save_image(rendered_flow_fwd[None], os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx))
+        torchvision.utils.save_image(rendered_flow_bwd[None], os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx))
+
         self.compute_loss(render_pkg, batch, mode="test")
-        self.test_psnr_total += psnr(image[None], gt[None]).mean()
-        self.test_ssim_total += ssim(image, gt)
+        _psnr = psnr(image[None], gt[None]).mean()
+        _ssim = ssim(image, gt)
+        _msssim = ms_ssim(image[None], gt[None], data_range=1, size_average=False).item()
+        _lpips = self.lpips(image[None]*2.-1., gt[None]*2. - 1.).item()
+        
+        self.test_psnr_total.append(_psnr)
+        self.test_ssim_total.append(_ssim)
+        self.test_msssim_total.append(_msssim)
+        self.test_lpips_total.append(_lpips)
+
+        self.test_image_name.append(batch["image_name"][0])
+        self.test_times.append(batch["time"][0].item())
+
+        
         #self.test_lpips_total += self.compute_lpips(image, gt)
         self.test_num_batches += 1
         #return psnr_test, ssim_test, lpips_test
     
     def on_test_epoch_end(self,):
-        avg_psnr = self.test_psnr_total / (self.test_num_batches + 1e-16)
-        avg_ssim = self.test_ssim_total / (self.test_num_batches + 1e-16)
-        #avg_lpips = self.test_lpips_total / (self.test_num_batches + 1e-16)
+        
+        avg_render_time = sum(self.test_render_time) / (self.test_num_batches + 1e-16)
+        avg_psnr = sum(self.test_psnr_total) / (self.test_num_batches + 1e-16)
+        avg_ssim = sum(self.test_ssim_total) / (self.test_num_batches + 1e-16)
+        avg_msssim = sum(self.test_msssim_total) / (self.test_num_batches + 1e-16)
+        avg_lpips = sum(self.test_lpips_total) / (self.test_num_batches + 1e-16)
+        
+        with open(self.log_txt, "w") as f:
+            f.write("image_name, time, render_time, psnr, ssim, msssim, lpips\n")
+            for i in range(len(self.test_image_name)):
+                f.write(f"{self.test_image_name[i]}, {self.test_times[i]}, {self.test_render_time[i]}, {self.test_psnr_total[i]}, {self.test_ssim_total[i]}, {self.test_msssim_total[i]}, {self.test_lpips_total[i]}\n")
+            f.write("\n")
+            f.write(f"Average Render Time: {avg_render_time}\n")
+            f.write(f"Average PSNR: {avg_psnr}\n")        
+            f.write(f"Average SSIM: {avg_ssim}\n")
+            f.write(f"Average MS-SSIM: {avg_msssim}\n")
+            f.write(f"Average LPIPS: {avg_lpips}\n")
+
+        
         self.log('test/avg_psnr', avg_psnr)
         self.log('test/avg_ssim', avg_ssim)
-        #self.log('test/avg_lpips', avg_lpips)
-        self.test_psnr_total = 0.0
-        self.test_ssim_total = 0.0
-        #self.test_lpips_total = 0.0
+        self.log('test/avg_msssim', avg_msssim)
+        self.log('test/avg_lpips', avg_lpips)
+        
+        self.test_image_name = []
+        self.test_times = []
+        self.test_render_time = []
+        self.test_psnr_total = []
+        self.test_ssim_total = []
+        self.test_msssim_total = []
+        self.test_lpips_total = []
         self.test_num_batches = 0
+
 
     def on_save_checkpoint(self, checkpoint):
         '''
@@ -1143,8 +1615,16 @@ class GS3d(MyModelBaseClass):
             "active_sh_degree_t": self.active_sh_degree_t,
             "spatial_lr_scale": self.spatial_lr_scale,
             "cameras_extent": self.cameras_extent,
-            "iteration": self.iteration
+            "iteration": self.iteration,
+            "emscnt": self.emscnt,
+            "selectedviews": self.selectedviews, 
+            "max_heap": self.max_heap,
+            "lasterems": self.lasterems,
+            "depthdict": self.depthdict,
+            "start_time": self.start_time
         }
+        if self.use_static:
+            checkpoint["extra_state_dict"]["isstatic"] = self.isstatic
         super().on_save_checkpoint(checkpoint)
 
     # order:
@@ -1179,13 +1659,160 @@ class GS3d(MyModelBaseClass):
         self.spatial_lr_scale = checkpoint["extra_state_dict"]["spatial_lr_scale"]
         self.cameras_extent = checkpoint["extra_state_dict"]["cameras_extent"]
         self.iteration = checkpoint["extra_state_dict"]["iteration"]
+        self.emscnt = checkpoint["extra_state_dict"]["emscnt"]
+        self.selectedviews = checkpoint["extra_state_dict"]["selectedviews"]
+        self.max_heap = checkpoint["extra_state_dict"]["max_heap"]
+        self.lasterems = checkpoint["extra_state_dict"]["lasterems"]
+        self.depthdict = checkpoint["extra_state_dict"]["depthdict"]
+        self.start_time = checkpoint["extra_state_dict"]["start_time"]
+        if self.use_static:
+            self.isstatic = checkpoint["extra_state_dict"]["isstatic"].to("cuda")
         super().on_load_checkpoint(checkpoint)
 
-    def add_densification_stats(self, viewspace_point_tensor, update_filter):
-        self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter, :2], dim=-1,
+    def add_densification_stats(self, viewspace_point_tensor_grad, update_filter):
+        self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor_grad[update_filter, :2], dim=-1,
                                                              keepdim=True)
         self.denom[update_filter] += 1
     
+    def addgaussians(self, baduvidx, depthmap, gt_image, 
+        camera2world, projectinverse, camera_center,
+        image_height, image_width, depthmax):
+        assert self.motion_mode != "FourDim", "RTGS does not support this!"
+        def pix2ndc(v, S):
+            return (v * 2.0 + 1.0) / S - 1.0
+        ratiaolist = torch.linspace(self.raystart, self.ratioend, self.numperay) 
+        rgbs = gt_image[:, baduvidx[:,0], baduvidx[:,1]]
+        rgbs = rgbs.permute(1,0)
+        if self.rgbdecoder is not None:
+            featuredc = torch.cat((rgbs, torch.zeros_like(rgbs)), dim=1).cuda()# should we add the feature dc with non zero values?  # Nx6
+        else:
+            featuredc = RGB2SH(rgbs.cuda().float())[:, None, :] # Nx1x3
+            #featuredc = torch.zeros((fused_color.shape[0], 3), device="cuda")
+
+        depths = depthmap[:, baduvidx[:,0], baduvidx[:,1]]
+        depths = depths.permute(1,0)
+
+        depths = torch.ones_like(depths) * depthmax
+
+        u = baduvidx[:,0] # hight y
+        v = baduvidx[:,1] # weidth  x 
+        Npoints = u.shape[0]
+
+        new_xyz = []
+        #new_scaling = []
+        #new_rotation = []
+        new_features_dc = []
+        new_features_rest = []
+        #new_opacity = []
+        new_trbf_center = []
+        new_trbf_scale = []
+        #new_motion = []
+        #new_omega = []
+        #new_featuret = []
+
+        maxz, minz = self.maxz, self.minz 
+        maxy, miny = self.maxy, self.miny 
+        maxx, minx = self.maxx, self.minx 
+
+        for zscale in ratiaolist:
+            ndcu, ndcv = pix2ndc(u, image_height), pix2ndc(v, image_width)
+            randomdepth = torch.rand_like(depths) - 0.5
+            targetPz = (depths + depths/10*(randomdepth)) *zscale
+        
+            ndcu = ndcu.unsqueeze(1)
+            ndcv = ndcv.unsqueeze(1)
+
+            ndccamera = torch.cat((ndcv, ndcu,   torch.ones_like(ndcu) * (1.0) , torch.ones_like(ndcu)), 1) # N,4 ...
+            
+            localpointuv = ndccamera @ projectinverse.T 
+
+            diretioninlocal = localpointuv / localpointuv[:,3:] # ray direction in camera space 
+
+
+            rate = targetPz / diretioninlocal[:, 2:3] #  
+            
+            localpoint = diretioninlocal * rate
+
+            localpoint[:, -1] = 1
+
+            worldpointH = localpoint @ camera2world.T  #myproduct4x4batch(localpoint, camera2wold) # 
+            worldpoint = worldpointH / worldpointH[:, 3:] #  
+
+            xyz = worldpoint[:, :3] 
+            distancetocameracenter = camera_center - xyz
+            distancetocameracenter = torch.norm(distancetocameracenter, dim=1)
+
+            xmask = torch.logical_and(xyz[:, 0] > minx, xyz[:, 0] < maxx )
+            selectedmask = torch.logical_or(xmask, torch.logical_not(xmask))  #torch.logical_and(xmask, ymask)
+            new_xyz.append(xyz[selectedmask]) 
+
+            new_features_dc.append(featuredc[selectedmask])
+            
+
+            selectnumpoints = torch.sum(selectedmask).item()
+            
+            if self.motion_mode == "TRBF":
+                new_trbf_center.append(torch.rand((selectnumpoints, 1)).cuda())
+                new_trbf_scale.append(self.trbfslinit * torch.ones((selectnumpoints, 1), device="cuda"))
+            if self.rgbdecoder is not None:
+                new_features_rest.append(torch.zeros((selectnumpoints, 3), device="cuda"))
+            else:
+                new_features_rest.append(torch.zeros((selectnumpoints, ((self.max_sh_degree + 1) ** 2)-1, 3), device="cuda"))
+
+
+
+        new_xyz = torch.cat(new_xyz, dim=0)
+        if self.motion_mode in ["TRBF", "EffGS"]:
+            new_xyz = torch.cat([new_xyz[:, None, :],
+                torch.zeros((new_xyz.shape[0], self._xyz.shape[1]-1, 3), device="cuda")], dim=1)
+       
+            new_rotation = torch.zeros((new_xyz.shape[0], self._rotation.shape[1], 4), device="cuda")
+            new_rotation[:, 0, 0]= 1
+        else:
+            new_rotation = torch.zeros((new_xyz.shape[0],4), device="cuda")
+            new_rotation[:, 0]= 1
+
+        tmpxyz = torch.cat((new_xyz, self._xyz), dim=0)
+        if len(list(tmpxyz.shape)) == 3:
+            assert tmpxyz.shape[-1] == 3
+            tmpxyz = tmpxyz[:, 0, :]
+        dist2 = torch.clamp_min(distCUDA2(tmpxyz), 0.0000001)
+        dist2 = dist2[:new_xyz.shape[0]]
+        scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 3)
+        scales = torch.clamp(scales, -10, 1.0)
+        new_scaling = scales 
+
+        new_opacity = inverse_sigmoid(0.1 *torch.ones((new_xyz.shape[0], 1), device="cuda"))
+        if self.motion_mode == "TRBF":
+            new_trbf_center = torch.cat(new_trbf_center, dim=0)
+            new_trbf_scale = torch.cat(new_trbf_scale, dim=0)
+        else:
+            new_trbf_center = None
+            new_trbf_scale = None
+        new_features_dc = torch.cat(new_features_dc, dim=0)
+        new_features_rest = torch.cat(new_features_rest, dim=0)
+        new_t = None
+        new_scaling_t = None
+        new_rotation_r = None
+        
+        if self.use_static:
+            new_isstatic = (torch.rand((new_xyz.shape[0],1)).cuda() < 0.5).float()
+        else:
+            new_isstatic = None
+        #print(
+        #    new_xyz.shape, 
+        #    new_features_dc.shape, new_features_rest.shape,
+        #    new_opacity.shape, new_scaling.shape, new_rotation.shape,)
+            #new_trbf_center.shape, new_trbf_scale.shape)
+        
+        self.densification_postfix(
+            new_xyz, new_features_dc, new_features_rest, 
+            new_opacity, new_scaling, new_rotation, 
+            new_t, new_scaling_t, new_rotation_r, 
+            new_trbf_center, new_trbf_scale, new_isstatic)
+        
+
+
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
@@ -1217,6 +1844,7 @@ class GS3d(MyModelBaseClass):
         new_opacities = self._opacity[selected_pts_mask]
         new_scaling = self._scaling[selected_pts_mask]
         new_rotation = self._rotation[selected_pts_mask]
+        
 
         new_t = None
         new_scaling_t = None
@@ -1232,10 +1860,14 @@ class GS3d(MyModelBaseClass):
             new_trbf_center =  torch.rand((self._trbf_center[selected_pts_mask].shape[0], 1), device="cuda")  #self._trbf_center[selected_pts_mask]
             new_trbf_scale = self._trbf_scale[selected_pts_mask]
 
+        if self.use_static:
+            new_isstatic = self.isstatic[selected_pts_mask]
+        else:
+            new_isstatic = None
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
                                    new_rotation, new_t, new_scaling_t, new_rotation_r,
-                                   new_trbf_center, new_trbf_scale)
+                                   new_trbf_center, new_trbf_scale, new_isstatic)
 
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         #(len(list(self._rotation.shape)))
@@ -1313,8 +1945,13 @@ class GS3d(MyModelBaseClass):
             new_trbf_center = None
             new_trbf_scale = None
         
+        if self.use_static:
+            new_isstatic = self.isstatic[selected_pts_mask].repeat(N, 1)
+        else:
+            new_isstatic = None
+        
         #print(self._features_dc.shape, new_features_dc.shape)
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale)
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic)
         #print(self._features_dc.shape, new_features_dc.shape)
         
 
@@ -1347,6 +1984,10 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             self._trbf_center = optimizable_tensors["trbf_center"]
             self._trbf_scale = optimizable_tensors["trbf_scale"]
+        
+        if self.use_static:
+            self.isstatic = self.isstatic[valid_points_mask]
+        
     
     def _prune_optimizer(self, mask):
         optimizable_tensors = {}
@@ -1371,7 +2012,7 @@ class GS3d(MyModelBaseClass):
         return optimizable_tensors
 
     def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-                              new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale):
+                              new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic):
         d = {"xyz": new_xyz,
              "f_dc": new_features_dc,
              "f_rest": new_features_rest,
@@ -1406,6 +2047,9 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             self._trbf_center = optimizable_tensors["trbf_center"]
             self._trbf_scale = optimizable_tensors["trbf_scale"]  
+        
+        if self.use_static:
+            self.isstatic = torch.cat([self.isstatic, new_isstatic], dim=0) 
 
     def cat_tensors_to_optimizer(self, tensors_dict):
         optimizable_tensors = {}

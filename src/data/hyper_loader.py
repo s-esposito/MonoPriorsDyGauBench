@@ -171,9 +171,29 @@ class Load_hyper_data(Dataset):
         else:
             depth = None
 
+        flow_path = image_path + "_flow"
+        fwd_flow_path = os.path.join(flow_path, f'{os.path.splitext(image_name)[0]}_fwd.npz')
+        bwd_flow_path = os.path.join(flow_path, f'{os.path.splitext(image_name)[0]}_bwd.npz')
+        #print(fwd_flow_path, bwd_flow_path)
+        #assert False, "Check flow paths"
+        if os.path.exists(fwd_flow_path):
+            fwd_data = np.load(fwd_flow_path)
+            fwd_flow = torch.from_numpy(fwd_data['flow'])
+            fwd_flow_mask = torch.from_numpy(fwd_data['mask'])
+        else:
+            fwd_flow, fwd_flow_mask  = None, None
+        if os.path.exists(bwd_flow_path):
+            bwd_data = np.load(bwd_flow_path)
+            bwd_flow = torch.from_numpy(bwd_data['flow'])
+            bwd_flow_mask = torch.from_numpy(bwd_data['mask'])
+        else:
+            bwd_flow, bwd_flow_mask  = None, None
+
         caminfo = CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=w, height=h, time=time,
-                              depth=depth
+                              depth=depth, 
+                              fwd_flow=fwd_flow, fwd_flow_mask=fwd_flow_mask,
+                              bwd_flow=bwd_flow, bwd_flow_mask=bwd_flow_mask,
                               )
         self.map[idx] = caminfo
         return caminfo  
