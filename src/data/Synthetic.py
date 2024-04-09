@@ -69,6 +69,8 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         ratio: float,
         white_background: bool,
         num_pts_ratio: float,
+        num_pts: int,
+        M: Optional[int] = 0,
         batch_size: Optional[int]=1,
         seed: Optional[int]=None,
         ) -> None:
@@ -79,7 +81,9 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         self.ratio = ratio
         self.white_background = white_background
         self.batch_size = batch_size
+        self.M = M
         self.save_hyperparameters()
+
 
     def setup(self, stage: str):
         # if stage == "fit"
@@ -114,7 +118,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         shs = np.random.random((num_pts, 3)) / 255.0
         #pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((num_pts, 3)))
 
-        times = [cam_info.time for cam_info in train_cam_infos]
+        times = [cam_info.time for cam_info in self.train_cam_infos]
         times = np.unique(times)
         # record time interval for potential AST
         assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]" 
@@ -123,7 +127,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         #assert False, "change self.pcd based on Nerfies debugged code"
         #shs = np.random.random((xyz.shape[0], 3)) / 255.0
         self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)),
-            times=times)
+            times=np.linspace(0., 1., self.M))
 
 
         #scene_info = SceneInfo(point_cloud=pcd,

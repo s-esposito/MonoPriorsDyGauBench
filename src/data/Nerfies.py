@@ -25,6 +25,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         white_background: bool,
         num_pts_ratio: float,
         num_pts: int,
+        M: Optional[int] = 0,
         batch_size: Optional[int]=1,
         seed: Optional[int]=None,
         #sample_interval: int,
@@ -41,6 +42,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         self.batch_size = batch_size
         self.num_pts_ratio = num_pts_ratio
         self.num_pts = num_pts
+        self.M = M
         if num_pts > 0:
             assert self.num_pts_ratio == 0
         if num_pts_ratio > 0:
@@ -104,8 +106,10 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         #assert False, [len(times), times]
         #times = np.array(set([cam_info.time for cam_info in train_cam]))
         #assert False, [len(times), np.max(times), np.min(times), times.shape]
+        
+        #times = np.linspace
         self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)),
-            times=times)
+            times=np.linspace(0., 1., self.M))
 
 
         #scene_info = SceneInfo(point_cloud=pcd,
