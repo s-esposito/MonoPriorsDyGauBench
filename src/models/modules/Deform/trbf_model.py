@@ -5,7 +5,7 @@ from src.utils.rigid_utils import exp_se3
 import os
 from src.utils.system_utils import searchForMaxIteration
 from src.utils.general_utils import get_expon_lr_func
-from typing import Dict
+from typing import Dict, Optional
 import math
 
 def trbfunction(x): 
@@ -25,6 +25,8 @@ class TRBFModel(nn.Module):
         self.Np = Np
         self.Nq = Nq
         super().__init__()
+        assert False, "Under construction for deform mode..."
+
     def forward(self, inp: Dict, time: float):
         
         pointtimes = torch.ones((inp["means3D"].shape[0],1), dtype=inp["means3D"].dtype, requires_grad=False, device="cuda") + 0 # 

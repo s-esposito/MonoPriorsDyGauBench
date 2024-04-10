@@ -5,7 +5,7 @@ from src.utils.rigid_utils import exp_se3
 import os
 from src.utils.system_utils import searchForMaxIteration
 from src.utils.general_utils import get_expon_lr_func
-from typing import Dict
+from typing import Dict, Optional
 
 def get_embedder(multires, i=1):
     if i == -1:
@@ -59,7 +59,11 @@ class Embedder:
 
 
 class DeformNetwork(nn.Module):
-    def __init__(self, D=8, W=256, input_ch=3, output_ch=59, multires=10, is_blender=False, is_6dof=False):
+    def __init__(self, D=8, W=256, input_ch=3, output_ch=59, multires=10, is_blender=False, is_6dof=False,
+        deform_scale: Optional[bool]=True,
+        deform_opacity: Optional[bool]=False,
+        deform_feature: Optional[bool]=False,
+        sh_dim=None):
         super(DeformNetwork, self).__init__()
         self.D = D
         self.W = W
@@ -102,7 +106,21 @@ class DeformNetwork(nn.Module):
         else:
             self.gaussian_warp = nn.Linear(W, 3)
         self.gaussian_rotation = nn.Linear(W, 4)
-        self.gaussian_scaling = nn.Linear(W, 3)
+        if deform_scale:
+            self.gaussian_scaling = nn.Linear(W, 3)
+        else:
+            self.gaussian_scaling = None
+
+        if deform_opacity:
+            self.gaussian_opacity = nn.Linear(W, 1)
+        else:
+            self.gaussian_opacity = None
+        
+        if deform_feature:
+            self.gaussian_feature = nn.Linear(W, sh_dim)
+        else:
+            self.gaussian_feature = None
+        
 
     def forward(self, x, t):
         t_emb = self.embed_time_fn(t)
@@ -126,21 +144,46 @@ class DeformNetwork(nn.Module):
             d_xyz = exp_se3(screw_axis, theta)
         else:
             d_xyz = self.gaussian_warp(h)
-        scaling = self.gaussian_scaling(h)
+        if self.gaussian_scaling is None:
+            scaling = 0.
+        else:
+            scaling = self.gaussian_scaling(h)
         rotation = self.gaussian_rotation(h)
 
-        return d_xyz, rotation, scaling
+        if self.gaussian_opacity is None:
+            opacity = 0.
+        else:
+            opacity = self.gaussian_opacity(h)
+        
+        if self.gaussian_feature is None:
+            feat = 0.
+        else:
+            feat = self.gaussian_feature(h)
+
+        return d_xyz, rotation, scaling, opacity, feat
 
 class DeformModel(nn.Module):
-    def __init__(self, is_blender=False, is_6dof=False):
+    def __init__(self, is_blender=False, is_6dof=False,
+        deform_scale: Optional[bool]=True, # default deform scale
+        deform_opacity: Optional[bool]=False,
+        deform_feature: Optional[bool]=False,
+        sh_dim=None,
+    ):
         super().__init__()
-        self.deform = DeformNetwork(is_blender=is_blender, is_6dof=is_6dof)#.cuda()
+        self.deform = DeformNetwork(is_blender=is_blender, is_6dof=is_6dof,
+            deform_scale=deform_scale,
+            deform_opacity=deform_opacity,
+            deform_feature=deform_feature,
+            sh_dim=sh_dim)#.cuda()
 
     def forward(self, inp: Dict, time: float):
         N = inp["means3D"].shape[0]
         time_emb = torch.Tensor([time]).unsqueeze(0).expand(N, -1).cuda()
-        d_xyz, d_rotation, d_scaling = self.deform(inp["means3D"].detach(), time_emb)
-        return d_xyz, d_rotation, d_scaling, 0., 0.
+        d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform(inp["means3D"].detach(), time_emb)
+        if (len(inp["shs"].shape) == 3) and (not isinstance(d_feat, float)):
+            d_feat = d_feat.view(inp["shs"].shape[0], inp["shs"].shape[1], inp["shs"].shape[2])
+        return d_xyz, d_rotation, d_scaling, d_opacity, d_feat
+        '''
         return {
             "d_xyz": d_xyz,
             "d_rotation": d_rotation,
@@ -151,6 +194,7 @@ class DeformModel(nn.Module):
         inp["rotations"] += d_rotation
 
         return inp
+        '''
 
     def train_setting(self, 
         spatial_lr_scale: float,

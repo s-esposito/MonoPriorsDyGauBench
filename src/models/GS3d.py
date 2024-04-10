@@ -43,6 +43,10 @@ from diff_gaussian_rasterization_ch9 import GaussianRasterizer as GaussianRaster
 
 class GS3d(MyModelBaseClass):
     def __init__(self,
+        is_blender: bool,
+        deform_scale: bool,
+        deform_opacity: bool,
+        deform_feature: bool,
         log_image_interval: int,
         sh_degree: int,
         sh_degree_t: int,
@@ -158,6 +162,15 @@ class GS3d(MyModelBaseClass):
         self.percent_dense = percent_dense
         self.lambda_dssim = lambda_dssim
 
+        if (motion_mode == "HexPlane") and is_blender:
+            assert time_smoothness_weight == 0.01
+            assert l1_time_planes_weight == 0.0001
+            assert plane_tv_weight == 0.0001
+        elif (motion_mode == "HexPlane"):
+            assert time_smoothness_weight == 0.001
+            assert l1_time_planes_weight == 0.0001
+            assert plane_tv_weight == 0.0002
+        
         self.time_smoothness_weight = time_smoothness_weight
         self.l1_time_planes_weight = l1_time_planes_weight
         self.plane_tv_weight = plane_tv_weight
@@ -200,9 +213,21 @@ class GS3d(MyModelBaseClass):
         #this is for mode selection of create_from_pcd
         self.init_mode = init_mode
         
+        self.color_mode = color_mode
+        if self.color_mode in ["sandwich", "sandwichnoact"]:
+            self.rgbdecoder = getcolormodel(self.color_mode)
+            self.decoder_lr = decoder_lr
+        else:
+            self.rgbdecoder = None
+
         # create motion representation
         self.deform_model = create_motion_model(
             init_mode=motion_mode,
+            is_blender=is_blender,
+            deform_scale=deform_scale,
+            deform_opacity=deform_opacity,
+            deform_feature=deform_feature,
+            sh_dim=((self.max_sh_degree + 1) ** 2) * 3 if (self.rgbdecoder is None) else 9
             **kwargs)    
         self.motion_mode = motion_mode   
         if self.motion_mode == "FourDim":
@@ -220,12 +245,7 @@ class GS3d(MyModelBaseClass):
             self._trbf_scale = torch.empty(0)
             self.trbfslinit = trbfslinit
 
-        self.color_mode = color_mode
-        if self.color_mode in ["sandwich", "sandwichnoact"]:
-            self.rgbdecoder = getcolormodel(self.color_mode)
-            self.decoder_lr = decoder_lr
-        else:
-            self.rgbdecoder = None
+        
 
         #LPIPS evaluation
         self.lpips_mode = lpips_mode
@@ -267,6 +287,13 @@ class GS3d(MyModelBaseClass):
         self.lambda_flow = lambda_flow
         if self.lambda_flow > 0.0:
             assert self.motion_mode not in "FourDim", "RTGS flow rendering not implemented for now"
+    
+        if not self.post_act:
+            assert self.motion_mode in ["HexPlane"], "otherwise may cause issues in def deform(self)"
+
+        if deform_opacity:
+            assert opacity_reset_interval > 100000, "Not supporting opacity reset for deforming opacity case"
+
     #@torch.inference_mode()
     #def compute_lpips(
     #    self, image: torch.Tensor, gt: torch.Tensor 
@@ -531,7 +558,7 @@ class GS3d(MyModelBaseClass):
                 result, time
             )
             if self.motion_mode in ["MLP"]:
-                assert d_feat == 0
+                #assert d_feat == 0
                 result_ = {
                     "means3D": self.get_xyz + d_xyz,#) if (2 == len(list(result["means3D"].shape))) else d_xyz, 
                     "shs": self.get_features + d_feat, 
@@ -582,7 +609,7 @@ class GS3d(MyModelBaseClass):
             elif self.motion_mode in ["HexPlane"]:
                 result_ = {
                     "means3D": d_xyz,
-                    "shs": self.get_features,
+                    "shs": d_feat,
                     "colors_precomp": None,
                     "opacity": self.opacity_activation(d_opacity),
                     "scales": self.scaling_activation(d_scaling),
