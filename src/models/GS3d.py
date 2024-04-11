@@ -1534,7 +1534,11 @@ class GS3d(MyModelBaseClass):
         )    
         end.record()
         torch.cuda.synchronize()
-        self.test_render_time.append(start.elapsed_time(end)/1000.0/2.) # rendered twice for render and render_flow    
+        if self.motion_mode != "FourDim":
+            self.test_render_time.append(start.elapsed_time(end)/1000.0/3.) # rendered twice for render and render_flow    
+        else:
+            assert self.motion_mode == "FourDim"
+            self.test_render_time.append(start.elapsed_time(end)/1000.0)
         assert batch["time"].shape[0] == 1, "Batch size must be 1 for testing"
         image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
         gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
