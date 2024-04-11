@@ -70,3 +70,6 @@ pip install submodules/depth-diff-gaussian-rasterization
 pip install submodules/gaussian_rasterization_ch3
 pip install submodules/gaussian_rasterization_ch9
 pip install submodules/simple-knn
+
+pip install imageio[ffmpeg]
+pip install imageio[pyav]

@@ -4,8 +4,8 @@
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
 #SBATCH --partition=3090-gcondo --gres=gpu:1
-#SBATCH --job-name debug_4DGS_blender_deformall
-#SBATCH --output debug_4DGS_blender_deformall.out
+#SBATCH --job-name debug_4DGS_real_flow
+#SBATCH --output debug_4DGS_real_flow.out
 
 
 module load gcc/10.1.0-mojgbn
@@ -32,10 +32,8 @@ conda activate ~/data/yliang51/envs/gaufre
 which python 
 which pip
 
-#pip install imageio[ffmpeg]
-#pip install imageio[pyav]
 
-variant="base_4DGS_blender_deformall"
+variant="base_4DGS_real_flow"
 
 #python main.py fit --config configs/${variant}.yaml
 python main.py test --config configs/${variant}.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config

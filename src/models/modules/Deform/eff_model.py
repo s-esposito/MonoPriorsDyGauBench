@@ -33,13 +33,21 @@ class EffModel(nn.Module):
         
         rotations = inp["rotations"][:, idx1, :] + inp["rotations"][:, idx2, :]*time
         #assert False,  "Should return scales and features accordingly "
-        assert False, "Should change in create_from_pcd"
+        #assert False, "Should change in create_from_pcd"
         if self.deform_scale:
             scales = inp["scales"][:, idx1, :] + inp["scales"][:, idx2, :]*time
         else:
-            scales = None
+            scales = inp["scales"]
+        if self.deform_opacity:
+            opacities = inp["opacity"][:, idx1, :] + inp["opacity"][:, idx2, :]*time
+        else:
+            opacities = inp["opacity"]
+        if self.deform_feature:
+            features = inp["shs"][:, idx1, ...] + inp["shs"][:, idx2, ...]*time
+        else:
+            features = inp["shs"]
         
-        return means3D, rotations, 0., 0., 0. 
+        return means3D, rotations, scales, opacities, features 
         
         
 

@@ -21,6 +21,8 @@ from src.utils.image_utils import psnr
 import torchvision
 import heapq
 import time
+import imageio
+import numpy as np
 
 from .diff_gaussian_rasterization import GaussianRasterizationSettings4D, GaussianRasterizer4D
 from .diff_gaussian_rasterization_4dch9 import GaussianRasterizationSettings4D_ch9, GaussianRasterizer4D_ch9
@@ -82,6 +84,7 @@ class GS3d(MyModelBaseClass):
         warm_up: int,
         lambda_dssim: float,
         lambda_flow: float,
+        flow_start: int,
         time_smoothness_weight: float,
         l1_time_planes_weight: float,
         plane_tv_weight: float,
@@ -176,6 +179,7 @@ class GS3d(MyModelBaseClass):
         self.plane_tv_weight = plane_tv_weight
 
         self.warm_up = warm_up
+        
         self.feature_lr = feature_lr
         self.opacity_lr = opacity_lr
         self.scaling_lr = scaling_lr
@@ -287,6 +291,7 @@ class GS3d(MyModelBaseClass):
         self.lambda_flow = lambda_flow
         if self.lambda_flow > 0.0:
             assert self.motion_mode not in "FourDim", "RTGS flow rendering not implemented for now"
+            self.flow_start = flow_start
     
         if not self.post_act:
             assert self.motion_mode in ["HexPlane"], "otherwise may cause issues in def deform(self)"
@@ -828,7 +833,7 @@ class GS3d(MyModelBaseClass):
                     image_width=int(batch["image_width"][idx]),
                     tanfovx=tanfovx,
                     tanfovy=tanfovy,
-                    bg=self.bg_color.to(batch["time"].device),
+                    bg=self.bg_color.to(batch["time"].device) * 0.,
                     scale_modifier=scaling_modifier,
                     viewmatrix=batch["world_view_transform"][idx],
                     projmatrix=batch["full_proj_transform"][idx],
@@ -853,6 +858,19 @@ class GS3d(MyModelBaseClass):
                 rasterizer = GaussianRasterizer_ch9(raster_settings=raster_settings)
                 rasterizer_ch3 = GaussianRasterizer(raster_settings=raster_settings_ch3)
             else:
+                raster_settings_ch3 = GaussianRasterizationSettings(
+                    image_height=int(batch["image_height"][idx]),
+                    image_width=int(batch["image_width"][idx]),
+                    tanfovx=tanfovx,
+                    tanfovy=tanfovy,
+                    bg=self.bg_color.to(batch["time"].device) * 0.,
+                    scale_modifier=scaling_modifier,
+                    viewmatrix=batch["world_view_transform"][idx],
+                    projmatrix=batch["full_proj_transform"][idx],
+                    sh_degree=self.active_sh_degree,
+                    campos=batch["camera_center"][idx],
+                    prefiltered=False,
+                    debug=False)
                 raster_settings = GaussianRasterizationSettings(
                     image_height=int(batch["image_height"][idx]),
                     image_width=int(batch["image_width"][idx]),
@@ -868,8 +886,9 @@ class GS3d(MyModelBaseClass):
                     debug=False)
 
             
-            
+
                 rasterizer = GaussianRasterizer(raster_settings=raster_settings)
+                rasterizer_ch3 = GaussianRasterizer(raster_settings=raster_settings_ch3)
 
             # get corresponding Gaussian for render at this time step
             # {
@@ -943,48 +962,27 @@ class GS3d(MyModelBaseClass):
                 flow_bwd[:, 1] = flow_bwd[:, 1] * focal_y / t[:, 2]  + flow_bwd[:, 2] * -(focal_y * t[:, 1]) / (t[:, 2]*t[:, 2])
  
                 # Rasterize visible Gaussians to image, obtain their radii (on screen). 
-                if self.rgbdecoder is None:
-                    rendered_flow_fwd, _, _ = rasterizer(
-                        means3D = result["means3D"].detach(),
-                        means2D = means2D_.detach(),
-                        shs = None,
-                        colors_precomp = flow_fwd,
-                        opacities = result["opacity"].detach(),
-                        scales = result["scales"].detach() if result["scales"] is not None else None,
-                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
-                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
-                    )
-                    rendered_flow_bwd, _, _ = rasterizer(
-                        means3D = result["means3D"].detach(),
-                        means2D = means2D_.detach(),
-                        shs = None,
-                        colors_precomp = flow_bwd,
-                        opacities = result["opacity"].detach(),
-                        scales = result["scales"].detach() if result["scales"] is not None else None,
-                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
-                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
-                    )
-                else:
-                    rendered_flow_fwd, _, _ = rasterizer_ch3(
-                        means3D = result["means3D"].detach(),
-                        means2D = means2D_.detach(),
-                        shs = None,
-                        colors_precomp = flow_fwd,
-                        opacities = result["opacity"].detach(),
-                        scales = result["scales"].detach() if result["scales"] is not None else None,
-                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
-                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
-                    )
-                    rendered_flow_bwd, _, _ = rasterizer_ch3(
-                        means3D = result["means3D"].detach(),
-                        means2D = means2D_.detach(),
-                        shs = None,
-                        colors_precomp = flow_bwd,
-                        opacities = result["opacity"].detach(),
-                        scales = result["scales"].detach() if result["scales"] is not None else None,
-                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
-                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
-                    )
+                
+                rendered_flow_fwd, _, _ = rasterizer_ch3(
+                    means3D = result["means3D"].detach(),
+                    means2D = means2D_.detach(),
+                    shs = None,
+                    colors_precomp = flow_fwd,
+                    opacities = result["opacity"].detach(),
+                    scales = result["scales"].detach() if result["scales"] is not None else None,
+                    rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                    cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                )
+                rendered_flow_bwd, _, _ = rasterizer_ch3(
+                    means3D = result["means3D"].detach(),
+                    means2D = means2D_.detach(),
+                    shs = None,
+                    colors_precomp = flow_bwd,
+                    opacities = result["opacity"].detach(),
+                    scales = result["scales"].detach() if result["scales"] is not None else None,
+                    rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                    cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                )
                 result.update(
                     {
                         "render_flow_fwd": rendered_flow_fwd,
@@ -1040,6 +1038,11 @@ class GS3d(MyModelBaseClass):
         batch: Dict,
         mode: str,
         ):
+        assert mode.split("_")[0] in ["train", "val", "test"], "Not a recognizable mode!"
+        if mode == "train":
+            eval_mode = False
+        else:
+            eval_mode = True
         images = render_pkg["render"] # a list of 3xHxW
         #assert batch["original_image"].shape[0] == 1
         gt_images = batch["original_image"]
@@ -1053,8 +1056,11 @@ class GS3d(MyModelBaseClass):
         ssim_list = []
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 = 0.
-        if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+        
+        flow_loss_list = None
+        if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             flow_loss = 0.
+            flow_loss_list = []
             fwd_flows = batch["fwd_flow"] 
             fwd_flow_masks = batch["fwd_flow_mask"]
             bwd_flows = batch["bwd_flow"] 
@@ -1077,7 +1083,7 @@ class GS3d(MyModelBaseClass):
                     self.time_smoothness_weight,
                     self.l1_time_planes_weight,
                     self.plane_tv_weight)
-            if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+            if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
                 
                 fwd_flow = fwd_flows[idx] 
                 fwd_flow_mask = fwd_flow_masks[idx]
@@ -1085,11 +1091,14 @@ class GS3d(MyModelBaseClass):
                 bwd_flow_mask = bwd_flow_masks[idx]
                 render_flow_fwd = render_flow_fwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_fwds[idx]).sum(-1))) + 1e-5)
                 render_flow_bwd = render_flow_bwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_bwds[idx]).sum(-1))) + 1e-5)
-                flow_loss += compute_flow_loss(
+                flow_loss_= compute_flow_loss(
                     render_flow_fwd, render_flow_bwd,
                     fwd_flow, bwd_flow,
                     fwd_flow_mask, bwd_flow_mask
                 )
+                flow_loss += flow_loss_
+                flow_loss_list.append(flow_loss_.item())
+                
                 '''
                 M_fwd = fwd_flow_mask[idx:idx+1]
                 M_bwd = bwd_flow_mask[idx:idx+1]
@@ -1105,8 +1114,10 @@ class GS3d(MyModelBaseClass):
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 /= float(batch_size)
             loss += tv1
-        if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+        if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             flow_loss /= float(batch_size)
+            
+        if (self.lambda_flow > 0.0) and (self.iteration > self.flow_start):
             loss += self.lambda_flow * flow_loss 
 
         #assert False, [Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])]
@@ -1115,10 +1126,10 @@ class GS3d(MyModelBaseClass):
         self.log(f"{mode}/loss", loss, prog_bar=True)
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             self.log(f"{mode}/loss_tv", tv1)
-        if (self.lambda_flow > 0.0) and (self.iteration > self.warm_up + 2):
+        if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             self.log(f"{mode}/loss_flow", flow_loss)
         #print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
-        return loss, ssim_list
+        return loss, ssim_list, flow_loss_list
     
     def on_train_epoch_start(self) -> None:
         if self.start_time is None:
@@ -1148,7 +1159,7 @@ class GS3d(MyModelBaseClass):
 
         #self.update_learning_rate_or_sched_or_sh()
         # Render
-        if (self.lambda_flow > 0.0) and (iteration > self.warm_up + 1): 
+        if (self.lambda_flow > 0.0) and (self.iteration > self.flow_start): 
             assert "fwd_flow" in batch, "Need to have flow data for flow loss"
             render_rgb, render_flow, time_offset = True, True, self.trainer.datamodule.time_interval
         else:
@@ -1166,7 +1177,7 @@ class GS3d(MyModelBaseClass):
         if deform_optimizer is not None:
             deform_optimizer.zero_grad()
         # Loss
-        loss, ssim_list = self.compute_loss(
+        loss, ssim_list, flow_loss_list = self.compute_loss(
             render_pkg, batch, mode="train"
         )
         #print(loss)
@@ -1405,6 +1416,10 @@ class GS3d(MyModelBaseClass):
             image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
             gt = torch.clamp(batch["original_image"][0][:3], 0.,1.0)
             
+            depth = render_pkg["depth"][0]
+            depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
+            depth = torch.from_numpy(depth).permute(2, 0, 1) / 255.
+
             rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
             rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
             try:
@@ -1423,12 +1438,12 @@ class GS3d(MyModelBaseClass):
                 #print(self.iteration)
                 #assert False, self.iteration
                 if (self.iteration % self.log_image_interval) == 0:
-                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, rendered_flow_fwd, rendered_flow_bwd])
+                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd])
                     # visualize fwd flow and bwd flow
                     #self.logger.log_image(f"val_flow_fwd_{split}/{image_name}", [rendered_flow_fwd], step=self.iteration)
             elif (split == "test") and (self.num_batches_test < 5):
                 if (self.iteration % self.log_image_interval) == 0:
-                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, rendered_flow_fwd, rendered_flow_bwd])
+                    self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd])
             
             #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
             #    image)
@@ -1486,6 +1501,7 @@ class GS3d(MyModelBaseClass):
         self.test_ssim_total = []
         self.test_msssim_total = []
         self.test_lpips_total = []
+        self.test_flow_total = []
         self.test_num_batches = 0
         print(f"Saving Results based on checkpoint: {self.trainer.ckpt_path}")
         #assert False
@@ -1556,7 +1572,7 @@ class GS3d(MyModelBaseClass):
         torchvision.utils.save_image(rendered_flow_fwd[None], os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx))
         torchvision.utils.save_image(rendered_flow_bwd[None], os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx))
 
-        self.compute_loss(render_pkg, batch, mode="test")
+        _, _, flow_loss_list = self.compute_loss(render_pkg, batch, mode="test")
         _psnr = psnr(image[None], gt[None]).mean()
         _ssim = ssim(image, gt)
         _msssim = ms_ssim(image[None], gt[None], data_range=1, size_average=False).item()
@@ -1566,6 +1582,7 @@ class GS3d(MyModelBaseClass):
         self.test_ssim_total.append(_ssim)
         self.test_msssim_total.append(_msssim)
         self.test_lpips_total.append(_lpips)
+        self.test_flow_total += flow_loss_list
 
         self.test_image_name.append(batch["image_name"][0])
         self.test_times.append(batch["time"][0].item())
@@ -1577,28 +1594,50 @@ class GS3d(MyModelBaseClass):
     
     def on_test_epoch_end(self,):
         
+        # save a mp4
+        fps = 10
+        writer = imageio.get_writer(os.path.join(self.logger.save_dir, "test.mp4"), fps=fps)
+        for i in range(self.test_num_batches):
+            gt = imageio.imread(f"{self.logger.save_dir}/gt/%05d.png" % i)
+            depth = imageio.imread(f"{self.logger.save_dir}/depth/%05d.png" % i)
+            test = imageio.imread(f"{self.logger.save_dir}/test/%05d.png" % i)
+            flow_fwd = imageio.imread(f"{self.logger.save_dir}/flow/%05d_fwd.png" % i)
+            flow_bwd = imageio.imread(f"{self.logger.save_dir}/flow/%05d_bwd.png" % i)
+
+            block = np.zeros_like(gt)
+
+
+            result_top = np.concatenate([gt, test, depth], axis=1)
+            result_bottom = np.concatenate([block, flow_fwd, flow_bwd], axis=1)
+            result = np.concatenate([result_top, result_bottom], axis=0)
+            writer.append_data(result)
+        writer.close()
+            
         avg_render_time = sum(self.test_render_time) / (self.test_num_batches + 1e-16)
         avg_psnr = sum(self.test_psnr_total) / (self.test_num_batches + 1e-16)
         avg_ssim = sum(self.test_ssim_total) / (self.test_num_batches + 1e-16)
         avg_msssim = sum(self.test_msssim_total) / (self.test_num_batches + 1e-16)
         avg_lpips = sum(self.test_lpips_total) / (self.test_num_batches + 1e-16)
+        avg_flow = sum(self.test_flow_total) / (self.test_num_batches + 1e-16)
         
         with open(self.log_txt, "w") as f:
             f.write("image_name, time, render_time, psnr, ssim, msssim, lpips\n")
             for i in range(len(self.test_image_name)):
-                f.write(f"{self.test_image_name[i]}, {self.test_times[i]}, {self.test_render_time[i]}, {self.test_psnr_total[i]}, {self.test_ssim_total[i]}, {self.test_msssim_total[i]}, {self.test_lpips_total[i]}\n")
+                f.write(f"{self.test_image_name[i]}, {self.test_times[i]}, {self.test_render_time[i]}, {self.test_psnr_total[i]}, {self.test_ssim_total[i]}, {self.test_msssim_total[i]}, {self.test_lpips_total[i]}, {self.test_flow_total[i]}\n")
             f.write("\n")
             f.write(f"Average Render Time: {avg_render_time}\n")
             f.write(f"Average PSNR: {avg_psnr}\n")        
             f.write(f"Average SSIM: {avg_ssim}\n")
             f.write(f"Average MS-SSIM: {avg_msssim}\n")
             f.write(f"Average LPIPS: {avg_lpips}\n")
+            f.write(f"Average Flow Loss: {avg_flow}\n")
 
         
         self.log('test/avg_psnr', avg_psnr)
         self.log('test/avg_ssim', avg_ssim)
         self.log('test/avg_msssim', avg_msssim)
         self.log('test/avg_lpips', avg_lpips)
+        self.log('test/avg_flow', avg_flow)
         
         self.test_image_name = []
         self.test_times = []
@@ -1607,7 +1646,10 @@ class GS3d(MyModelBaseClass):
         self.test_ssim_total = []
         self.test_msssim_total = []
         self.test_lpips_total = []
+        self.test_flow_total = []
         self.test_num_batches = 0
+
+
 
 
     def on_save_checkpoint(self, checkpoint):
