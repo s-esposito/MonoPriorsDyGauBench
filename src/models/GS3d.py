@@ -296,9 +296,12 @@ class GS3d(MyModelBaseClass):
         if not self.post_act:
             assert self.motion_mode in ["HexPlane"], "otherwise may cause issues in def deform(self)"
 
-        if deform_opacity:
-            assert opacity_reset_interval > 100000, "Not supporting opacity reset for deforming opacity case"
+        #if deform_opacity:
+        #    assert opacity_reset_interval > 100000, "Not supporting opacity reset for deforming opacity case"
 
+        self.deform_scale = deform_scale
+        self.deform_opacity = deform_opacity
+        self.deform_feature = deform_feature
     #@torch.inference_mode()
     #def compute_lpips(
     #    self, image: torch.Tensor, gt: torch.Tensor 
@@ -389,6 +392,23 @@ class GS3d(MyModelBaseClass):
         if self.use_static:
             self.isstatic = torch.zeros((self._xyz.shape[0],1), device="cuda").float()
             self.isstatic[:num_static] = 1.0
+        
+        if self.motion_mode in ["EffGS"]:
+            if self.deform_scale:
+                # zero initialization
+                scales_t = torch.zeros_like(self.get_scaling).cuda()
+                self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
+            if self.deform_opacity:
+                opacities_t = torch.zeros_like(self.get_opacity).cuda()
+                self._opacity_t = nn.Parameter(opacities_t.contiguous().requires_grad_(True))
+            if self.deform_feature:
+                features_t = torch.zeros_like(self.get_features).cuda()
+                self._features_t = nn.Parameter(features_t.contiguous().requires_grad_(True))
+        
+        if self.motion_mode in ["TRBF"]:
+            if self.deform_scale:
+                scales_t = torch.zeros_like(self.get_scaling).cuda()
+                self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -408,11 +428,22 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode in ["TRBF"]:
             l.append({'params': [self._trbf_center], 'lr': self.trbfc_lr, "name": "trbf_center"})
             l.append( {'params': [self._trbf_scale], 'lr': self.trbfs_lr, "name": "trbf_scale"})
-        
+        if self.motion_mode in ["EffGS"]:
+            if self.deform_scale:
+                l.append({'params': [self._scaling_t], 'lr': self.scaling_lr, "name": "scaling_t"})
+            if self.deform_opacity:
+                l.append({'params': [self._opacity_t], 'lr': self.opacity_lr, "name": "opacity_t"})
+            if self.deform_feature:
+                l.append({'params': [self._features_t], 'lr': self.feature_lr, "name": "f_t"})
+        if self.motion_mode in ["TRBF"]:
+            if self.deform_scale:
+                l.append({'params': [self._scaling_t], 'lr': self.scaling_lr, "name": "scaling_t"})
+
         if self.rgbdecoder is not None:
             l += [{'params': list(self.rgbdecoder.parameters()), 'lr': self.decoder_lr, "name": "decoder"}]
-
+        
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
+        #assert False, (l, [ [param_group["name"], param_group['params'][0], self.optimizer.state.get(param_group['params'][0], None)] for param_group in self.optimizer.param_groups])
         self.xyz_scheduler_args = get_expon_lr_func(lr_init=self.position_lr_init*self.spatial_lr_scale,
                                                     lr_final=self.position_lr_final*self.spatial_lr_scale,
                                                     lr_delay_mult=self.position_lr_delay_mult,
@@ -492,8 +523,18 @@ class GS3d(MyModelBaseClass):
         return self._features_dc.view(-1, 3)
 
     @property
+    def get_features_t(self):
+        return self._features_t
+
+    @property
     def get_opacity(self):
         return self.opacity_activation(self._opacity)
+    
+    @property
+    def get_opacity_t(self):
+        return self.opacity_activation(self._opacity_t)
+
+    
     
     def get_cov_t(self, scaling_modifier = 1):
         if self.rot_4d:
@@ -544,6 +585,24 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             result["trbfcenter"] = self._trbf_center
             result["trbfscale"] = self._trbf_scale
+            if self.deform_scale:
+                if self.post_act:
+                    result["scales_t"] = self.get_scaling_t
+                else:
+                    result["scales_t"] = self._scaling_t  
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                if self.post_act:
+                    result["scales_t"] = self.get_scaling_t
+                else:
+                    result["scales_t"] = self._scaling_t           
+            if self.deform_opacity:
+                if self.post_act:
+                    result["opacity_t"] = self.get_opacity_t
+                else:
+                    result["opacity_t"] = self._opacity_t 
+            if self.deform_feature:
+                result["shs_t"] = self.get_features_t
             
         if self.iteration  < self.warm_up:
             if self.post_act:
@@ -576,11 +635,11 @@ class GS3d(MyModelBaseClass):
             elif self.motion_mode in ["EffGS"]:
                 result_ = {
                     "means3D": d_xyz,
-                    "shs": self.get_features,
+                    "shs": d_feat,
                     "colors_precomp": None,
-                    "opacity": self.get_opacity,
-                    "scales": self.get_scaling,
-                    "rotations": d_rotation,
+                    "opacity": d_opacity if self.post_act else self.opacity_activation(d_opacity),
+                    "scales": d_scaling if self.post_act else self.scaling_activation(d_scaling),
+                    "rotations": d_rotation if self.post_act else self.rotation_activation(d_rotation),
                     "cov3D_precomp": None
                 }
             elif self.motion_mode in ["TRBF"]:
@@ -590,7 +649,7 @@ class GS3d(MyModelBaseClass):
                         "shs": None, 
                         "colors_precomp": self.get_features_dc.float(),
                         "opacity": d_opacity.float(),
-                        "scales": self.get_scaling.float(),
+                        "scales": d_scaling.float(),
                         "rotations": d_rotation.float(),
                         "cov3D_precomp": None
                     }
@@ -600,7 +659,7 @@ class GS3d(MyModelBaseClass):
                         "shs": d_feat.float(),
                         "colors_precomp": None,
                         "opacity": d_opacity.float(),
-                        "scales": self.get_scaling.float(),
+                        "scales": d_scaling.float(),
                         "rotations": d_rotation.float(),
                         "cov3D_precomp": None
                     }
@@ -612,6 +671,7 @@ class GS3d(MyModelBaseClass):
                 #        print(key, result[key].dtype)
                 #assert False
             elif self.motion_mode in ["HexPlane"]:
+                assert not self.post_act
                 result_ = {
                     "means3D": d_xyz,
                     "shs": d_feat,
@@ -1023,14 +1083,6 @@ class GS3d(MyModelBaseClass):
                 rays, 
             )[0] # 1 , 3
     
-
-
-    
-
-    def get_render_mode(self,
-        eval: Optional[bool]=False) -> Tuple[bool, bool, float]:
-        # return render_rgb, render_flow and time_offset
-        raise NotImplementedError
         
 
     def compute_loss(self,
@@ -1183,6 +1235,8 @@ class GS3d(MyModelBaseClass):
         #print(loss)
         self.manual_backward(loss)
 
+        #print([[param_group['name'], optimizer.state.get(param_group["params"][0])] for param_group in optimizer.param_groups])
+        
 
         with torch.no_grad():
             # keep track of stats for adaptive policy
@@ -1357,8 +1411,10 @@ class GS3d(MyModelBaseClass):
 
                 if (iteration % self.opacity_reset_interval == 0) or (
                         self.white_background and iteration == self.densify_from_iter
-                        and (self.motion_mode not in ["4DGS"])):
+                        and (self.motion_mode not in ["4DGS"])
+                        and (self.motion_mode not in ["EffGS"] or not self.deform_opacity)):
                     #if self.iteration > self.warm_up + 1:
+                    #if not self.deform_opacity:
                         self.reset_opacity()
 
                 
@@ -1723,6 +1779,15 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             self._trbf_center = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_trbf_center"].shape).requires_grad_(True))
             self._trbf_scale = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_trbf_scale"].shape).requires_grad_(True))
+            if self.deform_scale:
+                self._scaling_t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_scaling_t"].shape).requires_grad_(True))
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                self._scaling_t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_scaling_t"].shape).requires_grad_(True))
+            if self.deform_opacity:
+                self._opacity_t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_opacity_t"].shape).requires_grad_(True))
+            if self.deform_feature:
+                self._features_t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_features_t"].shape).requires_grad_(True))
         # load extra parameters
         self.max_radii2D = checkpoint["extra_state_dict"]["max_radii2D"].to("cuda")
         self.xyz_gradient_accum = checkpoint["extra_state_dict"]["xyz_gradient_accum"].to("cuda")
@@ -1872,6 +1937,20 @@ class GS3d(MyModelBaseClass):
             new_isstatic = (torch.rand((new_xyz.shape[0],1)).cuda() < 0.5).float()
         else:
             new_isstatic = None
+        
+        new_opacity_t = None
+        new_features_t = None
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                new_scaling_t = torch.zeros_like(new_scaling).cuda()
+            if self.deform_opacity:
+                new_opacity_t = torch.zeros_like(new_opacity).cuda()
+            if self.deform_feature:
+                new_features_t = torch.zeros_like(torch.cat([new_features_dc,
+                    new_features_rest], dim=1)).cuda()
+        if self.motion_mode == "TRBF":
+            if self.deform_scale:
+                new_scaling_t = torch.zeros_like(new_scaling).cuda()
         #print(
         #    new_xyz.shape, 
         #    new_features_dc.shape, new_features_rest.shape,
@@ -1882,7 +1961,8 @@ class GS3d(MyModelBaseClass):
             new_xyz, new_features_dc, new_features_rest, 
             new_opacity, new_scaling, new_rotation, 
             new_t, new_scaling_t, new_rotation_r, 
-            new_trbf_center, new_trbf_scale, new_isstatic)
+            new_trbf_center, new_trbf_scale, new_isstatic,
+            new_opacity_t, new_features_t)
         
 
 
@@ -1937,10 +2017,25 @@ class GS3d(MyModelBaseClass):
             new_isstatic = self.isstatic[selected_pts_mask]
         else:
             new_isstatic = None
+        
+        new_opacity_t = None
+        new_features_t = None
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                new_scaling_t = torch.zeros_like(new_scaling).cuda()
+            if self.deform_opacity:
+                new_opacity_t = torch.zeros_like(new_opacities).cuda()
+            if self.deform_feature:
+                new_features_t = torch.zeros_like(torch.cat([new_features_dc,
+                    new_features_rest], dim=1)).cuda()
+        if self.motion_mode == "TRBF":
+            if self.deform_scale:
+                new_scaling_t = torch.zeros_like(new_scaling).cuda()
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
                                    new_rotation, new_t, new_scaling_t, new_rotation_r,
-                                   new_trbf_center, new_trbf_scale, new_isstatic)
+                                   new_trbf_center, new_trbf_scale, new_isstatic,
+                                   new_opacity_t, new_features_t)
 
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         #(len(list(self._rotation.shape)))
@@ -2023,8 +2118,24 @@ class GS3d(MyModelBaseClass):
         else:
             new_isstatic = None
         
+        new_opacity_t = None
+        new_features_t = None
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                new_scaling_t = torch.zeros_like(new_scaling).cuda()
+            if self.deform_opacity:
+                new_opacity_t = torch.zeros_like(new_opacity).cuda()
+            if self.deform_feature:
+                new_features_t = torch.zeros_like(torch.cat([new_features_dc,
+                    new_features_rest], dim=1)).cuda()
+
+        if self.motion_mode == "TRBF":
+            if self.deform_scale:
+                new_scaling_t = torch.zeros_like(new_scaling).cuda()
+        
         #print(self._features_dc.shape, new_features_dc.shape)
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic)
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic,
+            new_opacity_t, new_features_t)
         #print(self._features_dc.shape, new_features_dc.shape)
         
 
@@ -2061,7 +2172,17 @@ class GS3d(MyModelBaseClass):
         if self.use_static:
             self.isstatic = self.isstatic[valid_points_mask]
         
-    
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                self._scaling_t = optimizable_tensors['scaling_t']
+            if self.deform_opacity:
+                self._opacity_t = optimizable_tensors['opacity_t']
+            if self.deform_feature:
+                self._features_t = optimizable_tensors['f_t']
+        if self.motion_mode == "TRBF":
+            if self.deform_scale:
+                self._scaling_t = optimizable_tensors['scaling_t']
+
     def _prune_optimizer(self, mask):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
@@ -2085,7 +2206,9 @@ class GS3d(MyModelBaseClass):
         return optimizable_tensors
 
     def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling,
-                              new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic):
+                              new_rotation, new_t, new_scaling_t, new_rotation_r, new_trbf_center, new_trbf_scale, new_isstatic,
+                              new_opacity_t, new_features_t):
+        
         d = {"xyz": new_xyz,
              "f_dc": new_features_dc,
              "f_rest": new_features_rest,
@@ -2100,7 +2223,24 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             d["trbf_center"] = new_trbf_center
             d["trbf_scale"] = new_trbf_scale
+            if self.deform_scale:
+                d["scaling_t"] = new_scaling_t
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                d["scaling_t"] = new_scaling_t
+            if self.deform_opacity:
+                d["opacity_t"] = new_opacity_t
+            if self.deform_feature:
+                d["f_t"] = new_features_t
+        
         optimizable_tensors = self.cat_tensors_to_optimizer(d)
+        for item in d:
+            if d[item] is None:
+                print(item)
+        for item in optimizable_tensors:
+            if optimizable_tensors[item] is None:
+                print(item)
+        
         self._xyz = optimizable_tensors["xyz"]
         self._features_dc = optimizable_tensors["f_dc"]
         self._features_rest = optimizable_tensors["f_rest"]
@@ -2123,6 +2263,17 @@ class GS3d(MyModelBaseClass):
         
         if self.use_static:
             self.isstatic = torch.cat([self.isstatic, new_isstatic], dim=0) 
+        
+        if self.motion_mode == "EffGS":
+            if self.deform_scale:
+                self._scaling_t = optimizable_tensors['scaling_t']
+            if self.deform_opacity:
+                self._opacity_t = optimizable_tensors['opacity_t']
+            if self.deform_feature:
+                self._features_t = optimizable_tensors['f_t']
+        if self.motion_mode == "TRBF":
+            if self.deform_scale:
+                self._scaling_t = optimizable_tensors['scaling_t']
 
     def cat_tensors_to_optimizer(self, tensors_dict):
         optimizable_tensors = {}
@@ -2150,18 +2301,26 @@ class GS3d(MyModelBaseClass):
                 group["params"][0] = nn.Parameter(
                     torch.cat((group["params"][0], extension_tensor), dim=0).requires_grad_(True))
                 optimizable_tensors[group["name"]] = group["params"][0]
-
+            #print(group["name"], self.optimizer.state.get(group['params'][0], None))
+            
         return optimizable_tensors
 
     def reset_opacity(self):
         opacities_new = inverse_sigmoid(torch.min(self.get_opacity, torch.ones_like(self.get_opacity) * 0.01))
         optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
         self._opacity = optimizable_tensors["opacity"]
+        if self.motion_mode == "EffGS":
+            if self.deform_opacity and (self.iteration > self.warm_up + 1):
+                opacity_t_new = torch.zeros_like(self.get_opacity).cuda()
+                optimizable_tensors = self.replace_tensor_to_optimizer(opacity_t_new, "opacity_t")
+                self._opacity_t = optimizable_tensors["opacity_t"]
 
     def replace_tensor_to_optimizer(self, tensor, name):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
+            #print(group["name"], self.optimizer.state.get(group['params'][0], None))
             if group["name"] == name:
+                #print(self.optimizer.state)
                 stored_state = self.optimizer.state.get(group['params'][0], None)
                 stored_state["exp_avg"] = torch.zeros_like(tensor)
                 stored_state["exp_avg_sq"] = torch.zeros_like(tensor)

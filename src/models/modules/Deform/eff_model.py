@@ -10,11 +10,13 @@ import math
 
 class EffModel(nn.Module):
     def __init__(self, L=2,
+        sh_dim: Optional[int]=0,
+        is_blender: Optional[bool]=False,
         deform_scale: Optional[bool]=False,
         deform_opacity: Optional[bool]=False,
         deform_feature: Optional[bool]=False,):
         self.L = L
-        assert False, "Under construction for deform mode..."
+        #assert False, "Under construction for deform mode..."
 
         self.deform_scale = deform_scale
         self.deform_opacity = deform_opacity
@@ -35,15 +37,15 @@ class EffModel(nn.Module):
         #assert False,  "Should return scales and features accordingly "
         #assert False, "Should change in create_from_pcd"
         if self.deform_scale:
-            scales = inp["scales"][:, idx1, :] + inp["scales"][:, idx2, :]*time
+            scales = inp["scales"] + inp["scales_t"]*time
         else:
             scales = inp["scales"]
         if self.deform_opacity:
-            opacities = inp["opacity"][:, idx1, :] + inp["opacity"][:, idx2, :]*time
+            opacities = inp["opacity"] + inp["opacity_t"]*time
         else:
             opacities = inp["opacity"]
         if self.deform_feature:
-            features = inp["shs"][:, idx1, ...] + inp["shs"][:, idx2, ...]*time
+            features = inp["shs"] + inp["shs_t"]*time
         else:
             features = inp["shs"]
         
