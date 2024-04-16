@@ -231,7 +231,7 @@ class GS3d(MyModelBaseClass):
             deform_scale=deform_scale,
             deform_opacity=deform_opacity,
             deform_feature=deform_feature,
-            sh_dim=((self.max_sh_degree + 1) ** 2) * 3 if (self.rgbdecoder is None) else 9
+            sh_dim=((self.max_sh_degree + 1) ** 2) * 3 if (self.rgbdecoder is None) else 9,
             **kwargs)    
         self.motion_mode = motion_mode   
         if self.motion_mode == "FourDim":
@@ -302,6 +302,10 @@ class GS3d(MyModelBaseClass):
         self.deform_scale = deform_scale
         self.deform_opacity = deform_opacity
         self.deform_feature = deform_feature
+
+        if self.motion_mode in ["TRBF"]:
+            if self.rgbdecoder is None:
+                assert not self.deform_feature, "Not supporting feature deformation for TRBF SH mode"
     #@torch.inference_mode()
     #def compute_lpips(
     #    self, image: torch.Tensor, gt: torch.Tensor 
@@ -396,7 +400,7 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode in ["EffGS"]:
             if self.deform_scale:
                 # zero initialization
-                scales_t = torch.zeros_like(self.get_scaling).cuda()
+                scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
                 self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
             if self.deform_opacity:
                 opacities_t = torch.zeros_like(self.get_opacity).cuda()
@@ -407,7 +411,7 @@ class GS3d(MyModelBaseClass):
         
         if self.motion_mode in ["TRBF"]:
             if self.deform_scale:
-                scales_t = torch.zeros_like(self.get_scaling).cuda()
+                scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
                 self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
 
     # not sure setup and configure_model which is better
@@ -573,6 +577,7 @@ class GS3d(MyModelBaseClass):
                 "cov3D_precomp": None
             }
         else:
+            assert self.motion_mode in ["HexPlane"]
             result = {
                 "means3D": self.get_xyz, 
                 "shs": self.get_features, 
@@ -586,10 +591,9 @@ class GS3d(MyModelBaseClass):
             result["trbfcenter"] = self._trbf_center
             result["trbfscale"] = self._trbf_scale
             if self.deform_scale:
-                if self.post_act:
-                    result["scales_t"] = self.get_scaling_t
-                else:
-                    result["scales_t"] = self._scaling_t  
+                result["scales_t"] = self.get_scaling_t  
+                result["scales"] = self.get_scaling
+            
         if self.motion_mode == "EffGS":
             if self.deform_scale:
                 if self.post_act:
@@ -978,6 +982,7 @@ class GS3d(MyModelBaseClass):
                 except:
                     pass
                 means2D = screenspace_points
+                
                 rendered_image, radii, depth = rasterizer(
                     means3D=result["means3D"],
                     means2D=means2D,
@@ -1111,14 +1116,15 @@ class GS3d(MyModelBaseClass):
         
         flow_loss_list = None
         if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
-            flow_loss = 0.
-            flow_loss_list = []
-            fwd_flows = batch["fwd_flow"] 
-            fwd_flow_masks = batch["fwd_flow_mask"]
-            bwd_flows = batch["bwd_flow"] 
-            bwd_flow_masks = batch["bwd_flow_mask"]
-            render_flow_fwds = render_pkg["render_flow_fwd"]
-            render_flow_bwds = render_pkg["render_flow_bwd"]
+            if "fwd_flow" in batch:
+                flow_loss = 0.
+                flow_loss_list = []
+                fwd_flows = batch["fwd_flow"] 
+                fwd_flow_masks = batch["fwd_flow_mask"]
+                bwd_flows = batch["bwd_flow"] 
+                bwd_flow_masks = batch["bwd_flow_mask"]
+                render_flow_fwds = render_pkg["render_flow_fwd"]
+                render_flow_bwds = render_pkg["render_flow_bwd"]
 
 
         for idx in range(batch_size):
@@ -1136,20 +1142,20 @@ class GS3d(MyModelBaseClass):
                     self.l1_time_planes_weight,
                     self.plane_tv_weight)
             if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
-                
-                fwd_flow = fwd_flows[idx] 
-                fwd_flow_mask = fwd_flow_masks[idx]
-                bwd_flow = bwd_flows[idx]
-                bwd_flow_mask = bwd_flow_masks[idx]
-                render_flow_fwd = render_flow_fwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_fwds[idx]).sum(-1))) + 1e-5)
-                render_flow_bwd = render_flow_bwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_bwds[idx]).sum(-1))) + 1e-5)
-                flow_loss_= compute_flow_loss(
-                    render_flow_fwd, render_flow_bwd,
-                    fwd_flow, bwd_flow,
-                    fwd_flow_mask, bwd_flow_mask
-                )
-                flow_loss += flow_loss_
-                flow_loss_list.append(flow_loss_.item())
+                if "fwd_flow" in batch:
+                    fwd_flow = fwd_flows[idx] 
+                    fwd_flow_mask = fwd_flow_masks[idx]
+                    bwd_flow = bwd_flows[idx]
+                    bwd_flow_mask = bwd_flow_masks[idx]
+                    render_flow_fwd = render_flow_fwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_fwds[idx]).sum(-1))) + 1e-5)
+                    render_flow_bwd = render_flow_bwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_bwds[idx]).sum(-1))) + 1e-5)
+                    flow_loss_= compute_flow_loss(
+                        render_flow_fwd, render_flow_bwd,
+                        fwd_flow, bwd_flow,
+                        fwd_flow_mask, bwd_flow_mask
+                    )
+                    flow_loss += flow_loss_
+                    flow_loss_list.append(flow_loss_.item())
                 
                 '''
                 M_fwd = fwd_flow_mask[idx:idx+1]
@@ -1167,7 +1173,8 @@ class GS3d(MyModelBaseClass):
             tv1 /= float(batch_size)
             loss += tv1
         if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
-            flow_loss /= float(batch_size)
+            if "fwd_flow" in batch:
+                flow_loss /= float(batch_size)
             
         if (self.lambda_flow > 0.0) and (self.iteration > self.flow_start):
             loss += self.lambda_flow * flow_loss 
@@ -1179,7 +1186,8 @@ class GS3d(MyModelBaseClass):
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             self.log(f"{mode}/loss_tv", tv1)
         if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
-            self.log(f"{mode}/loss_flow", flow_loss)
+            if "fwd_flow" in batch:
+                self.log(f"{mode}/loss_flow", flow_loss)
         #print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
         return loss, ssim_list, flow_loss_list
     
@@ -1420,7 +1428,8 @@ class GS3d(MyModelBaseClass):
                 
 
         #old_xyz = (self._xyz[:, 0]).detach().clone()
-        
+        #if self.motion_mode == "TRBF":
+        #    self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm") 
         optimizer.step()
         if deform_optimizer is not None:
             self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
@@ -1642,7 +1651,7 @@ class GS3d(MyModelBaseClass):
         self.test_ssim_total.append(_ssim)
         self.test_msssim_total.append(_msssim)
         self.test_lpips_total.append(_lpips)
-        self.test_flow_total += flow_loss_list
+        self.test_flow_total += flow_loss_list if flow_loss_list is not None else [0.]
 
         self.test_image_name.append(batch["image_name"][0])
         self.test_times.append(batch["time"][0].item())
@@ -1951,6 +1960,7 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode == "TRBF":
             if self.deform_scale:
                 new_scaling_t = torch.zeros_like(new_scaling).cuda()
+            
         #print(
         #    new_xyz.shape, 
         #    new_features_dc.shape, new_features_rest.shape,

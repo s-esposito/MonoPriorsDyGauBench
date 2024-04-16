@@ -58,11 +58,18 @@ class TRBFModel(nn.Module):
         rotations = torch.sum(inp["rotations"][:, :self.Nq+1, :] * basis_rot, dim=1) #Nx4
         
         if self.deform_scale:
-            basis_scale = create_sequence(tforpoly, self.Nq) # borrow from rotation
-            scales = torch.sum(torch.cat([
-                inp["scales"][:, None, :],
-                inp["scales_t"][:, None, :]
-            ], dim=1) * basis_scale, dim=1)
+            # to prevent negative value, adopt linear approx to prevent instability
+            scales = inp["scales"] + time * inp["scales_t"]
+            print(scales[:10])
+            #basis_scale = create_sequence(tforpoly, self.Nq) # borrow from rotation
+            #scales = torch.sum(torch.cat([
+            #    inp["scales"][:, None, :],
+            #    inp["scales_t"][:, None, :]
+            #], dim=1) * basis_scale, dim=1)
+            #print(basis_scale)
+            print(inp["scales"][:10, None, :])
+            print(inp["scales_t"][:10, None, :])
+            
         else:
             scales = inp["scales"]
         # Note: this is invalid when feature is SH! but anyways won't use it if SH
