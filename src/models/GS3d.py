@@ -652,9 +652,9 @@ class GS3d(MyModelBaseClass):
                         "means3D": d_xyz.float(),
                         "shs": None, 
                         "colors_precomp": self.get_features_dc.float(),
-                        "opacity": d_opacity.float(),
-                        "scales": d_scaling.float(),
-                        "rotations": d_rotation.float(),
+                        "opacity": torch.clamp(d_opacity.float(), min=1e-3),
+                        "scales": torch.clamp(d_scaling.float(), min=1e-3),
+                        "rotations": torch.nn.functional.normalize(d_rotation.float()),
                         "cov3D_precomp": None
                     }
                 else:
@@ -662,9 +662,9 @@ class GS3d(MyModelBaseClass):
                         "means3D": d_xyz.float(),
                         "shs": d_feat.float(),
                         "colors_precomp": None,
-                        "opacity": d_opacity.float(),
-                        "scales": d_scaling.float(),
-                        "rotations": d_rotation.float(),
+                        "opacity": torch.clamp(d_opacity.float(), min=1e-3),
+                        "scales": torch.clamp(d_scaling.float(), min=1e-3),
+                        "rotations": torch.nn.functional.normalize(d_rotation.float()),
                         "cov3D_precomp": None
                     }
                 #for key in result_:
@@ -720,14 +720,15 @@ class GS3d(MyModelBaseClass):
             result_["colors_precomp"] = result_["shs"]
             result_["shs"] = None
         
+        
         # prevent RuntimeError: numel: integer multiplication overflow
-        for key in result_:
-            if result_[key] is not None:
-                if torch.any(torch.abs(result_[key]) < 1e-3):
-                    pos_mask = result_[key] > 0.
-                    result_[key][pos_mask] = torch.clamp(result_[key][pos_mask], min=1e-3)
-                    result_[key][~pos_mask] = torch.clamp(result_[key][~pos_mask], max=-1e-3) 
-                
+        #for key in result_:
+        #    if result_[key] is not None:
+        #        problem_mask = (torch.abs(result_[key]) > 1e-3)
+        #        result_[key] *= problem_mask
+                #pos_mask = result_[key] > 0.
+                #result_[key][pos_mask] = result_[key][pos_mask].clamp_(min=1e-3)
+                #result_[key][~pos_mask] = result_[key][~pos_mask].clamp_(max=-1e-3)     
         
         return result_
 

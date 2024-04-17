@@ -1,14 +1,14 @@
 seed_everything: false
 name: 'TRBF_vanilla1'
 ckpt_path: null
-output: './output/dnerf/trex/TRBF'
-group: 'trex' 
+output: './output/hypernerf/split-cookie/TRBF'
+group: 'split-cookie' 
 logger: 'wandb'
-project: 'GaussianDiff_dnerf'
+project: 'GaussianDiff_hypernerf'
 model:
   class_path: src.models.GS3d
   init_args:
-    is_blender: true
+    is_blender: false
     deform_scale: false
     deform_opacity: true
     deform_feature: true
@@ -65,14 +65,14 @@ model:
     color_mode: "sandwich"
     rot_4d: true
 data:
-  class_path: src.data.SyntheticDataModule
+  class_path: src.data.NerfiesDataModule
   init_args:
     seed: null
-    datadir: '/users/yliang51/data/yliang51/GaussianDiff/data/dnerf/data/trex'
+    datadir: '/users/yliang51/data/yliang51/GaussianDiff/data/hypernerf/split-cookie'
     eval: True
     ratio: 0.5
     white_background: true
-    batch_size: 2
+    batch_size: 1 # 1 if syntethic, 2 if real
     num_pts_ratio: 0.0
     num_pts: 0
     M: 10

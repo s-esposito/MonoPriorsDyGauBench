@@ -1,22 +1,22 @@
 seed_everything: false
-name: 'TRBF_vanilla1'
+name: 'Curve_vanilla1'
 ckpt_path: null
-output: './output/dnerf/trex/TRBF'
-group: 'trex' 
+output: './output/hypernerf/split-cookie/Curve'
+group: 'split-cookie' 
 logger: 'wandb'
-project: 'GaussianDiff_dnerf'
+project: 'GaussianDiff_hypernerf'
 model:
   class_path: src.models.GS3d
   init_args:
-    is_blender: true
+    is_blender: false
     deform_scale: false
-    deform_opacity: true
-    deform_feature: true
+    deform_opacity: false
+    deform_feature: false
     log_image_interval: 1000
     sh_degree: 3
     sh_degree_t: 2
     percent_dense: 0.01
-    warm_up: 0 # turn on warmup if 3000
+    warm_up: 3000 # turn on warmup if 3000
     trbfc_lr: 0.0001
     trbfs_lr: 0.03
     trbfslinit: -2.0
@@ -42,13 +42,13 @@ model:
     lambda_dssim: 0.2
     lambda_flow: 0. # default to disable flow loss
     flow_start: 5000
-    plane_tv_weight: 0.0002 # if real, 0.0002
-    time_smoothness_weight: 0.001 # if real, 0.001
+    plane_tv_weight: 0.0001 # if real, 0.0002, else 0.0001
+    time_smoothness_weight: 0.01 # if real, 0.001 else 0.01
     l1_time_planes_weight: 0.0001
     densification_interval: 100
     opacity_reset_interval: 3000 # if deforming opacity, 30000000
     densify_from_iter: 500
-    densify_until_iter: 9000 # specifically for TRBF is 9000
+    densify_until_iter: 15000 # specifically for TRBF is 9000
     densify_grad_threshold: 0.0002
     l1_l2_switch: 0 # turn off l1_l2
     raystart: 0.7
@@ -56,23 +56,23 @@ model:
     numperay: 2
     emsthr: 0.6
     num_ems: 2
-    emsstartfromiterations: 5000  # turn off guided sampling if 5000000
+    emsstartfromiterations: 5000000000  # turn off guided sampling if 5000000
     selectedlength: 5000
     use_static: false
     use_AST: false
-    init_mode: "TRBF"
-    motion_mode: "TRBF"
-    color_mode: "sandwich"
+    init_mode: "EffGS"
+    motion_mode: "EffGS"
+    color_mode: "rgb"
     rot_4d: true
 data:
-  class_path: src.data.SyntheticDataModule
+  class_path: src.data.NerfiesDataModule
   init_args:
     seed: null
-    datadir: '/users/yliang51/data/yliang51/GaussianDiff/data/dnerf/data/trex'
+    datadir: '/users/yliang51/data/yliang51/GaussianDiff/data/hypernerf/split-cookie'
     eval: True
     ratio: 0.5
     white_background: true
-    batch_size: 2
+    batch_size: 1 # 1 if syntethic, 2 if real
     num_pts_ratio: 0.0
     num_pts: 0
     M: 10
