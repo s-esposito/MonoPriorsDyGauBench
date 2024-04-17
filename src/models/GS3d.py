@@ -719,6 +719,16 @@ class GS3d(MyModelBaseClass):
             assert result_["shs"] is not None and result_["colors_precomp"] is None
             result_["colors_precomp"] = result_["shs"]
             result_["shs"] = None
+        
+        # prevent RuntimeError: numel: integer multiplication overflow
+        for key in result_:
+            if result_[key] is not None:
+                if torch.any(torch.abs(result_[key]) < 1e-3):
+                    pos_mask = result_[key] > 0.
+                    result_[key][pos_mask] = torch.clamp(result_[key][pos_mask], min=1e-3)
+                    result_[key][~pos_mask] = torch.clamp(result_[key][~pos_mask], max=-1e-3) 
+                
+        
         return result_
 
     def forward_FourDim(self,
@@ -982,7 +992,9 @@ class GS3d(MyModelBaseClass):
                 except:
                     pass
                 means2D = screenspace_points
-                
+                #for key in result:
+                #    if result[key] is not None:
+                #        print(key, torch.any(result[key] < 0.)) 
                 rendered_image, radii, depth = rasterizer(
                     means3D=result["means3D"],
                     means2D=means2D,
