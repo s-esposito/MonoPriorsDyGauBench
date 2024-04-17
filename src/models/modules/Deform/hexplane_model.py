@@ -283,8 +283,10 @@ class Deformation(nn.Module):
         no_do=True,
         no_dshs=True,
         apply_rotation=False,
+        sh_dim=None,
     ):
         super(Deformation, self).__init__()
+        #assert False, self.D
         self.D = D
         self.W = W
         self.input_ch = input_ch
@@ -309,6 +311,7 @@ class Deformation(nn.Module):
             self.static_mlp = nn.Sequential(nn.ReLU(),nn.Linear(self.W,self.W),nn.ReLU(),nn.Linear(self.W, 1))
         
         self.ratio=0
+        self.sh_dim=sh_dim
         self.create_net()
     @property
     def get_aabb(self):
@@ -338,7 +341,7 @@ class Deformation(nn.Module):
         self.scales_deform = nn.Sequential(nn.ReLU(),nn.Linear(self.W,self.W),nn.ReLU(),nn.Linear(self.W, 3))
         self.rotations_deform = nn.Sequential(nn.ReLU(),nn.Linear(self.W,self.W),nn.ReLU(),nn.Linear(self.W, 4))
         self.opacity_deform = nn.Sequential(nn.ReLU(),nn.Linear(self.W,self.W),nn.ReLU(),nn.Linear(self.W, 1))
-        self.shs_deform = nn.Sequential(nn.ReLU(),nn.Linear(self.W,self.W),nn.ReLU(),nn.Linear(self.W, 16*3))
+        self.shs_deform = nn.Sequential(nn.ReLU(),nn.Linear(self.W,self.W),nn.ReLU(),nn.Linear(self.W, self.sh_dim))
 
     def query_time(self, rays_pts_emb, scales_emb, rotations_emb, time_feature, time_emb):
 
@@ -415,8 +418,11 @@ class Deformation(nn.Module):
         if self.args_no_dshs:
             shs = shs_emb
         else:
-            assert False, "Not allowed for now as decoder version is not set"
-            dshs = self.shs_deform(hidden).reshape([shs_emb.shape[0],16,3])
+            #assert False, "Not allowed for now as decoder version is not set"
+            dshs = self.shs_deform(hidden)
+            if len(shs_emb.shape)==3:
+                dshs = dshs.reshape([shs_emb.shape[0],-1,3])
+            
 
             shs = torch.zeros_like(shs_emb)
             # breakpoint()
@@ -521,9 +527,49 @@ class deform_network(nn.Module):
 
 class HexPlaneModel(nn.Module):
     def __init__(self,
+        is_blender=False,
+        deform_scale: Optional[bool]=True,
+        deform_opacity: Optional[bool]=False,
+        deform_feature: Optional[bool]=False,
+        sh_dim=None,
         **kwargs):
         super().__init__()
-        self._deformation = deform_network(**kwargs)
+        if is_blender:
+            D = 0
+            W = 64
+            multires = [1,2]
+            kplanes_config={
+                'grid_dimensions': 2,
+                'input_coordinate_dim': 4,
+                'output_coordinate_dim': 16,
+                'resolution': [64, 64, 64, 100]
+            }
+        else:
+            D = 1
+            W = 128
+            multires=[1,2,4]
+            kplanes_config={
+                'grid_dimensions': 2,
+                'input_coordinate_dim': 4,
+                'output_coordinate_dim': 32,
+                'resolution': [64, 64, 64, 150]
+            }
+        no_ds = not deform_scale
+        no_do = not deform_opacity
+        no_dshs = not deform_feature
+
+        self._deformation = deform_network(
+            D=D,
+            W=W,
+            multires=multires,
+            kplanes_config=kplanes_config,
+            no_ds=no_ds,
+            no_do=no_do,
+            no_dshs=no_dshs,
+            sh_dim=sh_dim,
+            **kwargs)
+        #assert False, "Under construction for deform mode..."
+
 
     def forward(self, inp: Dict, time: float):
         time=torch.tensor([time]).to(inp["means3D"].device).view(1, 1).repeat(inp["means3D"].shape[0],1)        
