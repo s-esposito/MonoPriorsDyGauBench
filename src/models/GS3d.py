@@ -1588,10 +1588,12 @@ class GS3d(MyModelBaseClass):
         self.log_dir_gt = os.path.join(self.logger.save_dir, "gt")
         self.log_dir_depth = os.path.join(self.logger.save_dir, "depth")
         self.log_dir_flow = os.path.join(self.logger.save_dir, "flow")
+        self.log_dir_error = os.path.join(self.logger.save_dir, "error")
         os.makedirs(self.log_dir_test, exist_ok=True)
         os.makedirs(self.log_dir_gt, exist_ok=True)
         os.makedirs(self.log_dir_depth, exist_ok=True)
         os.makedirs(self.log_dir_flow, exist_ok=True)
+        os.makedirs(self.log_dir_error, exist_ok=True)
         self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
 
     def test_step(self, batch, batch_idx):
@@ -1650,6 +1652,8 @@ class GS3d(MyModelBaseClass):
         #image_name = batch["image_name"][0]
         torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
         torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
+        error_map = torch.norm(torch.abs(image - gt), dim=0)
+        torchvision.utils.save_image(error_map[None], os.path.join(self.log_dir_error, "%05d.png" % batch_idx))
         torchvision.utils.save_image(depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
         torchvision.utils.save_image(rendered_flow_fwd[None], os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx))
         torchvision.utils.save_image(rendered_flow_bwd[None], os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx))

@@ -68,7 +68,7 @@ data:
   class_path: src.data.SyntheticDataModule
   init_args:
     seed: null
-    datadir: '/users/yliang51/data/yliang51/GaussianDiff/data/dnerf/data/trex'
+    datadir: data/dnerf/data/trex'
     eval: True
     ratio: 0.5
     white_background: true

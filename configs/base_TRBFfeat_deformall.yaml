@@ -1,6 +1,6 @@
 seed_everything: false
 name: 'base_TRBFfeat_deformall'
-ckpt_path: null
+#ckpt_path: null
 output: './output'
 group: 'TRBFfeat_deformall'
 logger: 'wandb'
@@ -68,7 +68,7 @@ data:
   class_path: src.data.NerfiesDataModule
   init_args:
     seed: null
-    datadir: '/users/yliang51/data/yliang51/GaussianDiff/data/hypernerf/split-cookie'
+    datadir: 'data/hypernerf/split-cookie'
     eval: True
     ratio: 0.25
     white_background: true
@@ -83,7 +83,7 @@ trainer:
   devices: "auto"
   enable_progress_bar: true
   max_epochs: 1
-  max_steps: 30000
+  max_steps: 1000
   val_check_interval: 1000
   log_every_n_steps: 50
   accelerator: "gpu"

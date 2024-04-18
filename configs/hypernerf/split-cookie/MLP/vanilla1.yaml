@@ -68,7 +68,7 @@ data:
   class_path: src.data.NerfiesDataModule
   init_args:
     seed: null
-    datadir: '/users/yliang51/data/yliang51/GaussianDiff/data/hypernerf/split-cookie'
+    datadir: 'data/hypernerf/split-cookie'
     eval: True
     ratio: 0.5
     white_background: true
