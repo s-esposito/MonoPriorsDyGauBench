@@ -21,6 +21,7 @@ source ~/anaconda3/etc/profile.d/conda.sh
 
 cd /orion/u/yiqingl/GaussianDiff
 
+conda env remove -p /orion/u/yiqingl/envs/gaufre
 conda create -p /orion/u/yiqingl/envs/gaufre python=3.9
 conda activate /orion/u/yiqingl/envs/gaufre
 
@@ -73,3 +74,5 @@ pip install submodules/simple-knn
 
 pip install imageio[ffmpeg]
 pip install imageio[pyav]
+
+pip install matplotlib
