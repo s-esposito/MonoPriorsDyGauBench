@@ -1,0 +1,785 @@
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2022 NVIDIA Corporation
+Built on Wed_Sep_21_10:33:58_PDT_2022
+Cuda compilation tools, release 11.8, V11.8.89
+Build cuda_11.8.r11.8/compiler.31833905_0
+Wed Apr 17 23:21:05 2024       
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 525.105.17   Driver Version: 525.105.17   CUDA Version: 12.0     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  Tesla V100-DGXS...  On   | 00000000:07:00.0 Off |                    0 |
+| N/A   27C    P0    35W / 300W |      0MiB / 16384MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+                                                                               
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
+/orion/u/yiqingl/envs/gaufre/bin/python
+/orion/u/yiqingl/envs/gaufre/bin/pip
+Collecting matplotlib
+  Downloading matplotlib-3.8.4-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.8 kB)
+Collecting contourpy>=1.0.1 (from matplotlib)
+  Downloading contourpy-1.2.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.8 kB)
+Collecting cycler>=0.10 (from matplotlib)
+  Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib)
+  Downloading fonttools-4.51.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (159 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 159.5/159.5 kB 5.2 MB/s eta 0:00:00
+Collecting kiwisolver>=1.3.1 (from matplotlib)
+  Downloading kiwisolver-1.4.5-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl.metadata (6.4 kB)
+Requirement already satisfied: numpy>=1.21 in /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages (from matplotlib) (1.26.4)
+Requirement already satisfied: packaging>=20.0 in /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages (from matplotlib) (24.0)
+Requirement already satisfied: pillow>=8 in /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages (from matplotlib) (10.2.0)
+Collecting pyparsing>=2.3.1 (from matplotlib)
+  Downloading pyparsing-3.1.2-py3-none-any.whl.metadata (5.1 kB)
+Collecting python-dateutil>=2.7 (from matplotlib)
+  Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Requirement already satisfied: importlib-resources>=3.2.0 in /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages (from matplotlib) (6.4.0)
+Requirement already satisfied: zipp>=3.1.0 in /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages (from importlib-resources>=3.2.0->matplotlib) (3.18.1)
+Requirement already satisfied: six>=1.5 in /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages (from python-dateutil>=2.7->matplotlib) (1.16.0)
+Downloading matplotlib-3.8.4-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (11.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.6/11.6 MB 41.5 MB/s eta 0:00:00
+Downloading contourpy-1.2.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (304 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 305.0/305.0 kB 18.4 MB/s eta 0:00:00
+Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Downloading fonttools-4.51.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (4.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.6/4.6 MB 41.4 MB/s eta 0:00:00
+Downloading kiwisolver-1.4.5-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl (1.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.6/1.6 MB 35.7 MB/s eta 0:00:00
+Downloading pyparsing-3.1.2-py3-none-any.whl (103 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 103.2/103.2 kB 6.5 MB/s eta 0:00:00
+Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 229.9/229.9 kB 13.9 MB/s eta 0:00:00
+Installing collected packages: python-dateutil, pyparsing, kiwisolver, fonttools, cycler, contourpy, matplotlib
+Successfully installed contourpy-1.2.1 cycler-0.12.1 fonttools-4.51.0 kiwisolver-1.4.5 matplotlib-3.8.4 pyparsing-3.1.2 python-dateutil-2.9.0.post0
+Using /sailhome/yiqingl/.cache/torch_extensions/py39_cu118 as PyTorch extensions root...
+Detected CUDA files, patching ldflags
+Emitting ninja build file /sailhome/yiqingl/.cache/torch_extensions/py39_cu118/diff_gaussian_rasterization/build.ninja...
+Building extension module diff_gaussian_rasterization...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+[1/5] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output forward.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/cuda_rasterizer/forward.cu -o forward.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/cuda_rasterizer/auxiliary.h(150): warning #177-D: variable "p_proj" was declared but never referenced
+
+[2/5] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output backward.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/cuda_rasterizer/backward.cu -o backward.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/cuda_rasterizer/auxiliary.h(150): warning #177-D: variable "p_proj" was declared but never referenced
+
+[3/5] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output rasterizer_impl.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/cuda_rasterizer/rasterizer_impl.cu -o rasterizer_impl.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/cuda_rasterizer/auxiliary.h(150): warning #177-D: variable "p_proj" was declared but never referenced
+
+[4/5] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output rasterize_points.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu -o rasterize_points.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu: In function ‘std::tuple<int, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> RasterizeGaussiansCUDA(const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, float, int, int, const at::Tensor&, int, int, const at::Tensor&, float, float, bool, int, bool, bool, bool)’:
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:144: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:190: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                              ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:268: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                            ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:306: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                  ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:346: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:629: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:672: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:715: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:754: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:890: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:931: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:973: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:1011: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:103:1047: warning: ‘T* at::Tensor::data() const [with T = int]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu: In function ‘std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> RasterizeGaussiansBackwardCUDA(const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, float, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, int, int, const at::Tensor&, float, float, bool, int, bool, const at::Tensor&, int, const at::Tensor&, const at::Tensor&, bool)’:
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:105: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                         ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:151: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:186: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:225: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:266: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:308: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:343: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:527: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:570: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:613: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:652: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:769: warning: ‘T* at::Tensor::data() const [with T = int]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1014: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1060: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1105: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1150: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1194: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1236: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1280: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1323: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1367: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1409: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1448: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1490: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1529: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1572: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1617: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1663: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:211:1711: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu: In function ‘at::Tensor markVisible(at::Tensor&, at::Tensor&, at::Tensor&)’:
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:275:81: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:275:124: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                                                            ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:275:167: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization/rasterize_points.cu:275:206: warning: ‘T* at::Tensor::data() const [with T = bool]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                                                                                                                                              ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+[5/5] c++ rasterizer_impl.cuda.o forward.cuda.o backward.cuda.o rasterize_points.cuda.o ext.o -shared -L/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/lib -lc10 -lc10_cuda -ltorch_cpu -ltorch_cuda -ltorch -ltorch_python -L/usr/local/cuda-11.8/lib64 -lcudart -o diff_gaussian_rasterization.so
+Loading extension module diff_gaussian_rasterization...
+Using /sailhome/yiqingl/.cache/torch_extensions/py39_cu118 as PyTorch extensions root...
+Creating extension directory /sailhome/yiqingl/.cache/torch_extensions/py39_cu118/diff_gaussian_rasterization_4dch9...
+Detected CUDA files, patching ldflags
+Emitting ninja build file /sailhome/yiqingl/.cache/torch_extensions/py39_cu118/diff_gaussian_rasterization_4dch9/build.ninja...
+Building extension module diff_gaussian_rasterization_4dch9...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+[1/6] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output forward.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization_4dch9 -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/cuda_rasterizer/forward.cu -o forward.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/cuda_rasterizer/auxiliary.h(150): warning #177-D: variable "p_proj" was declared but never referenced
+
+[2/6] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output backward.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization_4dch9 -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/cuda_rasterizer/backward.cu -o backward.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/cuda_rasterizer/auxiliary.h(150): warning #177-D: variable "p_proj" was declared but never referenced
+
+[3/6] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output rasterizer_impl.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization_4dch9 -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/cuda_rasterizer/rasterizer_impl.cu -o rasterizer_impl.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/cuda_rasterizer/auxiliary.h(150): warning #177-D: variable "p_proj" was declared but never referenced
+
+[4/6] c++ -MMD -MF ext.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization_4dch9 -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -fPIC -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/ext.cpp -o ext.o 
+[5/6] /usr/local/cuda-11.8/bin/nvcc --generate-dependencies-with-compile --dependency-output rasterize_points.cuda.o.d -DTORCH_EXTENSION_NAME=diff_gaussian_rasterization_4dch9 -DTORCH_API_INCLUDE_EXTENSION_H -DPYBIND11_COMPILER_TYPE=\"_gcc\" -DPYBIND11_STDLIB=\"_libstdcpp\" -DPYBIND11_BUILD_ABI=\"_cxxabi1011\" -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/torch/csrc/api/include -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/TH -isystem /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/THC -isystem /usr/local/cuda-11.8/include -isystem /orion/u/yiqingl/envs/gaufre/include/python3.9 -D_GLIBCXX_USE_CXX11_ABI=0 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 --compiler-options '-fPIC' -I /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/third_party/glm/ -g -std=c++17 -c /orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu -o rasterize_points.cuda.o 
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu: In function ‘std::tuple<int, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> RasterizeGaussiansCUDA(const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, float, int, int, const at::Tensor&, int, int, const at::Tensor&, float, float, bool, int, bool, bool, bool)’:
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:144: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:190: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                              ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:268: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                            ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:306: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                  ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:346: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:629: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:672: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:715: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:754: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:890: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:931: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:973: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:1011: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:103:1047: warning: ‘T* at::Tensor::data() const [with T = int]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  103 |    rendered = CudaRasterizer::Rasterizer::forward(
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu: In function ‘std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> RasterizeGaussiansBackwardCUDA(const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, const at::Tensor&, const at::Tensor&, const at::Tensor&, float, float, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, int, int, const at::Tensor&, float, float, bool, int, bool, const at::Tensor&, int, const at::Tensor&, const at::Tensor&, bool)’:
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:105: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                         ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:151: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:186: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:225: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:266: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:308: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:343: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:527: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:570: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:613: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:652: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:769: warning: ‘T* at::Tensor::data() const [with T = int]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1014: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1060: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1105: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1150: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1194: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1236: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1280: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1323: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1367: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1409: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1448: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1490: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1529: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1572: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1617: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1663: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:211:1711: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  211 |    CudaRasterizer::Rasterizer::backward(P, degree, degree_t, M, R,
+      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu: In function ‘at::Tensor markVisible(at::Tensor&, at::Tensor&, at::Tensor&)’:
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:275:81: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                 ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:275:124: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                                                            ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:275:167: warning: ‘T* at::Tensor::data() const [with T = float]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                                                                                                       ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+/orion/u/yiqingl/GaussianDiff/src/diff-gaussian-rasterization_4dch9/rasterize_points.cu:275:206: warning: ‘T* at::Tensor::data() const [with T = bool]’ is deprecated: Tensor.data<T>() is deprecated. Please use Tensor.data_ptr<T>() instead. [-Wdeprecated-declarations]
+  275 |  CudaRasterizer::Rasterizer::markVisible(P,
+      |                                                                                                                                                                                                              ^
+/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/include/ATen/core/TensorBody.h:247:1: note: declared here
+  247 |   T * data() const {
+      | ^ ~~
+[6/6] c++ rasterizer_impl.cuda.o forward.cuda.o backward.cuda.o rasterize_points.cuda.o ext.o -shared -L/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/torch/lib -lc10 -lc10_cuda -ltorch_cpu -ltorch_cuda -ltorch -ltorch_python -L/usr/local/cuda-11.8/lib64 -lcudart -o diff_gaussian_rasterization_4dch9.so
+Loading extension module diff_gaussian_rasterization_4dch9...
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
+
+wandb: Currently logged in as: lynl7130. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.5
+wandb: Run data is saved locally in ./output/hypernerf/split-cookie/FourDim/FourDim_vanilla1/wandb/run-20240417_232642-g42pjuof
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run FourDim_vanilla1_fit
+wandb: ⭐️ View project at https://wandb.ai/lynl7130/GaussianDiff_hypernerf
+wandb: 🚀 View run at https://wandb.ai/lynl7130/GaussianDiff_hypernerf/runs/g42pjuof/workspace
+output path: ./output/hypernerf/split-cookie/FourDim/FourDim_vanilla1
+Setting up [LPIPS] perceptual loss: trunk [alex], v[0.1], spatial [off]
+Loading model from: /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lpips/weights/v0.1/alex.pth
+Traceback (most recent call last):
+  File "/orion/u/yiqingl/GaussianDiff/main.py", line 6, in <module>
+    cli = MyLightningCLI(
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/cli.py", line 388, in __init__
+    self._run_subcommand(self.subcommand)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/cli.py", line 679, in _run_subcommand
+    fn(**fn_kwargs)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 949, in _run
+    call._call_setup_hook(self)  # allow user to set up LightningModule in accelerator environment
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 92, in _call_setup_hook
+    _call_lightning_datamodule_hook(trainer, "setup", stage=fn)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 179, in _call_lightning_datamodule_hook
+    return fn(*args, **kwargs)
+  File "/orion/u/yiqingl/GaussianDiff/src/data/Nerfies.py", line 58, in setup
+    self.train_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split ="train", eval=eval)
+  File "/orion/u/yiqingl/GaussianDiff/src/data/hyper_loader.py", line 40, in __init__
+    with open(f'{datadir}/scene.json', 'r') as f:
+FileNotFoundError: [Errno 2] No such file or directory: 'data/hypernerf/split-cookie/scene.json'
+wandb: - 0.005 MB of 0.005 MB uploadedwandb: \ 0.005 MB of 0.005 MB uploadedwandb: | 0.008 MB of 0.012 MB uploadedwandb: 🚀 View run FourDim_vanilla1_fit at: https://wandb.ai/lynl7130/GaussianDiff_hypernerf/runs/g42pjuof/workspace
+wandb: Synced 5 W&B file(s), 0 media file(s), 2 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./output/hypernerf/split-cookie/FourDim/FourDim_vanilla1/wandb/run-20240417_232642-g42pjuof/logs
+Using /sailhome/yiqingl/.cache/torch_extensions/py39_cu118 as PyTorch extensions root...
+Detected CUDA files, patching ldflags
+Emitting ninja build file /sailhome/yiqingl/.cache/torch_extensions/py39_cu118/diff_gaussian_rasterization/build.ninja...
+Building extension module diff_gaussian_rasterization...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Loading extension module diff_gaussian_rasterization...
+Using /sailhome/yiqingl/.cache/torch_extensions/py39_cu118 as PyTorch extensions root...
+Detected CUDA files, patching ldflags
+Emitting ninja build file /sailhome/yiqingl/.cache/torch_extensions/py39_cu118/diff_gaussian_rasterization_4dch9/build.ninja...
+Building extension module diff_gaussian_rasterization_4dch9...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Loading extension module diff_gaussian_rasterization_4dch9...
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
+
+wandb: Currently logged in as: lynl7130. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.5
+wandb: Run data is saved locally in ./output/hypernerf/split-cookie/FourDim/FourDim_vanilla1/wandb/run-20240417_232725-e0mqei2z
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run FourDim_vanilla1_test
+wandb: ⭐️ View project at https://wandb.ai/lynl7130/GaussianDiff_hypernerf
+wandb: 🚀 View run at https://wandb.ai/lynl7130/GaussianDiff_hypernerf/runs/e0mqei2z/workspace
+output path: ./output/hypernerf/split-cookie/FourDim/FourDim_vanilla1
+Setting up [LPIPS] perceptual loss: trunk [alex], v[0.1], spatial [off]
+Loading model from: /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lpips/weights/v0.1/alex.pth
+Traceback (most recent call last):
+  File "/orion/u/yiqingl/GaussianDiff/main.py", line 6, in <module>
+    cli = MyLightningCLI(
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/cli.py", line 388, in __init__
+    self._run_subcommand(self.subcommand)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/cli.py", line 679, in _run_subcommand
+    fn(**fn_kwargs)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 754, in test
+    return call._call_and_handle_interrupt(
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 794, in _test_impl
+    results = self._run(model, ckpt_path=ckpt_path)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 949, in _run
+    call._call_setup_hook(self)  # allow user to set up LightningModule in accelerator environment
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 92, in _call_setup_hook
+    _call_lightning_datamodule_hook(trainer, "setup", stage=fn)
+  File "/orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 179, in _call_lightning_datamodule_hook
+    return fn(*args, **kwargs)
+  File "/orion/u/yiqingl/GaussianDiff/src/data/Nerfies.py", line 58, in setup
+    self.train_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split ="train", eval=eval)
+  File "/orion/u/yiqingl/GaussianDiff/src/data/hyper_loader.py", line 40, in __init__
+    with open(f'{datadir}/scene.json', 'r') as f:
+FileNotFoundError: [Errno 2] No such file or directory: 'data/hypernerf/split-cookie/scene.json'
+wandb: - 0.005 MB of 0.005 MB uploadedwandb: \ 0.005 MB of 0.010 MB uploadedwandb: | 0.010 MB of 0.010 MB uploadedwandb: 🚀 View run FourDim_vanilla1_test at: https://wandb.ai/lynl7130/GaussianDiff_hypernerf/runs/e0mqei2z/workspace
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./output/hypernerf/split-cookie/FourDim/FourDim_vanilla1/wandb/run-20240417_232725-e0mqei2z/logs

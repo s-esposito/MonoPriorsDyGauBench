@@ -7,9 +7,14 @@ from src.utils.system_utils import searchForMaxIteration
 from src.utils.general_utils import get_expon_lr_func
 from typing import Dict
 import math
+from typing import Optional
 
 class FourDimModel(nn.Module):
-    def __init__(self, ):
+    def __init__(self, sh_dim: Optional[int]=0,
+        is_blender: Optional[bool]=False,
+        deform_scale: Optional[bool]=False,
+        deform_opacity: Optional[bool]=False,
+        deform_feature: Optional[bool]=False,):
         super().__init__()
     def forward(self, inp: Dict, time: float):
         return None

@@ -117,7 +117,7 @@ class MyLightningCLI(LightningCLI):
             #wandb_name = config.name
             #if config.version is not None:
             #    wandb_name = "{}_{}".format(wandb_name, config.version)
-            setattr(logger_config.init_args, "name", config.name)
+            setattr(logger_config.init_args, "name", config.name + "_" + self.config.subcommand)
             setattr(logger_config.init_args, "project", config.project)
             setattr(logger_config.init_args, "group", config.group)
             setattr(logger_config.init_args, "mode", "online")

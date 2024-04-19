@@ -652,9 +652,9 @@ class GS3d(MyModelBaseClass):
                         "means3D": d_xyz.float(),
                         "shs": None, 
                         "colors_precomp": self.get_features_dc.float(),
-                        "opacity": d_opacity.float(),
-                        "scales": d_scaling.float(),
-                        "rotations": d_rotation.float(),
+                        "opacity": torch.clamp(d_opacity.float(), min=1e-3),
+                        "scales": torch.clamp(d_scaling.float(), min=1e-3),
+                        "rotations": torch.nn.functional.normalize(d_rotation.float()),
                         "cov3D_precomp": None
                     }
                 else:
@@ -662,9 +662,9 @@ class GS3d(MyModelBaseClass):
                         "means3D": d_xyz.float(),
                         "shs": d_feat.float(),
                         "colors_precomp": None,
-                        "opacity": d_opacity.float(),
-                        "scales": d_scaling.float(),
-                        "rotations": d_rotation.float(),
+                        "opacity": torch.clamp(d_opacity.float(), min=1e-3),
+                        "scales": torch.clamp(d_scaling.float(), min=1e-3),
+                        "rotations": torch.nn.functional.normalize(d_rotation.float()),
                         "cov3D_precomp": None
                     }
                 #for key in result_:
@@ -720,14 +720,15 @@ class GS3d(MyModelBaseClass):
             result_["colors_precomp"] = result_["shs"]
             result_["shs"] = None
         
+        
         # prevent RuntimeError: numel: integer multiplication overflow
-        for key in result_:
-            if result_[key] is not None:
-                if torch.any(torch.abs(result_[key]) < 1e-3):
-                    pos_mask = result_[key] > 0.
-                    result_[key][pos_mask] = torch.clamp(result_[key][pos_mask], min=1e-3)
-                    result_[key][~pos_mask] = torch.clamp(result_[key][~pos_mask], max=-1e-3) 
-                
+        #for key in result_:
+        #    if result_[key] is not None:
+        #        problem_mask = (torch.abs(result_[key]) > 1e-3)
+        #        result_[key] *= problem_mask
+                #pos_mask = result_[key] > 0.
+                #result_[key][pos_mask] = result_[key][pos_mask].clamp_(min=1e-3)
+                #result_[key][~pos_mask] = result_[key][~pos_mask].clamp_(max=-1e-3)     
         
         return result_
 
@@ -1587,10 +1588,12 @@ class GS3d(MyModelBaseClass):
         self.log_dir_gt = os.path.join(self.logger.save_dir, "gt")
         self.log_dir_depth = os.path.join(self.logger.save_dir, "depth")
         self.log_dir_flow = os.path.join(self.logger.save_dir, "flow")
+        self.log_dir_error = os.path.join(self.logger.save_dir, "error")
         os.makedirs(self.log_dir_test, exist_ok=True)
         os.makedirs(self.log_dir_gt, exist_ok=True)
         os.makedirs(self.log_dir_depth, exist_ok=True)
         os.makedirs(self.log_dir_flow, exist_ok=True)
+        os.makedirs(self.log_dir_error, exist_ok=True)
         self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
 
     def test_step(self, batch, batch_idx):
@@ -1649,6 +1652,8 @@ class GS3d(MyModelBaseClass):
         #image_name = batch["image_name"][0]
         torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
         torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
+        error_map = torch.norm(torch.abs(image - gt), dim=0)
+        torchvision.utils.save_image(error_map[None], os.path.join(self.log_dir_error, "%05d.png" % batch_idx))
         torchvision.utils.save_image(depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
         torchvision.utils.save_image(rendered_flow_fwd[None], os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx))
         torchvision.utils.save_image(rendered_flow_bwd[None], os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx))
