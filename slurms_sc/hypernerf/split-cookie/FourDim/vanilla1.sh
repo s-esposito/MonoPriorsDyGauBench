@@ -3,11 +3,11 @@
 #SBATCH -n 1
 #SBATCH --mem=24G
 #SBATCH -t 48:00:00
-#SBATCH --partition=orion --gres=gpu:a4000:1
+#SBATCH --partition=orion --gres=gpu:titanrtx:1
 #SBATCH --job-name install
 #SBATCH --output install.out
 #SBATCH --account=orion
-#SBATCH --nodelist=oriong12
+#SBATCH --nodelist=oriong10
 
 #SBATCH --job-name hypernerf_split-cookie_FourDim_vanilla1
 #SBATCH --output vanilla1.out
@@ -20,7 +20,7 @@ export CUDA_HOME=/usr/local/cuda-11.8
 nvcc --version
 nvidia-smi
 
-source ~/anaconda3/etc/profile.d/conda.sh
+source /orion/u/yiqingl/anaconda3/etc/profile.d/conda.sh
 
 cd /orion/u/yiqingl/GaussianDiff
 
@@ -29,7 +29,7 @@ conda activate /orion/u/yiqingl/envs/gaufre
 
 
 export LD_LIBRARY_PATH=$CUDA_PREFIX/lib:$LD_LIBRARY_PATH 
-
+export TORCH_EXTENSIONS_DIR=/orion/u/yiqingl/.cache/torch_extensions
 
 which python 
 which pip

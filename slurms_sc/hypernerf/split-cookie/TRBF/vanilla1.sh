@@ -15,20 +15,23 @@
 
 
 
+source /orion/u/yiqingl/anaconda3/etc/profile.d/conda.sh
 
 
-
-
-source ~/anaconda3/etc/profile.d/conda.sh
-
-cd /orion/u/yiqingl/GaussianDiff
 
 #conda create -p /orion/u/yiqingl/envs/gaufre python=3.9
 conda activate /orion/u/yiqingl/envs/gaufre
+
+
+export LD_LIBRARY_PATH=$CUDA_PREFIX/lib:$LD_LIBRARY_PATH
+export TORCH_EXTENSIONS_DIR=/orion/u/yiqingl/.cache/torch_extensions
+
+
 export PATH=/usr/local/cuda-11.8/bin${PATH:+:${PATH}}$
-#export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
 export CUDA_HOME=/usr/local/cuda-11.8
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+
+cd /orion/u/yiqingl/GaussianDiff
 
 nvcc --version
 nvidia-smi

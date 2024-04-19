@@ -1,9 +1,29 @@
+/var/lib/slurm/slurmd/job7430257/slurm_script: line 22: /afs/cs.stanford.edu/u/yiqingl/anaconda3/etc/profile.d/conda.sh: Permission denied
+
+CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'.
+To initialize your shell, run
+
+    $ conda init <SHELL_NAME>
+
+Currently supported shells are:
+  - bash
+  - fish
+  - tcsh
+  - xonsh
+  - zsh
+  - powershell
+
+See 'conda init --help' for more information and options.
+
+IMPORTANT: You may need to close and restart your shell after running 'conda init'.
+
+
 nvcc: NVIDIA (R) Cuda compiler driver
 Copyright (c) 2005-2022 NVIDIA Corporation
 Built on Wed_Sep_21_10:33:58_PDT_2022
 Cuda compilation tools, release 11.8, V11.8.89
 Build cuda_11.8.r11.8/compiler.31833905_0
-Thu Apr 18 14:29:01 2024       
+Thu Apr 18 19:57:37 2024       
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 525.105.17   Driver Version: 525.105.17   CUDA Version: 12.0     |
 |-------------------------------+----------------------+----------------------+
@@ -12,7 +32,7 @@ Thu Apr 18 14:29:01 2024
 |                               |                      |               MIG M. |
 |===============================+======================+======================|
 |   0  NVIDIA RTX A4000    On   | 00000000:31:00.0 Off |                  Off |
-| 51%   58C    P8    21W / 140W |      1MiB / 16376MiB |      0%      Default |
+| 41%   32C    P8    17W / 140W |      1MiB / 16376MiB |      0%      Default |
 |                               |                      |                  N/A |
 +-------------------------------+----------------------+----------------------+
                                                                                
@@ -23,11 +43,14 @@ Thu Apr 18 14:29:01 2024
 |=============================================================================|
 |  No running processes found                                                 |
 +-----------------------------------------------------------------------------+
-/orion/u/yiqingl/envs/gaufre/bin/python
-/orion/u/yiqingl/envs/gaufre/bin/pip
-True
-2.2.1+cu118
-8700
+/orion/u/mikacuy/anaconda3/bin/python
+/orion/u/mikacuy/anaconda3/bin/pip
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'torch'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'torch'
 cmake
 libaccinj64.so
 libaccinj64.so.11.8
@@ -200,90 +223,15 @@ stubs
 /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/nvidia/cudnn/lib/libcudnn_cnn_infer.so.8
 /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/nvidia/cudnn/lib/libcudnn_ops_infer.so.8
 /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/nvidia/cudnn/lib/libcudnn_ops_train.so.8
-Using /sailhome/yiqingl/.cache/torch_extensions/py39_cu118 as PyTorch extensions root...
-Detected CUDA files, patching ldflags
-Emitting ninja build file /sailhome/yiqingl/.cache/torch_extensions/py39_cu118/diff_gaussian_rasterization/build.ninja...
-Building extension module diff_gaussian_rasterization...
-Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
-ninja: no work to do.
-Loading extension module diff_gaussian_rasterization...
-Using /sailhome/yiqingl/.cache/torch_extensions/py39_cu118 as PyTorch extensions root...
-Detected CUDA files, patching ldflags
-Emitting ninja build file /sailhome/yiqingl/.cache/torch_extensions/py39_cu118/diff_gaussian_rasterization_4dch9/build.ninja...
-Building extension module diff_gaussian_rasterization_4dch9...
-Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
-ninja: no work to do.
-Loading extension module diff_gaussian_rasterization_4dch9...
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-You are using a CUDA device ('NVIDIA RTX A4000') that has Tensor Cores. To properly utilize them, you should set `torch.set_float32_matmul_precision('medium' | 'high')` which will trade-off precision for performance. For more details, read https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
-Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
-----------------------------------------------------------------------------------------------------
-distributed_backend=nccl
-All distributed processes registered. Starting with 1 processes
-----------------------------------------------------------------------------------------------------
-
-wandb: Currently logged in as: lynl7130. Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.16.6 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.16.5
-wandb: Run data is saved locally in ./output/hypernerf/split-cookie/TRBF/TRBF_vanilla1/wandb/run-20240418_142920-u730elkk
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run TRBF_vanilla1_test
-wandb: ⭐️ View project at https://wandb.ai/lynl7130/GaussianDiff_hypernerf
-wandb: 🚀 View run at https://wandb.ai/lynl7130/GaussianDiff_hypernerf/runs/u730elkk/workspace
-output path: ./output/hypernerf/split-cookie/TRBF/TRBF_vanilla1
-Setting up [LPIPS] perceptual loss: trunk [alex], v[0.1], spatial [off]
-Loading model from: /orion/u/yiqingl/envs/gaufre/lib/python3.9/site-packages/lpips/weights/v0.1/alex.pth
-0it [00:00, ?it/s]135it [00:00, 67160.60it/s]
-Restoring states from the checkpoint path at ./output/hypernerf/split-cookie/TRBF/TRBF_vanilla1/checkpoints/last.ckpt
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-Loaded model weights from the checkpoint at ./output/hypernerf/split-cookie/TRBF/TRBF_vanilla1/checkpoints/last.ckpt
-SLURM auto-requeueing enabled. Setting signal handlers.
-Number of points at initialisation :  20075
-Testing: |          | 0/? [00:00<?, ?it/s]Saving Results based on checkpoint: ./output/hypernerf/split-cookie/TRBF/TRBF_vanilla1/checkpoints/last.ckpt
-Testing:   0%|          | 0/134 [00:00<?, ?it/s]Testing DataLoader 0:   0%|          | 0/134 [00:00<?, ?it/s]Testing DataLoader 0:   1%|          | 1/134 [00:01<02:44,  0.81it/s]Testing DataLoader 0:   1%|▏         | 2/134 [00:02<02:36,  0.84it/s]Testing DataLoader 0:   2%|▏         | 3/134 [00:03<02:33,  0.85it/s]Testing DataLoader 0:   3%|▎         | 4/134 [00:04<02:31,  0.86it/s]Testing DataLoader 0:   4%|▎         | 5/134 [00:05<02:28,  0.87it/s]Testing DataLoader 0:   4%|▍         | 6/134 [00:06<02:26,  0.87it/s]Testing DataLoader 0:   5%|▌         | 7/134 [00:08<02:25,  0.87it/s]Testing DataLoader 0:   6%|▌         | 8/134 [00:09<02:23,  0.88it/s]Testing DataLoader 0:   7%|▋         | 9/134 [00:10<02:24,  0.87it/s]Testing DataLoader 0:   7%|▋         | 10/134 [00:11<02:22,  0.87it/s]Testing DataLoader 0:   8%|▊         | 11/134 [00:12<02:20,  0.88it/s]Testing DataLoader 0:   9%|▉         | 12/134 [00:13<02:17,  0.89it/s]Testing DataLoader 0:  10%|▉         | 13/134 [00:14<02:15,  0.89it/s]Testing DataLoader 0:  10%|█         | 14/134 [00:15<02:13,  0.90it/s]Testing DataLoader 0:  11%|█         | 15/134 [00:16<02:12,  0.90it/s]Testing DataLoader 0:  12%|█▏        | 16/134 [00:17<02:11,  0.90it/s]Testing DataLoader 0:  13%|█▎        | 17/134 [00:18<02:09,  0.90it/s]Testing DataLoader 0:  13%|█▎        | 18/134 [00:19<02:08,  0.90it/s]Testing DataLoader 0:  14%|█▍        | 19/134 [00:21<02:07,  0.90it/s]Testing DataLoader 0:  15%|█▍        | 20/134 [00:22<02:06,  0.90it/s]Testing DataLoader 0:  16%|█▌        | 21/134 [00:23<02:05,  0.90it/s]Testing DataLoader 0:  16%|█▋        | 22/134 [00:24<02:04,  0.90it/s]Testing DataLoader 0:  17%|█▋        | 23/134 [00:25<02:03,  0.90it/s]Testing DataLoader 0:  18%|█▊        | 24/134 [00:26<02:02,  0.90it/s]Testing DataLoader 0:  19%|█▊        | 25/134 [00:27<02:00,  0.90it/s]Testing DataLoader 0:  19%|█▉        | 26/134 [00:28<01:59,  0.90it/s]Testing DataLoader 0:  20%|██        | 27/134 [00:29<01:58,  0.90it/s]Testing DataLoader 0:  21%|██        | 28/134 [00:31<01:57,  0.90it/s]Testing DataLoader 0:  22%|██▏       | 29/134 [00:32<01:56,  0.90it/s]Testing DataLoader 0:  22%|██▏       | 30/134 [00:33<01:55,  0.90it/s]Testing DataLoader 0:  23%|██▎       | 31/134 [00:34<01:54,  0.90it/s]Testing DataLoader 0:  24%|██▍       | 32/134 [00:35<01:53,  0.90it/s]Testing DataLoader 0:  25%|██▍       | 33/134 [00:36<01:52,  0.90it/s]Testing DataLoader 0:  25%|██▌       | 34/134 [00:37<01:51,  0.90it/s]Testing DataLoader 0:  26%|██▌       | 35/134 [00:39<01:50,  0.90it/s]Testing DataLoader 0:  27%|██▋       | 36/134 [00:40<01:49,  0.90it/s]Testing DataLoader 0:  28%|██▊       | 37/134 [00:41<01:48,  0.90it/s]Testing DataLoader 0:  28%|██▊       | 38/134 [00:42<01:47,  0.90it/s]Testing DataLoader 0:  29%|██▉       | 39/134 [00:43<01:46,  0.89it/s]Testing DataLoader 0:  30%|██▉       | 40/134 [00:44<01:45,  0.89it/s]Testing DataLoader 0:  31%|███       | 41/134 [00:45<01:43,  0.89it/s]Testing DataLoader 0:  31%|███▏      | 42/134 [00:46<01:42,  0.89it/s]Testing DataLoader 0:  32%|███▏      | 43/134 [00:48<01:41,  0.89it/s]Testing DataLoader 0:  33%|███▎      | 44/134 [00:49<01:40,  0.89it/s]Testing DataLoader 0:  34%|███▎      | 45/134 [00:50<01:39,  0.89it/s]Testing DataLoader 0:  34%|███▍      | 46/134 [00:51<01:38,  0.90it/s]Testing DataLoader 0:  35%|███▌      | 47/134 [00:52<01:37,  0.90it/s]Testing DataLoader 0:  36%|███▌      | 48/134 [00:53<01:36,  0.90it/s]Testing DataLoader 0:  37%|███▋      | 49/134 [00:54<01:34,  0.90it/s]Testing DataLoader 0:  37%|███▋      | 50/134 [00:55<01:33,  0.90it/s]Testing DataLoader 0:  38%|███▊      | 51/134 [00:57<01:32,  0.89it/s]Testing DataLoader 0:  39%|███▉      | 52/134 [00:58<01:31,  0.89it/s]Testing DataLoader 0:  40%|███▉      | 53/134 [00:59<01:30,  0.89it/s]Testing DataLoader 0:  40%|████      | 54/134 [01:00<01:29,  0.89it/s]Testing DataLoader 0:  41%|████      | 55/134 [01:01<01:28,  0.89it/s]Testing DataLoader 0:  42%|████▏     | 56/134 [01:02<01:27,  0.89it/s]Testing DataLoader 0:  43%|████▎     | 57/134 [01:03<01:26,  0.89it/s]Testing DataLoader 0:  43%|████▎     | 58/134 [01:04<01:24,  0.89it/s]Testing DataLoader 0:  44%|████▍     | 59/134 [01:05<01:23,  0.89it/s]Testing DataLoader 0:  45%|████▍     | 60/134 [01:07<01:22,  0.89it/s]Testing DataLoader 0:  46%|████▌     | 61/134 [01:08<01:21,  0.89it/s]Testing DataLoader 0:  46%|████▋     | 62/134 [01:09<01:20,  0.89it/s]Testing DataLoader 0:  47%|████▋     | 63/134 [01:10<01:19,  0.89it/s]Testing DataLoader 0:  48%|████▊     | 64/134 [01:11<01:18,  0.89it/s]Testing DataLoader 0:  49%|████▊     | 65/134 [01:13<01:17,  0.89it/s]Testing DataLoader 0:  49%|████▉     | 66/134 [01:14<01:16,  0.89it/s]Testing DataLoader 0:  50%|█████     | 67/134 [01:15<01:15,  0.89it/s]Testing DataLoader 0:  51%|█████     | 68/134 [01:16<01:14,  0.89it/s]Testing DataLoader 0:  51%|█████▏    | 69/134 [01:17<01:13,  0.89it/s]Testing DataLoader 0:  52%|█████▏    | 70/134 [01:18<01:12,  0.89it/s]Testing DataLoader 0:  53%|█████▎    | 71/134 [01:20<01:11,  0.89it/s]Testing DataLoader 0:  54%|█████▎    | 72/134 [01:21<01:09,  0.89it/s]Testing DataLoader 0:  54%|█████▍    | 73/134 [01:22<01:08,  0.89it/s]Testing DataLoader 0:  55%|█████▌    | 74/134 [01:23<01:07,  0.89it/s]Testing DataLoader 0:  56%|█████▌    | 75/134 [01:24<01:06,  0.89it/s]Testing DataLoader 0:  57%|█████▋    | 76/134 [01:25<01:05,  0.89it/s]Testing DataLoader 0:  57%|█████▋    | 77/134 [01:26<01:04,  0.89it/s]Testing DataLoader 0:  58%|█████▊    | 78/134 [01:28<01:03,  0.88it/s]Testing DataLoader 0:  59%|█████▉    | 79/134 [01:29<01:02,  0.88it/s]Testing DataLoader 0:  60%|█████▉    | 80/134 [01:30<01:01,  0.88it/s]Testing DataLoader 0:  60%|██████    | 81/134 [01:31<00:59,  0.88it/s]Testing DataLoader 0:  61%|██████    | 82/134 [01:32<00:58,  0.88it/s]Testing DataLoader 0:  62%|██████▏   | 83/134 [01:34<00:57,  0.88it/s]Testing DataLoader 0:  63%|██████▎   | 84/134 [01:35<00:56,  0.88it/s]Testing DataLoader 0:  63%|██████▎   | 85/134 [01:36<00:55,  0.88it/s]Testing DataLoader 0:  64%|██████▍   | 86/134 [01:37<00:54,  0.88it/s]Testing DataLoader 0:  65%|██████▍   | 87/134 [01:38<00:53,  0.88it/s]Testing DataLoader 0:  66%|██████▌   | 88/134 [01:39<00:52,  0.88it/s]Testing DataLoader 0:  66%|██████▋   | 89/134 [01:40<00:51,  0.88it/s]Testing DataLoader 0:  67%|██████▋   | 90/134 [01:42<00:49,  0.88it/s]Testing DataLoader 0:  68%|██████▊   | 91/134 [01:43<00:48,  0.88it/s]Testing DataLoader 0:  69%|██████▊   | 92/134 [01:44<00:47,  0.88it/s]Testing DataLoader 0:  69%|██████▉   | 93/134 [01:45<00:46,  0.88it/s]Testing DataLoader 0:  70%|███████   | 94/134 [01:46<00:45,  0.88it/s]Testing DataLoader 0:  71%|███████   | 95/134 [01:47<00:44,  0.88it/s]Testing DataLoader 0:  72%|███████▏  | 96/134 [01:49<00:43,  0.88it/s]Testing DataLoader 0:  72%|███████▏  | 97/134 [01:50<00:42,  0.88it/s]Testing DataLoader 0:  73%|███████▎  | 98/134 [01:51<00:40,  0.88it/s]Testing DataLoader 0:  74%|███████▍  | 99/134 [01:52<00:39,  0.88it/s]Testing DataLoader 0:  75%|███████▍  | 100/134 [01:53<00:38,  0.88it/s]Testing DataLoader 0:  75%|███████▌  | 101/134 [01:54<00:37,  0.88it/s]Testing DataLoader 0:  76%|███████▌  | 102/134 [01:55<00:36,  0.88it/s]Testing DataLoader 0:  77%|███████▋  | 103/134 [01:57<00:35,  0.88it/s]Testing DataLoader 0:  78%|███████▊  | 104/134 [01:58<00:34,  0.88it/s]Testing DataLoader 0:  78%|███████▊  | 105/134 [01:59<00:32,  0.88it/s]Testing DataLoader 0:  79%|███████▉  | 106/134 [02:00<00:31,  0.88it/s]Testing DataLoader 0:  80%|███████▉  | 107/134 [02:01<00:30,  0.88it/s]Testing DataLoader 0:  81%|████████  | 108/134 [02:02<00:29,  0.88it/s]Testing DataLoader 0:  81%|████████▏ | 109/134 [02:03<00:28,  0.88it/s]Testing DataLoader 0:  82%|████████▏ | 110/134 [02:05<00:27,  0.88it/s]Testing DataLoader 0:  83%|████████▎ | 111/134 [02:06<00:26,  0.88it/s]Testing DataLoader 0:  84%|████████▎ | 112/134 [02:07<00:25,  0.88it/s]Testing DataLoader 0:  84%|████████▍ | 113/134 [02:08<00:23,  0.88it/s]Testing DataLoader 0:  85%|████████▌ | 114/134 [02:09<00:22,  0.88it/s]Testing DataLoader 0:  86%|████████▌ | 115/134 [02:10<00:21,  0.88it/s]Testing DataLoader 0:  87%|████████▋ | 116/134 [02:11<00:20,  0.88it/s]Testing DataLoader 0:  87%|████████▋ | 117/134 [02:13<00:19,  0.88it/s]Testing DataLoader 0:  88%|████████▊ | 118/134 [02:14<00:18,  0.88it/s]Testing DataLoader 0:  89%|████████▉ | 119/134 [02:15<00:17,  0.88it/s]Testing DataLoader 0:  90%|████████▉ | 120/134 [02:16<00:15,  0.88it/s]Testing DataLoader 0:  90%|█████████ | 121/134 [02:17<00:14,  0.88it/s]Testing DataLoader 0:  91%|█████████ | 122/134 [02:18<00:13,  0.88it/s]Testing DataLoader 0:  92%|█████████▏| 123/134 [02:20<00:12,  0.88it/s]Testing DataLoader 0:  93%|█████████▎| 124/134 [02:21<00:11,  0.88it/s]Testing DataLoader 0:  93%|█████████▎| 125/134 [02:22<00:10,  0.88it/s]Testing DataLoader 0:  94%|█████████▍| 126/134 [02:23<00:09,  0.88it/s]Testing DataLoader 0:  95%|█████████▍| 127/134 [02:24<00:07,  0.88it/s]Testing DataLoader 0:  96%|█████████▌| 128/134 [02:25<00:06,  0.88it/s]Testing DataLoader 0:  96%|█████████▋| 129/134 [02:26<00:05,  0.88it/s]Testing DataLoader 0:  97%|█████████▋| 130/134 [02:27<00:04,  0.88it/s]Testing DataLoader 0:  98%|█████████▊| 131/134 [02:28<00:03,  0.88it/s]Testing DataLoader 0:  99%|█████████▊| 132/134 [02:30<00:02,  0.88it/s]Testing DataLoader 0:  99%|█████████▉| 133/134 [02:31<00:01,  0.88it/s]Testing DataLoader 0: 100%|██████████| 134/134 [02:32<00:00,  0.88it/s]IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1608, 1920) to (1616, 1920) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
-[swscaler @ 0x6355340] Warning: data is not aligned! This can lead to a speed loss
-Testing DataLoader 0: 100%|██████████| 134/134 [03:06<00:00,  0.72it/s]
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-       Test metric             DataLoader 0
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-      test/avg_flow                 0.0
-     test/avg_lpips          0.643214225769043
-     test/avg_msssim        0.5716076493263245
-      test/avg_psnr         17.999670028686523
-      test/avg_ssim         0.5798299312591553
-        test/loss           0.15090252459049225
-      test/loss_L1          0.08358564227819443
-     test/loss_ssim         0.4201701581478119
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-wandb: - 0.011 MB of 0.011 MB uploadedwandb: \ 0.011 MB of 0.021 MB uploadedwandb: | 0.024 MB of 0.024 MB uploadedwandb: 
-wandb: Run history:
-wandb:               epoch ▁
-wandb:       test/avg_flow ▁
-wandb:      test/avg_lpips ▁
-wandb:     test/avg_msssim ▁
-wandb:       test/avg_psnr ▁
-wandb:       test/avg_ssim ▁
-wandb:           test/loss ▁
-wandb:        test/loss_L1 ▁
-wandb:      test/loss_ssim ▁
-wandb: trainer/global_step ▁
-wandb: 
-wandb: Run summary:
-wandb:               epoch 0
-wandb:       test/avg_flow 0.0
-wandb:      test/avg_lpips 0.64321
-wandb:     test/avg_msssim 0.57161
-wandb:       test/avg_psnr 17.99967
-wandb:       test/avg_ssim 0.57983
-wandb:           test/loss 0.1509
-wandb:        test/loss_L1 0.08359
-wandb:      test/loss_ssim 0.42017
-wandb: trainer/global_step 0
-wandb: 
-wandb: 🚀 View run TRBF_vanilla1_test at: https://wandb.ai/lynl7130/GaussianDiff_hypernerf/runs/u730elkk/workspace
-wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ./output/hypernerf/split-cookie/TRBF/TRBF_vanilla1/wandb/run-20240418_142920-u730elkk/logs
+Traceback (most recent call last):
+  File "main.py", line 1, in <module>
+    from cli import MyLightningCLI
+  File "/orion/u/yiqingl/GaussianDiff/cli.py", line 1, in <module>
+    from lightning.pytorch.cli import LightningCLI, LightningArgumentParser, SaveConfigCallback
+ModuleNotFoundError: No module named 'lightning'
+Traceback (most recent call last):
+  File "main.py", line 1, in <module>
+    from cli import MyLightningCLI
+  File "/orion/u/yiqingl/GaussianDiff/cli.py", line 1, in <module>
+    from lightning.pytorch.cli import LightningCLI, LightningArgumentParser, SaveConfigCallback
+ModuleNotFoundError: No module named 'lightning'
