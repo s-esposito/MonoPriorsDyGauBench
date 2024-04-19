@@ -3,8 +3,13 @@ output/*
 data/*
 submodules/*/build/*
 slurms/*.out
+slurms/**/*.out
 slurms/wandb/*
+slurms/**/wandb/*
 slurms_sc/*.out
+slurms_sc/**/*.out
 slurms_sc/wandb/*
+slurms_sc/**/wandb/*
+**/build/**
 **/__pycache__/**
 **/*.egg-info/**
