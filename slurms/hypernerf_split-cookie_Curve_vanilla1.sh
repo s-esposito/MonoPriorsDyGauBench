@@ -35,7 +35,7 @@ which pip
 
 variant="hypernerf/split-cookie/Curve/vanilla1"
 
-python main.py fit --config configs/${variant}.yaml
+#python main.py fit --config configs/${variant}.yaml
 python main.py test --config configs/${variant}.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
 
 rm -rf output/${variant}/wandb
