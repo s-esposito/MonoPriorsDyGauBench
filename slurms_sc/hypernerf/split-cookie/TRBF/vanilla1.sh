@@ -23,7 +23,7 @@ source /orion/u/yiqingl/anaconda3/etc/profile.d/conda.sh
 conda activate /orion/u/yiqingl/envs/gaufre
 
 
-export LD_LIBRARY_PATH=$CUDA_PREFIX/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$CUDA_PREFIX/lib/python3.9/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 export TORCH_EXTENSIONS_DIR=/orion/u/yiqingl/.cache/torch_extensions
 
 
@@ -58,7 +58,7 @@ python -c "import torch; print(torch.cuda.is_available()); print(torch.__version
 python -c "import torch; print(torch.backends.cudnn.version())"
 
 
-ls /usr/local/cuda-11.8/lib64/
+#ls /usr/local/cuda-11.8/lib64/
 
 cat /usr/local/cuda-11.8/include/cudnn_version.h | grep CUDNN_MAJOR -A 2
 find /orion/u/yiqingl/envs/gaufre -name "libcudnn*"

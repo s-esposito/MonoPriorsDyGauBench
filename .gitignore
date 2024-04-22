@@ -2,8 +2,6 @@ __pycache__/*
 output/*
 data/*
 submodules/*/build/*
-configs/**/*.yaml
-configs/*.yaml
 slurms/*.sh
 slurms/**/*.sh
 slurms/*.out

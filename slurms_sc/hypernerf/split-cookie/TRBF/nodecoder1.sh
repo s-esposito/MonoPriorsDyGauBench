@@ -3,7 +3,7 @@
 #SBATCH -n 1
 #SBATCH --mem=24G
 #SBATCH -t 48:00:00
-#SBATCH --partition=orion --gres=gpu:a5000:1
+#SBATCH --partition=orion --gres=gpu:a4000:1
 #SBATCH --job-name install
 #SBATCH --output install.out
 #SBATCH --account=orion
@@ -28,7 +28,7 @@ conda activate /orion/u/yiqingl/envs/gaufre
 export PATH=/usr/local/cuda-11.8/bin${PATH:+:${PATH}}$
 #export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 export CUDA_HOME=/usr/local/cuda-11.8
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib/python3.9/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 export TORCH_EXTENSIONS_DIR=/orion/u/yiqingl/.cache/torch_extension
 
 nvcc --version
@@ -56,7 +56,7 @@ python -c "import torch; print(torch.cuda.is_available()); print(torch.__version
 python -c "import torch; print(torch.backends.cudnn.version())"
 
 
-ls /usr/local/cuda-11.8/lib64/
+#ls /usr/local/cuda-11.8/lib64/
 
 cat /usr/local/cuda-11.8/include/cudnn_version.h | grep CUDNN_MAJOR -A 2
 find /orion/u/yiqingl/envs/gaufre -name "libcudnn*"
