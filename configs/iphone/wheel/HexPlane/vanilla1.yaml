@@ -1,0 +1,102 @@
+seed_everything: false
+name: 'HexPlane_vanilla1'
+ckpt_path: null
+output: './output/iphone/wheel/HexPlane'
+group: 'wheel' 
+logger: 'wandb'
+project: 'GaussianDiff_iphone'
+data:
+  class_path: src.data.NerfiesDataModule
+  init_args:
+    seed: null
+    datadir: 'data/iphone/wheel'
+    eval: True
+    ratio: 0.5
+    white_background: true
+    batch_size: 2 # 1 if syntethic, 2 if real
+    num_pts_ratio: 0.0
+    num_pts: 0
+    M: 10
+model:
+  class_path: src.models.GS3d
+  init_args:
+    is_blender: false
+    deform_scale: true
+    deform_opacity: false
+    deform_feature: false
+    log_image_interval: 1000
+    sh_degree: 3
+    sh_degree_t: 2
+    percent_dense: 0.01
+    warm_up: 3000 # turn on warmup if 3000
+    trbfc_lr: 0.0001
+    trbfs_lr: 0.03
+    trbfslinit: -2.0
+    position_t_lr_init: 0.00016
+    position_lr_init: 0.00016
+    position_lr_final: 0.0000016
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 30000
+    deform_lr_init: 0.00016
+    deform_lr_final: 0.000016
+    deform_lr_delay_mult: 0.01
+    deform_lr_max_steps: 30000
+    grid_lr_init: 0.0016
+    grid_lr_final: 0.000016
+    grid_lr_delay_mult: 0.01
+    grid_lr_max_steps: 30000
+    post_act: false # default to be true
+    feature_lr: 0.0025
+    opacity_lr: 0.05
+    scaling_lr: 0.005 
+    rotation_lr: 0.001
+    decoder_lr: 0.0001
+    lambda_dssim: 0.2
+    lambda_flow: 0. # default to disable flow loss
+    flow_start: 5000
+    plane_tv_weight: 0.0002 # if real, 0.0002, else 0.0001
+    time_smoothness_weight: 0.001 # if real, 0.001 else 0.01
+    l1_time_planes_weight: 0.0001
+    densification_interval: 100
+    opacity_reset_interval: 3000 # if deforming opacity, 30000000
+    densify_from_iter: 500
+    densify_until_iter: 15000 # specifically for TRBF is 9000
+    densify_grad_threshold: 0.0002
+    l1_l2_switch: 0 # turn off l1_l2
+    raystart: 0.7
+    ratioend: 7.5
+    numperay: 2
+    emsthr: 0.6
+    num_ems: 2
+    emsstartfromiterations: 5000000000  # turn off guided sampling if 5000000
+    selectedlength: 5000
+    use_static: false
+    use_AST: false
+    init_mode: "default"
+    motion_mode: "HexPlane"
+    color_mode: "rgb"
+    rot_4d: true
+trainer:
+  logger: true
+  enable_checkpointing: true
+  num_nodes: 1
+  devices: "auto"
+  enable_progress_bar: true
+  max_epochs: 1
+  max_steps: 30000
+  val_check_interval: 1000
+  log_every_n_steps: 50
+  accelerator: "gpu"
+  strategy: "ddp_find_unused_parameters_true"
+  precision: 32 # cannot set to 16; otherwise ssim bug and https://stackoverflow.com/questions/75969294/assertionerror-no-inf-checks-were-recorded-for-this-optimizer
+  enable_model_summary: true
+  callbacks:
+    - class_path: "lightning.pytorch.callbacks.ModelCheckpoint"
+      init_args:
+        monitor: 'val/avg_ssim_train'
+        dirpath: null
+        filename: 'model-{step:06d}-{val/avg_ssim_train:.2f}'
+        save_top_k: 0
+        mode: 'max'
+        save_last: true
+        save_on_train_epoch_end: true

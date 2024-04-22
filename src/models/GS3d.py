@@ -1441,8 +1441,10 @@ class GS3d(MyModelBaseClass):
                 
 
         #old_xyz = (self._xyz[:, 0]).detach().clone()
+        # in practice, to prevent NaN loss
         #if self.motion_mode == "TRBF":
-        #    self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm") 
+        self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm") 
+        
         optimizer.step()
         if deform_optimizer is not None:
             self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")

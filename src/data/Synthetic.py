@@ -22,7 +22,11 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
         
         frames = contents["frames"]
         for idx, frame in enumerate(frames):
-            cam_name = os.path.join(path, frame["file_path"] + extension)
+            file_path = frame["file_path"]
+            if file_path.startswith('./'):
+                file_path = file_path[2:]
+            cam_name = os.path.join(path, file_path + extension)
+            
             time = frame["time"] # 0 ~ 1
             
             matrix = np.linalg.inv(np.array(frame["transform_matrix"]))
@@ -31,8 +35,10 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
             T = -matrix[:3, 3]
 
             image_path = os.path.join(path, cam_name)
+            #print(path, cam_name, image_path)
             image_name = Path(cam_name).stem
-            image = Image.open(image_path)
+            #print(path, file_path, cam_name, image_path)
+            image = Image.open(cam_name)
 
 
             im_data = np.array(image.convert("RGBA"))

@@ -8,6 +8,12 @@
 #SBATCH --output vanilla1.out
 
 
+base="iphone/apple/Curve"
+name="vanilla1"
+variant="${base}/${name}"
+output_path="./output/${base}"
+
+
 module load gcc/10.1.0-mojgbn
 module load cmake/3.26.3-xi6h36u
 module load cuda/11.8.0-lpttyok
@@ -32,10 +38,6 @@ conda activate ~/data/yliang51/envs/gaufre
 which python 
 which pip
 
-base="iphone/apple/Curve"
-name="vanilla1"
-variant="${base}/${name}"
-output_path="./output/${base}"
 
 python main.py fit --config configs/${variant}.yaml --output ${output_path} 
 python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} #--print_config #--trainer.strategy FSDP #--print_config

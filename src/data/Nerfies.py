@@ -66,6 +66,11 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         #video_cam_infos.split="video"
         ply_path = os.path.join(datadir, "points.npy")        
         xyz = np.load(ply_path,allow_pickle=True)
+        # if xyz's  shape[0] is greater than 100000, then subsample evenly 100000 points
+        if len(xyz) > 100000:
+            gap = len(xyz) // 100000
+            xyz = xyz[::gap]
+
         xyz -= self.train_cam_infos.scene_center
         xyz *= self.train_cam_infos.coord_scale
         xyz = xyz.astype(np.float32)
