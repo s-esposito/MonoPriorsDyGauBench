@@ -11,7 +11,7 @@ data:
     seed: null
     datadir: 'data/hypernerf/tamping'
     eval: True
-    ratio: 0.5
+    ratio: 0.25
     white_background: true
     batch_size: 4 # 1 if syntethic, 4 if real
     num_pts_ratio: 0.0
