@@ -10,7 +10,7 @@
 
 base="hypernerf/vrig-3dprinter/Curve"
 name="vanilla1"
-variant="${base}/${name}"
+variant="${base}/${name%?}1"
 output_path="./output/${base}"
 
 
@@ -39,8 +39,8 @@ which python
 which pip
 
 
-python main.py fit --config configs/${variant}.yaml --output ${output_path} 
-python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} #--print_config #--trainer.strategy FSDP #--print_config
+python main.py fit --config configs/${variant}.yaml --output ${output_path} --name "${base##*/}_$name" 
+python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} --name "${base##*/}_$name" #--print_config #--trainer.strategy FSDP #--print_config
 
 rm -rf "${output_path}/${name}/wandb"
 

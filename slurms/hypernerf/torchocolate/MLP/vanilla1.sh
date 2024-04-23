@@ -3,14 +3,14 @@
 #SBATCH -n 1
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
-#SBATCH --partition=3090-gcondo --gres=gpu:1
+#SBATCH --partition=a6000-gcondo --gres=gpu:1
 #SBATCH --job-name hypernerf_torchocolate_MLP_vanilla1
 #SBATCH --output vanilla1.out
 
 
 base="hypernerf/torchocolate/MLP"
 name="vanilla1"
-variant="${base}/${name}"
+variant="${base}/${name%?}1"
 output_path="./output/${base}"
 
 
@@ -39,8 +39,8 @@ which python
 which pip
 
 
-python main.py fit --config configs/${variant}.yaml --output ${output_path} 
-python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} #--print_config #--trainer.strategy FSDP #--print_config
+python main.py fit --config configs/${variant}.yaml --output ${output_path} --name "${base##*/}_$name" 
+python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} --name "${base##*/}_$name" #--print_config #--trainer.strategy FSDP #--print_config
 
 rm -rf "${output_path}/${name}/wandb"
 
@@ -48,6 +48,3 @@ rm -rf "${output_path}/${name}/wandb"
 #pip install --upgrade --no-cache-dir gdown
 #conda install -c conda-forge gdown
 #gdown --id 1ibzV_4hOaQs8VF2X1ciYQ33jE9VOEVOW
-
-
-

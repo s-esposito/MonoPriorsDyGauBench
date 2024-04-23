@@ -24,7 +24,7 @@ model:
     deform_scale: false
     deform_opacity: true
     deform_feature: false
-    log_image_interval: 5000
+    log_image_interval: 50000
     sh_degree: 3
     sh_degree_t: 2
     percent_dense: 0.01

@@ -3,7 +3,7 @@
 #SBATCH -n 1
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
-#SBATCH --partition=3090-gcondo --gres=gpu:1
+#SBATCH --partition=a6000-gcondo --gres=gpu:1
 #SBATCH --job-name test_flow_gt
 #SBATCH --output test_flow_gt.out
 
@@ -49,6 +49,6 @@ which pip
 #    --model ./src/RAFT/raft-sintel.pth \
     
 
-python generate_flow_hypernerf.py --dataset_path ~/data/yliang51/Gaussian4D_depre/data/hypernerf/vrig-chicken/rgb \
-    --input_dir "4x" \
+python generate_flow_hypernerf.py --dataset_path ~/data/yliang51/GaussianDiff/data/hypernerf/vrig-chicken/rgb \
+    --input_dir "2x" \
     --model ./src/RAFT/raft-sintel.pth \

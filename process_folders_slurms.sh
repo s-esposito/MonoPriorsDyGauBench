@@ -7,12 +7,12 @@ process_sh() {
     
     # Read the content of the .sh file
     content=$(cat "$sh_file")
-    scene="sieve"
-    dataset="nerfds"
+    scene="torchocolate"
+    dataset="hypernerf"
     # Replace specific patterns in the content
     #content=$(echo "$content" | sed "s/nerf\/curls/${dataset}\/${scene}/g")
-    content=$(echo "$content" | sed "s/curls/${scene}/g")
-    content=$(echo "$content" | sed "s/nerfies/${dataset}/g")
+    content=$(echo "$content" | sed "s/aleks-teapot/${scene}/g")
+    content=$(echo "$content" | sed "s/hypernerf/${dataset}/g")
    
     # Write the modified content to the output file
     echo "$content" > "$output_file"

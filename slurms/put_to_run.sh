@@ -1,6 +1,6 @@
 #!/bin/bash
 
-predefined_list=("vanilla1" "nodecoder1") # "vanilla2" "vanilla3")
+predefined_list=("vanilla2" "vanilla3" "nodecoder2" "nodecoder3")
 
 
 # Function to process each subfolder

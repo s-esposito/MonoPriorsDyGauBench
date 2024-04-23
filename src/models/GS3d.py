@@ -413,6 +413,7 @@ class GS3d(MyModelBaseClass):
             if self.deform_scale:
                 scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
                 self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
+            
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -1445,10 +1446,11 @@ class GS3d(MyModelBaseClass):
         #if self.motion_mode == "TRBF":
         self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm") 
         
-        optimizer.step()
+        
         if deform_optimizer is not None:
             self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
             deform_optimizer.step()
+        optimizer.step()
         #assert False, torch.any(old_xyz != self._xyz[:, 0])
         #for param_group in self.optimizer.param_groups:
         #    print(param_group["name"], param_group["lr"])

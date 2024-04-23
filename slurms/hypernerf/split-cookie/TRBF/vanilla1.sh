@@ -8,6 +8,12 @@
 #SBATCH --output vanilla1.out
 
 
+base="hypernerf/split-cookie/TRBF"
+name="vanilla1"
+variant="${base}/${name%?}1"
+output_path="./output/${base}"
+
+
 module load gcc/10.1.0-mojgbn
 module load cmake/3.26.3-xi6h36u
 module load cuda/11.8.0-lpttyok
@@ -33,17 +39,12 @@ which python
 which pip
 
 
-variant="hypernerf/split-cookie/TRBF/vanilla1"
+python main.py fit --config configs/${variant}.yaml --output ${output_path} --name "${base##*/}_$name" 
+python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} --name "${base##*/}_$name" #--print_config #--trainer.strategy FSDP #--print_config
 
-python main.py fit --config configs/${variant}.yaml
-python main.py test --config configs/${variant}.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
-
-rm -rf output/${variant}/wandb
+rm -rf "${output_path}/${name}/wandb"
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown
 #conda install -c conda-forge gdown
 #gdown --id 1ibzV_4hOaQs8VF2X1ciYQ33jE9VOEVOW
-
-
-
