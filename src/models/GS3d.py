@@ -1256,7 +1256,7 @@ class GS3d(MyModelBaseClass):
         )
         #print(loss)
         print(iteration, self.trainer.global_step, loss)
-        assert False, render_pkg["render"]
+        #assert False, render_pkg["render"]
         self.manual_backward(loss)
 
         #print([[param_group['name'], optimizer.state.get(param_group["params"][0])] for param_group in optimizer.param_groups])
