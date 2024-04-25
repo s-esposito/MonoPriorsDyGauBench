@@ -879,7 +879,7 @@ class GS3d_flow(MyModelBaseClass):
         batch: Dict,
         render_rgb: Optional[bool]=True,
         render_flow: Optional[bool]=True,
-        time_offset: Optional[float]=0.0,
+        #time_offset: Optional[float]=0.0,
         scaling_modifier: Optional[float]=1.0
     ) -> Dict:
         if self.use_AST and (not render_mode):
@@ -972,11 +972,16 @@ class GS3d_flow(MyModelBaseClass):
             # } 
             result = self.deform(batch["time"][idx] + ast_noise) 
             # result would contain two sets of deformation results if time_offset is not 0.0
-            if time_offset != 0.:
-                result_fwd = self.deform(batch["time"][idx] + ast_noise + time_offset)
-                result_bwd = self.deform(batch["time"][idx] + ast_noise - time_offset)
+            if render_flow:
+                result_fwd = {}
+                if batch["time_post"][idx] >= 0.:
+                    result_fwd = self.deform(batch["time_post"][idx] + ast_noise)
+                result_bwd = {}
+                if batch["time_prev"][idx] >= 0.:
+                    result_bwd = self.deform(batch["time_prev"][idx] + ast_noise)
                 for key in result_fwd:
                     result[key+"_fwd"] = result_fwd[key]
+                for key in result_bwd:
                     result[key+"_bwd"] = result_bwd[key]
             '''
             for key in result:
@@ -1020,13 +1025,14 @@ class GS3d_flow(MyModelBaseClass):
                     "depth": depth
                 })
             if render_flow: # need to rename means2D and screenspace points to prevent gradient error
-                assert time_offset > 0.0, "Must have a time offset for rendering the flow"
+                #assert time_offset > 0.0, "Must have a time offset for rendering the flow"
                 screenspace_points_ = torch.zeros_like(result["means3D"], dtype=result["means3D"].dtype, requires_grad=True, device=result["means3D"].device) + 0
                 try:
                     screenspace_points_.retain_grad()
                 except:
                     pass
                 means2D_ = screenspace_points_
+                '''
                 flow_fwd = result["means3D_fwd"] - result["means3D"].detach()
                 flow_bwd = result["means3D_bwd"] - result["means3D"].detach()
                 focal_y = int(batch["image_height"][idx]) / (2.0 * tanfovy)
@@ -1062,6 +1068,127 @@ class GS3d_flow(MyModelBaseClass):
                     rotations = result["rotations"].detach() if result["rotations"] is not None else None,
                     cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
                 )
+                
+
+                focal_y = int(batch["image_height"][idx]) / (2.0 * tanfovy)
+                focal_x = int(batch["image_width"][idx]) / (2.0 * tanfovx)
+                
+                # project current point set to middle camera to get u,v,t
+                # Convert points to homogeneous coordinates
+                uvt = torch.cat([result["means3D"], torch.ones(result["means3D"].shape[0], 1).to(result["means3D"].device)], dim=1)
+                # Apply the view matrix to transform points from world space to camera space
+                view_matrix = batch["world_view_transform"][idx]#.cuda()
+                uvt = torch.matmul(view_matrix, uvt.T).T
+                uvt = uvt[:, :3]
+                uvt = uvt[:, :2] / uvt[:, 2:]
+
+                # if prev camera exists
+                # project prev point set to prev camera to get u_prev, v_prev, t_prev
+                if batch["time_prev"][idx] >= 0.0:
+                    uvt_prev = torch.cat([result["means3D_bwd"], torch.ones(result["means3D_bwd"].shape[0], 1).to(result["means3D_bwd"].device)], dim=1)
+                    view_matrix_prev = batch["world_view_transform_prev"][idx]#.cuda()
+                    uvt_prev = torch.matmul(view_matrix_prev, uvt_prev.T).T
+                    uvt_prev = uvt_prev[:, :3]
+                    uvt_prev = uvt_prev[:, :2] / uvt_prev[:, 2:]
+
+                    flow_bwd = uvt_prev - uvt
+                    rendered_flow_bwd, _, _ = rasterizer_ch3(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow_bwd,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
+                else:
+                    rendered_flow_bwd = None
+                # if post camera exists
+                # project post point set to post camera to get u_post, v_post, t_post
+                if batch["time_post"][idx] >= 0.0:
+                    uvt_post = torch.cat([result["means3D_fwd"], torch.ones(result["means3D_fwd"].shape[0], 1).to(result["means3D_fwd"].device)], dim=1)
+                    view_matrix_post = batch["world_view_transform_post"][idx]#.cuda()
+                    uvt_post = torch.matmul(view_matrix_post, uvt_post.T).T
+                    uvt_post = uvt_post[:, :3]
+                    uvt_post = uvt_post[:, :2] / uvt_post[:, 2:]
+                    flow_fwd = uvt_post - uvt
+                    
+                    # Rasterize visible Gaussians to image, obtain their radii (on screen). 
+                    
+                    rendered_flow_fwd, _, _ = rasterizer_ch3(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow_fwd,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
+                else:
+                    rendered_flow_fwd = None
+                '''
+                focal_y = int(batch["image_height"][idx]) / (2.0 * tanfovy)
+                focal_x = int(batch["image_width"][idx]) / (2.0 * tanfovx)
+                
+
+                # Project the points at time onto the image plane of the camera at time
+                points = result["means3D"]
+                viewmatrix = batch["world_view_transform"][idx]
+                points_camera = torch.matmul(viewmatrix[:3, :3], points.T).T + viewmatrix[:3, 3]
+                points_uv = torch.zeros_like(points_camera[:, :3])
+                points_uv[:, 0] = points_camera[:, 0] * focal_x / points_camera[:, 2]
+                points_uv[:, 1] = points_camera[:, 1] * focal_y / points_camera[:, 2]
+
+                 
+
+                # Project the points at time_prev onto the image plane of the camera at time
+                if batch["time_prev"][idx] >= 0.0:
+                    points_prev = result["means3D_bwd"]
+                    viewmatrix_prev = batch["world_view_transform_prev"][idx]#.cuda()
+                    points_prev_camera = torch.matmul(viewmatrix_prev[:3, :3], points_prev.T).T + viewmatrix_prev[:3, 3]
+                    points_prev_uv = torch.zeros_like(points_prev_camera[:, :3])
+                    points_prev_uv[:, 0] = points_prev_camera[:, 0] * focal_x / points_prev_camera[:, 2]
+                    points_prev_uv[:, 1] = points_prev_camera[:, 1] * focal_y / points_prev_camera[:, 2]
+                    flow_bwd =  points_prev_uv - points_uv
+                    rendered_flow_bwd, _, _ = rasterizer_ch3(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow_bwd,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
+                else:
+                    rendered_flow_bwd = None
+
+                if batch["time_post"][idx] >= 0.0:
+                    points_post = result["means3D_fwd"]
+                    viewmatrix_post = batch["world_view_transform_post"][idx]
+                    points_post_camera = torch.matmul(viewmatrix_post[:3, :3], points_post.T).T + viewmatrix_post[:3, 3]
+                    points_post_uv = torch.zeros_like(points_post_camera[:, :3])
+                    points_post_uv[:, 0] = points_post_camera[:, 0] * focal_x / points_post_camera[:, 2]
+                    points_post_uv[:, 1] = points_post_camera[:, 1] * focal_y / points_post_camera[:, 2]
+                    flow_fwd = points_post_uv - points_uv
+                    rendered_flow_fwd, _, _ = rasterizer_ch3(
+                        means3D = result["means3D"].detach(),
+                        means2D = means2D_.detach(),
+                        shs = None,
+                        colors_precomp = flow_fwd,
+                        opacities = result["opacity"].detach(),
+                        scales = result["scales"].detach() if result["scales"] is not None else None,
+                        rotations = result["rotations"].detach() if result["rotations"] is not None else None,
+                        cov3D_precomp = result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None
+                    )
+                else:
+                    rendered_flow_fwd = None
+
+                
+                
+                
                 result.update(
                     {
                         "render_flow_fwd": rendered_flow_fwd,
@@ -1157,10 +1284,18 @@ class GS3d_flow(MyModelBaseClass):
                     self.plane_tv_weight)
             if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
                 if "fwd_flow" in batch:
-                    fwd_flow = fwd_flows[idx] 
-                    fwd_flow_mask = fwd_flow_masks[idx]
-                    bwd_flow = bwd_flows[idx]
-                    bwd_flow_mask = bwd_flow_masks[idx]
+                    if batch["time_post"] >=0:
+                        fwd_flow = fwd_flows[idx] 
+                        fwd_flow_mask = fwd_flow_masks[idx]
+                    else:
+                        fwd_flow = None
+                        fwd_flow_mask = None
+                    if batch["time_prev"] >=0:
+                        bwd_flow = bwd_flows[idx]
+                        bwd_flow_mask = bwd_flow_masks[idx]
+                    else:
+                        bwd_flow = None
+                        bwd_flow_mask = None
                     render_flow_fwd = render_flow_fwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_fwds[idx]).sum(-1))) + 1e-5)
                     render_flow_bwd = render_flow_bwds[idx]# / (torch.max(torch.sqrt(torch.square(render_flow_bwds[idx]).sum(-1))) + 1e-5)
                     flow_loss_= compute_flow_loss(
@@ -1222,7 +1357,7 @@ class GS3d_flow(MyModelBaseClass):
             deform_optimizer = None
         
         iteration = self.iteration  + 1 # has to start from 1 to prevent actions on step=0
-        print(iteration, self.trainer.global_step)      
+              
         # Every 1000 its we increase the levels of SH up to a maximum degree
         if iteration % 1000 == 0:
             if self.active_sh_degree < self.max_sh_degree:
@@ -1243,7 +1378,7 @@ class GS3d_flow(MyModelBaseClass):
             batch=batch,
             render_rgb=render_rgb,
             render_flow=render_flow,
-            time_offset=time_offset
+            #time_offset=time_offset
         )        
         
         
@@ -1255,6 +1390,8 @@ class GS3d_flow(MyModelBaseClass):
             render_pkg, batch, mode="train"
         )
         #print(loss)
+        print(iteration, self.trainer.global_step, loss)
+        #assert False, render_pkg["render"]
         self.manual_backward(loss)
 
         #print([[param_group['name'], optimizer.state.get(param_group["params"][0])] for param_group in optimizer.param_groups])
@@ -1492,7 +1629,7 @@ class GS3d_flow(MyModelBaseClass):
                 batch=batch,
                 render_rgb=render_rgb,
                 render_flow=render_flow,
-                time_offset=time_offset
+                #time_offset=time_offset
             )        
             assert batch["time"].shape[0] == 1
             image = torch.clamp(render_pkg["render"][0], 0.0, 1.0)
@@ -1502,9 +1639,10 @@ class GS3d_flow(MyModelBaseClass):
             depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
             depth = torch.from_numpy(depth).permute(2, 0, 1) / 255.
 
-            rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
-            rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
             try:
+                rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+                rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+            
                 rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
                 rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.
                 rendered_flow_bwd = flow_to_image(rendered_flow_bwd)
@@ -1519,12 +1657,12 @@ class GS3d_flow(MyModelBaseClass):
             if (split == "train") and (self.num_batches_train < 5):
                 #print(self.iteration)
                 #assert False, self.iteration
-                if (self.iteration % self.log_image_interval) == 0:
+                if (self.iteration > 0) and (self.iteration % self.log_image_interval) == 0:
                     self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd])
                     # visualize fwd flow and bwd flow
                     #self.logger.log_image(f"val_flow_fwd_{split}/{image_name}", [rendered_flow_fwd], step=self.iteration)
             elif (split == "test") and (self.num_batches_test < 5):
-                if (self.iteration % self.log_image_interval) == 0:
+                if (self.iteration > 0) and (self.iteration % self.log_image_interval) == 0:
                     self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd])
             
             #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
@@ -1614,7 +1752,7 @@ class GS3d_flow(MyModelBaseClass):
             batch=batch,
             render_rgb=render_rgb,
             render_flow=render_flow,
-            time_offset=time_offset
+            #time_offset=time_offset
         )    
         end.record()
         torch.cuda.synchronize()
@@ -1634,9 +1772,10 @@ class GS3d_flow(MyModelBaseClass):
         depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
         depth = torch.from_numpy(depth).permute(2, 0, 1)
 
-        rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
-        rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
         try:
+            rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+            rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+        
             rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
             rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.
             rendered_flow_bwd = flow_to_image(rendered_flow_bwd)

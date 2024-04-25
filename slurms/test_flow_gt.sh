@@ -3,7 +3,7 @@
 #SBATCH -n 1
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
-#SBATCH --partition=a6000-gcondo --gres=gpu:1
+#SBATCH --partition=gpu-he --gres=gpu:1
 #SBATCH --job-name test_flow_gt
 #SBATCH --output test_flow_gt.out
 

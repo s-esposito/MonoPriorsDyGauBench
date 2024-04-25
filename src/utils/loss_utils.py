@@ -35,21 +35,24 @@ def compute_flow_loss(
     ):
     flow_loss = 0.
 
-    fwd_flow = fwd_flow.permute(2, 0, 1)
-    render_flow_fwd = render_flow_fwd[:2, ...]
-    fwd_flow = fwd_flow / (torch.max(torch.sqrt(torch.square(fwd_flow).sum(-1))) + 1e-5)
-    render_flow_fwd = render_flow_fwd / (torch.max(torch.sqrt(torch.square(render_flow_fwd).sum(-1))) + 1e-5)
-    M = fwd_flow_mask.unsqueeze(0)
-    fwd_flow_loss = torch.sum(torch.abs(fwd_flow - render_flow_fwd) * M) / (torch.sum(M) + 1e-8) / fwd_flow.shape[-1]
-    flow_loss += fwd_flow_loss
+    if (render_flow_fwd is not None) and (fwd_flow is not None):
+        fwd_flow = fwd_flow.permute(2, 0, 1)
+        render_flow_fwd = render_flow_fwd[:2, ...]
+        fwd_flow = fwd_flow / (torch.max(torch.sqrt(torch.square(fwd_flow).sum(-1))) + 1e-5)
+        render_flow_fwd = render_flow_fwd / (torch.max(torch.sqrt(torch.square(render_flow_fwd).sum(-1))) + 1e-5)
+        M = fwd_flow_mask.unsqueeze(0)
+        fwd_flow_loss = torch.sum(torch.abs(fwd_flow - render_flow_fwd) * M) / (torch.sum(M) + 1e-8) / fwd_flow.shape[-1]
+        flow_loss += fwd_flow_loss
 
-    bwd_flow = bwd_flow.permute(2, 0, 1)
-    render_flow_bwd = render_flow_bwd[:2, ...]
-    bwd_flow = bwd_flow / (torch.max(torch.sqrt(torch.square(bwd_flow).sum(-1))) + 1e-5)
-    render_flow_bwd = render_flow_bwd / (torch.max(torch.sqrt(torch.square(render_flow_bwd).sum(-1))) + 1e-5)
-    M = bwd_flow_mask.unsqueeze(0)
-    bwd_flow_loss = torch.sum(torch.abs(bwd_flow - render_flow_bwd) * M) / (torch.sum(M) + 1e-8) / bwd_flow.shape[-1]
-    flow_loss += bwd_flow_loss
+    if (render_flow_bwd is not None) and (bwd_flow is not None):
+        
+        bwd_flow = bwd_flow.permute(2, 0, 1)
+        render_flow_bwd = render_flow_bwd[:2, ...]
+        bwd_flow = bwd_flow / (torch.max(torch.sqrt(torch.square(bwd_flow).sum(-1))) + 1e-5)
+        render_flow_bwd = render_flow_bwd / (torch.max(torch.sqrt(torch.square(render_flow_bwd).sum(-1))) + 1e-5)
+        M = bwd_flow_mask.unsqueeze(0)
+        bwd_flow_loss = torch.sum(torch.abs(bwd_flow - render_flow_bwd) * M) / (torch.sum(M) + 1e-8) / bwd_flow.shape[-1]
+        flow_loss += bwd_flow_loss
     return flow_loss
 
 def l1_loss(network_output, gt):
