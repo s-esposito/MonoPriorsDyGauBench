@@ -10,7 +10,7 @@
 #SBATCH --nodelist=oriong12
 
 #SBATCH --job-name hypernerf_split-cookie_TRBF_nodecoder1
-#SBATCH --output nodecoder1.out
+#SBATCH --output nodecoder2-%j.out
 
 base="hypernerf/split-cookie/TRBF"
 name="nodecoder1"
@@ -64,7 +64,7 @@ python -c "import torch; print(torch.backends.cudnn.version())"
 cat /usr/local/cuda-11.8/include/cudnn_version.h | grep CUDNN_MAJOR -A 2
 find /orion/u/yiqingl/envs/gaufre -name "libcudnn*"
 
-variant="hypernerf/split-cookie/TRBF/nodecoder1"
+variant="hypernerf/split-cookie/TRBF/nodecoder2"
 
 python main.py fit --config configs/${variant}.yaml
 python main.py test --config configs/${variant}.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config

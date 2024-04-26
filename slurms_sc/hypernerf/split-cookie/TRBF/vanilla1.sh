@@ -12,8 +12,14 @@
 #SBATCH --job-name hypernerf_split-cookie_TRBF_vanilla1
 #SBATCH --output vanilla1.out
 
+base="hypernerf/split-cookie/TRBF"
+name="vanilla1"
+variant="${base}/${name%?}1"
+output_path="./output/${base}"
 
+current_path=$pwd
 
+chmod -R 777 $current_path/${name}.out
 
 source /orion/u/yiqingl/anaconda3/etc/profile.d/conda.sh
 
@@ -63,12 +69,13 @@ python -c "import torch; print(torch.backends.cudnn.version())"
 cat /usr/local/cuda-11.8/include/cudnn_version.h | grep CUDNN_MAJOR -A 2
 find /orion/u/yiqingl/envs/gaufre -name "libcudnn*"
 
-variant="hypernerf/split-cookie/TRBF/vanilla1"
 
-python main.py fit --config configs/${variant}.yaml
-python main.py test --config configs/${variant}.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
+python main.py fit --config configs/${variant}.yaml --output ${output_path} --name "${base##*/}_$name" 
+python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} --name "${base##*/}_$name" #--print_config #--trainer.strategy FSDP #--print_config
 
-rm -rf output/${variant}/wandb
+rm -rf "${output_path}/${name}/wandb"
+
+chmod -R 777 $current_path/${name}.out
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown
