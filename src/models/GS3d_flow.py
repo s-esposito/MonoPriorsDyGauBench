@@ -1861,7 +1861,7 @@ class GS3d_flow(MyModelBaseClass):
             f.write(f"Average LPIPS: {avg_lpips}\n")
             f.write(f"Average Flow Loss: {avg_flow}\n")
 
-        
+        self.log("test/avg_render_time", avg_render_time)
         self.log('test/avg_psnr', avg_psnr)
         self.log('test/avg_ssim', avg_ssim)
         self.log('test/avg_msssim', avg_msssim)
