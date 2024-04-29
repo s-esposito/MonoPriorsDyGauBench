@@ -18,3 +18,5 @@ src/models/GS3d_flow_old.py
 **/build/**
 **/__pycache__/**
 **/*.egg-info/**
+visualize/*.pkl
+visualize/*.png
