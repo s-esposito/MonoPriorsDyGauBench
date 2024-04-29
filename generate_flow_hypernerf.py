@@ -64,11 +64,15 @@ def run(args, images, input_path, output_path, output_img_path):
     with torch.no_grad():
 
         images = sorted(images)
+        #i = len(images)-2
+        #assert False, [len(images), images[0], images[1], images[i], images[i+1]]
         for i in range(len(images) - 1):
-            print(i)
+            
             image_name = os.path.splitext(os.path.basename(images[i]))[0]
+            print(i, image_name)
             image1 = load_image(images[i])
             image2 = load_image(images[i + 1])
+            
 
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
@@ -110,8 +114,9 @@ if __name__ == '__main__':
 
     left_images = glob.glob(os.path.join(input_path, '*left*.png')) + glob.glob(os.path.join(input_path, '*left*.jpg'))
     right_images = glob.glob(os.path.join(input_path, '*right*.png')) + glob.glob(os.path.join(input_path, '*right*.jpg'))
-    rest_images = [os.path.join(input_path, img) for img in os.listdir(input_path) if img not in left_images and img not in right_images and (img.endswith('.png') or img.endswith('.jpg'))]    
-    #assert False, [left_images, right_images, rest_images]
+    rest_images = [os.path.join(input_path, img) for img in os.listdir(input_path) if (img.endswith('.png') or img.endswith('.jpg'))]    
+    rest_images = [img for img in rest_images if img not in left_images and img not in right_images]
+    #assert False, [left_images[:5], right_images[:5], rest_images[:5]]
     #assert False, input_path#images
     if len(left_images):
         run(args, left_images, input_path, output_path, output_img_path)

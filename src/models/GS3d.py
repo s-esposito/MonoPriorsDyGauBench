@@ -413,6 +413,7 @@ class GS3d(MyModelBaseClass):
             if self.deform_scale:
                 scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
                 self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
+            
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -1221,7 +1222,7 @@ class GS3d(MyModelBaseClass):
             deform_optimizer = None
         
         iteration = self.iteration  + 1 # has to start from 1 to prevent actions on step=0
-        print(iteration, self.trainer.global_step)      
+              
         # Every 1000 its we increase the levels of SH up to a maximum degree
         if iteration % 1000 == 0:
             if self.active_sh_degree < self.max_sh_degree:
@@ -1254,6 +1255,8 @@ class GS3d(MyModelBaseClass):
             render_pkg, batch, mode="train"
         )
         #print(loss)
+        print(iteration, self.trainer.global_step, loss)
+        #assert False, render_pkg["render"]
         self.manual_backward(loss)
 
         #print([[param_group['name'], optimizer.state.get(param_group["params"][0])] for param_group in optimizer.param_groups])
@@ -1441,12 +1444,15 @@ class GS3d(MyModelBaseClass):
                 
 
         #old_xyz = (self._xyz[:, 0]).detach().clone()
+        # in practice, to prevent NaN loss
         #if self.motion_mode == "TRBF":
-        #    self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm") 
-        optimizer.step()
+        self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm") 
+        
+        
         if deform_optimizer is not None:
             self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
             deform_optimizer.step()
+        optimizer.step()
         #assert False, torch.any(old_xyz != self._xyz[:, 0])
         #for param_group in self.optimizer.param_groups:
         #    print(param_group["name"], param_group["lr"])
@@ -1498,9 +1504,10 @@ class GS3d(MyModelBaseClass):
             depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
             depth = torch.from_numpy(depth).permute(2, 0, 1) / 255.
 
-            rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
-            rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
             try:
+                rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+                rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+            
                 rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
                 rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.
                 rendered_flow_bwd = flow_to_image(rendered_flow_bwd)
@@ -1515,12 +1522,12 @@ class GS3d(MyModelBaseClass):
             if (split == "train") and (self.num_batches_train < 5):
                 #print(self.iteration)
                 #assert False, self.iteration
-                if (self.iteration % self.log_image_interval) == 0:
+                if (self.iteration > 0) and (self.iteration % self.log_image_interval) == 0:
                     self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd])
                     # visualize fwd flow and bwd flow
                     #self.logger.log_image(f"val_flow_fwd_{split}/{image_name}", [rendered_flow_fwd], step=self.iteration)
             elif (split == "test") and (self.num_batches_test < 5):
-                if (self.iteration % self.log_image_interval) == 0:
+                if (self.iteration > 0) and (self.iteration % self.log_image_interval) == 0:
                     self.logger.log_image(f"val_images_{split}/{image_name}", [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd])
             
             #self.log(f"{self.trainer.global_step}_{batch_idx}_render",
@@ -1630,9 +1637,10 @@ class GS3d(MyModelBaseClass):
         depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
         depth = torch.from_numpy(depth).permute(2, 0, 1)
 
-        rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
-        rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
         try:
+            rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+            rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+        
             rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
             rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.
             rendered_flow_bwd = flow_to_image(rendered_flow_bwd)
@@ -1718,7 +1726,7 @@ class GS3d(MyModelBaseClass):
             f.write(f"Average LPIPS: {avg_lpips}\n")
             f.write(f"Average Flow Loss: {avg_flow}\n")
 
-        
+        self.log("test/avg_render_time", avg_render_time)
         self.log('test/avg_psnr', avg_psnr)
         self.log('test/avg_ssim', avg_ssim)
         self.log('test/avg_msssim', avg_msssim)

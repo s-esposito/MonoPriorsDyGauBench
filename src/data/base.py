@@ -42,10 +42,24 @@ class CameraInfo(NamedTuple):
     height: int
     time : float
     depth: Optional[np.array] = None
+    # previous camera info
+    R_prev: Optional[np.array] = None
+    T_prev: Optional[np.array] = None
+    FovY_prev: Optional[np.array] = None
+    FovX_prev: Optional[np.array] = None
+    time_prev: Optional[float] = None
+    # next camera info
+    R_post: Optional[np.array] = None
+    T_post: Optional[np.array] = None
+    FovY_post: Optional[np.array] = None
+    FovX_post: Optional[np.array] = None
+    time_post: Optional[float] = None
+    # pseudo ground truth flow
     fwd_flow: Optional[np.array] = None
     fwd_flow_mask: Optional[np.array] = None
     bwd_flow: Optional[np.array] = None
     bwd_flow_mask: Optional[np.array] = None
+
 
 
 def getNerfppNorm(cam_info):

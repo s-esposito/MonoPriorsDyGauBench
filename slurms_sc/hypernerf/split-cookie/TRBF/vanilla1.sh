@@ -12,23 +12,32 @@
 #SBATCH --job-name hypernerf_split-cookie_TRBF_vanilla1
 #SBATCH --output vanilla1.out
 
+base="hypernerf/split-cookie/TRBF"
+name="vanilla1"
+variant="${base}/${name%?}1"
+output_path="./output/${base}"
+
+current_path=$pwd
+
+chmod -R 777 $current_path/${name}.out
+
+source /orion/u/yiqingl/anaconda3/etc/profile.d/conda.sh
 
 
-
-
-
-
-
-source ~/anaconda3/etc/profile.d/conda.sh
-
-cd /orion/u/yiqingl/GaussianDiff
 
 #conda create -p /orion/u/yiqingl/envs/gaufre python=3.9
 conda activate /orion/u/yiqingl/envs/gaufre
+
+
+export LD_LIBRARY_PATH=$CUDA_PREFIX/lib/python3.9/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+export TORCH_EXTENSIONS_DIR=/orion/u/yiqingl/.cache/torch_extensions
+
+
 export PATH=/usr/local/cuda-11.8/bin${PATH:+:${PATH}}$
-#export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
 export CUDA_HOME=/usr/local/cuda-11.8
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+
+cd /orion/u/yiqingl/GaussianDiff
 
 nvcc --version
 nvidia-smi
@@ -55,17 +64,18 @@ python -c "import torch; print(torch.cuda.is_available()); print(torch.__version
 python -c "import torch; print(torch.backends.cudnn.version())"
 
 
-ls /usr/local/cuda-11.8/lib64/
+#ls /usr/local/cuda-11.8/lib64/
 
 cat /usr/local/cuda-11.8/include/cudnn_version.h | grep CUDNN_MAJOR -A 2
 find /orion/u/yiqingl/envs/gaufre -name "libcudnn*"
 
-variant="hypernerf/split-cookie/TRBF/vanilla1"
 
-python main.py fit --config configs/${variant}.yaml
-python main.py test --config configs/${variant}.yaml  --ckpt_path  last #--print_config #--trainer.strategy FSDP #--print_config
+python main.py fit --config configs/${variant}.yaml --output ${output_path} --name "${base##*/}_$name" 
+python main.py test --config configs/${variant}.yaml  --ckpt_path  last --output ${output_path} --name "${base##*/}_$name" #--print_config #--trainer.strategy FSDP #--print_config
 
-rm -rf output/${variant}/wandb
+rm -rf "${output_path}/${name}/wandb"
+
+chmod -R 777 $current_path/${name}.out
 
 #cd ~/data/yliang51/Gaussian4D/data
 #pip install --upgrade --no-cache-dir gdown

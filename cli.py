@@ -51,7 +51,7 @@ class MyLightningCLI(LightningCLI):
         
         
         # build output path
-        output_path = os.path.join(config.output, config.name)
+        output_path = os.path.join(config.output, config.name.split("_")[1])
         os.makedirs(output_path, exist_ok=True)
         print("output path: {}".format(output_path))
 
