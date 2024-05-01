@@ -23,6 +23,7 @@ import heapq
 import time
 import imageio
 import numpy as np
+import shutil
 
 from .diff_gaussian_rasterization import GaussianRasterizationSettings4D, GaussianRasterizer4D
 from .diff_gaussian_rasterization_4dch9 import GaussianRasterizationSettings4D_ch9, GaussianRasterizer4D_ch9
@@ -105,6 +106,7 @@ class GS3d_flow(MyModelBaseClass):
         lpips_mode: Optional[str]="alex",
         post_act: Optional[bool]=True,
         rot_4d: Optional[bool]=False,
+        verbose: Optional[bool]=False,
         **kwargs
     ):
         super().__init__()
@@ -112,6 +114,7 @@ class GS3d_flow(MyModelBaseClass):
         # needs manual optimization
         self.automatic_optimization = False        
 
+        self.verbose = verbose
         self.log_image_interval = log_image_interval
         self.post_act = post_act
         self.iteration = 0
@@ -1832,15 +1835,22 @@ class GS3d_flow(MyModelBaseClass):
             test = imageio.imread(f"{self.logger.save_dir}/test/%05d.png" % i)
             flow_fwd = imageio.imread(f"{self.logger.save_dir}/flow/%05d_fwd.png" % i)
             flow_bwd = imageio.imread(f"{self.logger.save_dir}/flow/%05d_bwd.png" % i)
-
-            block = np.zeros_like(gt)
+            error = imageio.imread(f"{self.logger.save_dir}/error/%05d.png" % i)
+            
 
 
             result_top = np.concatenate([gt, test, depth], axis=1)
-            result_bottom = np.concatenate([block, flow_fwd, flow_bwd], axis=1)
+            result_bottom = np.concatenate([error, flow_fwd, flow_bwd], axis=1)
             result = np.concatenate([result_top, result_bottom], axis=0)
             writer.append_data(result)
         writer.close()
+        if not self.verbose:
+            shutil.rmtree(f"{self.logger.save_dir}/gt")
+            shutil.rmtree(f"{self.logger.save_dir}/depth")
+            shutil.rmtree(f"{self.logger.save_dir}/test")
+            shutil.rmtree(f"{self.logger.save_dir}/flow")
+            shutil.rmtree(f"{self.logger.save_dir}/error")
+            print("Directory removed successfully.")
             
         avg_render_time = sum(self.test_render_time) / (self.test_num_batches + 1e-16)
         avg_psnr = sum(self.test_psnr_total) / (self.test_num_batches + 1e-16)

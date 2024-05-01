@@ -11,7 +11,7 @@ import math
 
 exp_prefix="vanilla"
 # specify dataset output directory
-datasets=["iphone", "nerfies", "hypernerf", "nerfds", "dnerf"]
+datasets=["hypernerf", "iphone", "nerfies", "nerfds", "dnerf"]
 root_dir="../output"
 
 # specify experiments to track
@@ -47,6 +47,13 @@ else:
                 continue
             runs = api.runs(path=f"{project.name}")
             
+            # sort all runs by creation time
+            # runs[0]: earliest run
+            runs = [run for run in runs]
+            runs.sort(key=lambda run: run.created_at)
+            #assert False, [[run.created_at, run.state] for run in runs]
+            runs = [run for run in runs if run.state != "crashed"]
+            
             # for each scene
             for scene_dir in tqdm(scene_dirs):
                 scene = scene_dir.split("/")[-1]
@@ -76,31 +83,41 @@ else:
                         local_path = os.path.join(scene_dir, big_name, small_name+run_id)
                         
                         # skip this experiment if train run or test run is not found, or local path does not exist
-                        if (len(train_run) != 1) or (len(test_run) != 1) or (not os.path.isdir(local_path)):
+                        if (len(train_run) < 1) or (len(test_run) < 1) or (not os.path.isdir(local_path)):
                             print(["Exp incomplete: ", local_path, len(train_run), len(test_run), os.path.isdir(local_path)])
                             continue
                         if not os.path.exists(os.path.join(local_path, "test.txt")):
                             print("text.txt not found locally: ", os.path.join(local_path, "test.txt"))
-                            continue
+                            continue 
 
-                        train_run = train_run[0]
-                        test_run = test_run[0]
+                        # if there is one experiment that is killed during train or test and rerun, there would be 2 train, 0 test or 2 train, 1 test
+                        
+                        test_run = test_run[-1]
 
-                        # skip this experiment if psnr is lower than 10 (means crashed)
-                        test_psnr = float(test_run.history(keys=['test/avg_psnr'], pandas=False)[0]["test/avg_psnr"])
-                        test_ssim = float(test_run.history(keys=["test/avg_ssim"], pandas=False)[0]["test/avg_ssim"])
-                        test_msssim = float(test_run.history(keys=["test/avg_msssim"], pandas=False)[0]["test/avg_msssim"])
-                        test_lpips = float(test_run.history(keys=["test/avg_lpips"], pandas=False)[0]["test/avg_lpips"])
+                        
                         try:
+                            # skip this experiment if psnr is lower than 10 (means crashed)
+                            test_psnr = float(test_run.history(keys=['test/avg_psnr'], pandas=False)[0]["test/avg_psnr"])
+                            test_ssim = float(test_run.history(keys=["test/avg_ssim"], pandas=False)[0]["test/avg_ssim"])
+                            test_msssim = float(test_run.history(keys=["test/avg_msssim"], pandas=False)[0]["test/avg_msssim"])
+                            test_lpips = float(test_run.history(keys=["test/avg_lpips"], pandas=False)[0]["test/avg_lpips"])
                             test_render_time = float(test_run.history(keys=["test/avg_render_time"], pandas=False)[0]["test/avg_render_time"])
                         except:
                             with open(os.path.join(local_path, "test.txt"), "r") as f:
                                 line = f.readline()
                                 while line:
+                                    if line.startswith("Average PSNR:"):
+                                        test_psnr = float(line.strip().split(" ")[-1])
+                                    if line.startswith("Average SSIM:"):
+                                        test_ssim = float(line.strip().split(" ")[-1])
+                                    if line.startswith("Average MS-SSIM:"):
+                                        test_msssim = float(line.strip().split(" ")[-1])
+                                    if line.startswith("Average LPIPS:"):
+                                        test_lpips = float(line.strip().split(" ")[-1])
                                     if line.startswith("Average Render Time:"):
-                                        break
+                                        test_render_time = float(line.strip().split(" ")[-1])
                                     line = f.readline()
-                                test_render_time = float(line.strip().split(" ")[-1])
+                                
                         test_FPS = 1./test_render_time
                         exp["render_FPS"] = test_FPS
                         if (test_psnr < 10.) or math.isnan(test_psnr):
@@ -111,18 +128,27 @@ else:
                         exp["test_msssim"] = test_msssim
                         exp["test_lpips"] = test_lpips
 
-                        train_step = int(train_run.history(keys=["trainer/global_step"], pandas=False)[-1]["trainer/global_step"])
-                        if train_step == 29999:
-                            start_time = train_run.created_at
-                            end_time = train_run.heartbeatAt
-                            # Convert the start and end times to datetime objects
-                            start_datetime = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S')
-                            end_datetime = datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S')
-                            # Calculate the total training time
-                            total_time = end_datetime - start_datetime
-                            exp["train_time"] = total_time.total_seconds()
+                        train_iter = len(train_run) - 1
+                        while train_iter >= 0:
+                            if len(train_run[train_iter].history(keys=["trainer/global_step"], pandas=False)) >= 1:
+                                break
+                            train_iter -= 1
+                        if train_iter < 0:
+                            print(["No trainer record!", local_path, test_psnr])
                         else:
-                            print(["OOM!", local_path, train_step])
+                            train_run = train_run[train_iter]
+                            train_step = int(train_run.history(keys=["trainer/global_step"], pandas=False)[-1]["trainer/global_step"])
+                            if train_step == 29999:
+                                start_time = train_run.created_at
+                                end_time = train_run.heartbeatAt
+                                # Convert the start and end times to datetime objects
+                                start_datetime = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S')
+                                end_datetime = datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S')
+                                # Calculate the total training time
+                                total_time = end_datetime - start_datetime
+                                exp["train_time"] = total_time.total_seconds()
+                            else:
+                                print(["OOM!", local_path, train_step])
                         
                         exps.append(exp)
                     
