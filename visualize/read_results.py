@@ -10,8 +10,10 @@ import math
 
 
 exp_prefix="vanilla"
+
+sub_class = "all"
 # specify dataset output directory
-datasets=["hypernerf", "iphone", "nerfies", "nerfds", "dnerf"]
+datasets=["iphone", "nerfies", "hypernerf",  "nerfds", "dnerf"]
 root_dir="../output"
 
 # specify experiments to track
@@ -156,8 +158,10 @@ else:
                         #print(method)
                         if method not in result_final[dataset]:
                             result_final[dataset][method] = {}
+                        if scene not in result_final[dataset][method]:
+                            result_final[dataset][method][scene] = {}
                             for key in exps[0]:
-                                result_final[dataset][method][key] = []
+                                result_final[dataset][method][scene][key] = []
                     
                         # for each metric, get this dataset, scene, method's mean and variance
                         for key in exps[0]:
@@ -167,14 +171,32 @@ else:
                                 mean = sum(scene_result) / float(len(scene_result))
                                 # get variance metric
                                 variance = sum((x - mean) ** 2 for x in scene_result) / float(len(scene_result))
-                                result_final[dataset][method][key].append((mean, variance))
+                                result_final[dataset][method][scene][key].append((mean, variance))
                     else:
                         print("Empty Exps! ", dataset, scene, method)
+            
 
     # Open a file in binary write mode
     with open(f'{exp_prefix}.pkl', 'wb') as file:
         # Use pickle.dump() to save the nested dictionary to the file
         pickle.dump(result_final, file)
+
+
+for dataset in datasets:
+    dataset_dir = os.path.join(root_dir, dataset)
+    scenes=[os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
+    scene_dirs=[scene for scene in scenes if os.path.isdir(scene)]
+    for method in methods:
+        result_final[dataset][method]["all"] = {}
+        for scene_dir in scene_dirs:
+            scene = scene_dir.split("/")[-1]
+            if scene not in result_final[dataset][method]:
+                continue
+            for key in result_final[dataset][method][scene]:
+                if key not in result_final[dataset][method]["all"]:
+                    result_final[dataset][method]["all"][key] = []
+                result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][key]
+
 
 method_colors = ['steelblue', "red", "yellow", "green", "orange", "purple"]
 assert len(method_colors) >= len(methods)
@@ -187,25 +209,25 @@ for color, method in zip(method_colors[:len(methods)], methods):
 lims = {
     "render_FPS": (None, None),
     "test_lpips": (0.0, 0.8),
-    "test_msssim": (0.3, 1.0),
-    "test_psnr": (15., 50.),
-    "test_ssim": (0.3, 1.0),
-    "train_time": (None, None)
+    "test_msssim": (0.1, 1.0),
+    "test_psnr": (0., 50.),
+    "test_ssim": (0.1, 1.0),
+    "train_time": (None, None),
 }
 
 
 
-for key in result_final[datasets[0]][methods[0]]:
+for key in result_final[datasets[0]][methods[0]]["all"]:
     plt.rcParams['font.family'] = 'Arial'
     plt.rcParams['font.size'] = 12
     # Set up the figure and axes
     fig, ax = plt.subplots(figsize=(12, 6))  # Adjust the figure size as needed
     
-    lim = lims[key]
-    if lim[0] is not None:
-        ax.set_ylim(bottom=lim[0])
-    if lim[1] is not None:
-        ax.set_ylim(top=lim[1])
+    #lim = lims[key]
+    #if lim[0] is not None:
+    #    ax.set_ylim(bottom=lim[0])
+    #if lim[1] is not None:
+    #    ax.set_ylim(top=lim[1])
     bar_width = 0.8
     gap=2.0
     bar_positions = []
@@ -220,19 +242,25 @@ for key in result_final[datasets[0]][methods[0]]:
                 continue
             method_id = methods.index(method)        
             bar_positions.append(dataset_id * len(methods) + method_id + gap*(dataset_id+1.))
-            if (key not in result_final[dataset][method]) or (len(result_final[dataset][method][key]) == 0):
+            if (key not in result_final[dataset][method][sub_class]) or (len(result_final[dataset][method][sub_class][key]) == 0):
                 means.append(0)
                 variances.append(0)
             else:
                 # average the mean and variance across all scenes
-                mean = sum([x[0] for x in result_final[dataset][method][key]]) / float(len(result_final[dataset][method][key]))
-                variance = sum([x[1] for x in result_final[dataset][method][key]]) / float(len(result_final[dataset][method][key]))
+                mean = sum([x[0] for x in result_final[dataset][method][sub_class][key]]) / float(len(result_final[dataset][method][sub_class][key]))
+                variance = sum([x[1] for x in result_final[dataset][method][sub_class][key]]) / float(len(result_final[dataset][method][sub_class][key]))
                 means.append(mean)
                 variances.append(variance)
             bar_colors.append(method_colors[method_id])
+    # Adaptively set the y-axis limits based on the minimum and maximum values of the means
+    y_min = min(means)
+    y_max = max(means)
+    y_range = y_max - y_min
+    y_padding = y_range * 0.1  # Add 10% padding to the y-axis range
+    ax.set_ylim(bottom=max(y_min - y_padding, 0.), top=y_max + y_padding)
 
     ax.bar(bar_positions, means, width=bar_width, color=bar_colors, edgecolor='white', linewidth=1)
-    ax.errorbar(bar_positions, means, yerr=np.sqrt(variances), fmt='none', ecolor=error_color, capsize=10, elinewidth=1)
+    ax.errorbar(bar_positions, means, yerr=np.sqrt(variances), fmt='none', ecolor=error_color, capsize=5, elinewidth=1)
 
     # Remove the top and right spines
     ax.spines['top'].set_visible(False)
@@ -258,9 +286,87 @@ for key in result_final[datasets[0]][methods[0]]:
         plt.ylabel(key)
 
     plt.tight_layout()
-    plt.savefig(exp_prefix+"_"+key+".png")
+    plt.savefig(exp_prefix+"_"+sub_class+"_"+key+".png")
     plt.close(fig)
     
 
 
+for dataset in datasets:
+    dataset_dir = os.path.join(root_dir, dataset)
+    scenes=[os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
+    scene_dirs=[scene for scene in scenes if os.path.isdir(scene)]
+    common_scenes = [scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"]
 
+    for key in lims:
+        plt.rcParams['font.family'] = 'Arial'
+        plt.rcParams['font.size'] = 12
+
+        # Set up the figure and axes
+        fig, ax = plt.subplots(figsize=(2*len(scene_dirs), 6))  # Adjust the figure size as needed
+
+        #lim = lims[key]
+        #if lim[0] is not None:
+        #    ax.set_ylim(bottom=lim[0])
+        #if lim[1] is not None:
+        #    ax.set_ylim(top=lim[1])
+
+        bar_width = 0.8
+        gap = 2.0
+        bar_positions = []
+        means = []
+        variances = []
+        bar_colors = []
+
+        for scene in common_scenes:
+            scene_id = common_scenes.index(scene)
+            for method in methods:
+                if scene not in result_final[dataset][method]:
+                    continue  # Skip the scene if it's not present in the method's results
+
+                method_id = methods.index(method)
+                bar_positions.append(scene_id * len(methods) + method_id + gap * (scene_id + 1.))
+
+                if (key not in result_final[dataset][method][scene]) or (len(result_final[dataset][method][scene][key]) == 0):
+                    means.append(0)
+                    variances.append(0)
+                else:
+                    mean = sum([x[0] for x in result_final[dataset][method][scene][key]]) / float(len(result_final[dataset][method][scene][key]))
+                    variance = sum([x[1] for x in result_final[dataset][method][scene][key]]) / float(len(result_final[dataset][method][scene][key]))
+                    means.append(mean)
+                    variances.append(variance)
+
+                bar_colors.append(method_colors[method_id])
+        # Adaptively set the y-axis limits based on the minimum and maximum values of the means
+        y_min = min(means)
+        y_max = max(means)
+        y_range = y_max - y_min
+        y_padding = y_range * 0.1  # Add 10% padding to the y-axis range
+        ax.set_ylim(bottom=max(y_min - y_padding, 0.0), top=y_max + y_padding)
+
+        ax.bar(bar_positions, means, width=bar_width, color=bar_colors, edgecolor='white', linewidth=1)
+        ax.errorbar(bar_positions, means, yerr=np.sqrt(variances), fmt='none', ecolor=error_color, capsize=5, elinewidth=1)
+
+        # Remove the top and right spines
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        xticks_positions = [gap * (i + 1.) + (len(methods) / 2.) + i * len(methods) - 0.5 for i in range(len(common_scenes))]
+        ax.set_xticks(xticks_positions)
+        ax.set_xticklabels(common_scenes)
+
+        # Add vertical dotted lines to separate the partitions
+        for i in range(1, len(common_scenes)):
+            ax.axvline(gap * (i + 0.5) + len(methods) * i - 0.5, linestyle='--', color='gray', linewidth=0.5)
+
+        plt.legend(handles=pops)
+
+        if key == "train_time":
+            plt.ylabel(key + " (second)")
+        else:
+            plt.ylabel(key)
+
+        plt.title(f"{dataset}")
+
+        plt.tight_layout()
+        plt.savefig(exp_prefix + "_" + dataset + "_" + key + ".png")
+        plt.close(fig)
