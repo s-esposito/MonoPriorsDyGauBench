@@ -20,3 +20,4 @@ src/models/GS3d_flow_old.py
 **/*.egg-info/**
 visualize/*.pkl
 visualize/*.png
+**/*.pt
