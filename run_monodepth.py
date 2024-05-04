@@ -81,7 +81,26 @@ def write_depth(path, depth, bits=1, absolute_depth=False):
         path (str): filepath without extension
         depth (array): depth
     """
-    write_pfm(path + ".pfm", depth.astype(np.float32))
+    #write_pfm(path + ".pfm", depth.astype(np.float32))
+    if absolute_depth:
+        out = depth
+    else:
+        depth_min = depth.min()
+        depth_max = depth.max()
+
+        max_val = (2 ** (8 * bits)) - 1
+
+        if depth_max - depth_min > np.finfo("float").eps:
+            out = max_val * (depth - depth_min) / (depth_max - depth_min)
+        else:
+            out = np.zeros(depth.shape, dtype=depth.dtype)
+
+    if bits == 1:
+        cv2.imwrite(path + ".png", out.astype("uint8"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+    elif bits == 2:
+        cv2.imwrite(path + ".png", out.astype("uint16"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+
+    return
 
 def get_mask_pallete(npimg, dataset='detail'):
     """Get image color pallete for visualizing masks"""
@@ -255,34 +274,6 @@ def resize_depth(depth, width, height):
     return depth_resized
 
 
-def write_depth(path, depth, bits=1, absolute_depth=False):
-    """Write depth map to pfm and png file.
-
-    Args:
-        path (str): filepath without extension
-        depth (array): depth
-    """
-    write_pfm(path + ".pfm", depth.astype(np.float32))
-
-    if absolute_depth:
-        out = depth
-    else:
-        depth_min = depth.min()
-        depth_max = depth.max()
-
-        max_val = (2 ** (8 * bits)) - 1
-
-        if depth_max - depth_min > np.finfo("float").eps:
-            out = max_val * (depth - depth_min) / (depth_max - depth_min)
-        else:
-            out = np.zeros(depth.shape, dtype=depth.dtype)
-
-    if bits == 1:
-        cv2.imwrite(path + ".png", out.astype("uint8"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
-    elif bits == 2:
-        cv2.imwrite(path + ".png", out.astype("uint16"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
-
-    return
 
 
 def write_segm_img(path, image, labels, palette="detail", alpha=0.5):
@@ -469,13 +460,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-i", "--input_path", default="input", help="folder with input images"
+        "-i", "--input_path", required=True, help="folder with input images"
     )
 
     parser.add_argument(
         "-o",
         "--output_path",
-        default="output_monodepth",
+        required=True,
         help="folder for output images",
     )
 

@@ -23,18 +23,33 @@ from src.utils.general_utils import PILtoTorch
 # from scene.dataset_readers import 
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 
+
 def extract_prefix_and_id(image_name):
     # only contain direct file name
     image_name = image_name.split('/')[-1]
-    match = re.match(r'(.*)_(\d+)\.(png|jpg)', image_name)
+    
+    # Check for the format "name_id.extension"
+    match = re.match(r'(.*?)_(\d+)\.(png|jpg)', image_name)
     if match:
         prefix = match.group(1)
         image_id = int(match.group(2))
         return prefix, image_id
-    else:
-        return None, int(re.search(r'(\d+)\.(png|jpg)', image_name).group(1))
-
-
+    
+    # Check for the format "id_name.extension"
+    match = re.match(r'(\d+)_(.*?)\.(png|jpg)', image_name)
+    if match:
+        image_id = int(match.group(1))
+        prefix = match.group(2)
+        return prefix, image_id
+    
+    # If neither format matches, try to extract the integer ID from the beginning of the name
+    match = re.search(r'^(\d+)', image_name)
+    if match:
+        image_id = int(match.group(1))
+        return None, image_id
+    
+    # If no ID is found, return the entire name as the prefix and None as the ID
+    return os.path.splitext(image_name)[0], None
 
 class Load_hyper_data(Dataset):
     def __init__(self, 

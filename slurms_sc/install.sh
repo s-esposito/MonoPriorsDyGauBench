@@ -76,3 +76,6 @@ pip install imageio[ffmpeg]
 pip install imageio[pyav]
 
 pip install matplotlib
+
+
+pip install timm==0.4.5
