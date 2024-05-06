@@ -80,3 +80,5 @@ pip install ninja
 
 
 
+
+pip install timm==0.4.5

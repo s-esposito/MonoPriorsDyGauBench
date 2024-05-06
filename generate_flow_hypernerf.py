@@ -53,7 +53,7 @@ def compute_fwdbwd_mask(fwd_flow, bwd_flow):
 
     return fwd_mask, bwd_mask
 
-def run(args, images, input_path, output_path, output_img_path):
+def run(args, images, input_path, output_path):
     model = torch.nn.DataParallel(RAFT(args))
     model.load_state_dict(torch.load(args.model))
 
@@ -90,11 +90,11 @@ def run(args, images, input_path, output_path, output_img_path):
             np.savez(os.path.join(output_path, f'{image_name}_bwd.npz'), flow=flow_bwd, mask=mask_bwd)
 
             # Save flow_img
-            Image.fromarray(flow_viz.flow_to_image(flow_fwd)).save(os.path.join(output_img_path, f'{image_name}_fwd.png'))
-            Image.fromarray(flow_viz.flow_to_image(flow_bwd)).save(os.path.join(output_img_path, f'{image_name}_bwd.png'))
+            #Image.fromarray(flow_viz.flow_to_image(flow_fwd)).save(os.path.join(output_img_path, f'{image_name}_fwd.png'))
+            #Image.fromarray(flow_viz.flow_to_image(flow_bwd)).save(os.path.join(output_img_path, f'{image_name}_bwd.png'))
 
-            Image.fromarray(mask_fwd).save(os.path.join(output_img_path, f'{image_name}_fwd_mask.png'))
-            Image.fromarray(mask_bwd).save(os.path.join(output_img_path, f'{image_name}_bwd_mask.png'))
+            #Image.fromarray(mask_fwd).save(os.path.join(output_img_path, f'{image_name}_fwd_mask.png'))
+            #Image.fromarray(mask_bwd).save(os.path.join(output_img_path, f'{image_name}_bwd_mask.png'))
 
 
 if __name__ == '__main__':
@@ -108,9 +108,9 @@ if __name__ == '__main__':
 
     input_path = os.path.join(args.dataset_path, args.input_dir)
     output_path = os.path.join(args.dataset_path, f'{args.input_dir}_flow')
-    output_img_path = os.path.join(args.dataset_path, f'{args.input_dir}_flow_png')
+    #output_img_path = os.path.join(args.dataset_path, f'{args.input_dir}_flow_png')
     create_dir(output_path)
-    create_dir(output_img_path)
+    #create_dir(output_img_path)
 
     left_images = glob.glob(os.path.join(input_path, '*left*.png')) + glob.glob(os.path.join(input_path, '*left*.jpg'))
     right_images = glob.glob(os.path.join(input_path, '*right*.png')) + glob.glob(os.path.join(input_path, '*right*.jpg'))
@@ -119,9 +119,9 @@ if __name__ == '__main__':
     #assert False, [left_images[:5], right_images[:5], rest_images[:5]]
     #assert False, input_path#images
     if len(left_images):
-        run(args, left_images, input_path, output_path, output_img_path)
+        run(args, left_images, input_path, output_path)
     if len(right_images):
-        run(args, right_images, input_path, output_path, output_img_path)
+        run(args, right_images, input_path, output_path)
     if len(rest_images):
-        run(args, rest_images, input_path, output_path, output_img_path)
+        run(args, rest_images, input_path, output_path)
     
