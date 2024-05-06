@@ -13,6 +13,7 @@ from typing import NamedTuple, Optional
 from torch.utils.data import DataLoader
 import torch
 import torch.nn.functional as F
+import cv2
 
 def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png", downsample=1,
     load_flow=False):
@@ -38,11 +39,18 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
             R[:,0] = -R[:,0]
             T = -matrix[:3, 3]
 
-            image_path = os.path.join(path, cam_name)
-            #print(path, cam_name, image_path)
+            
             image_name = Path(cam_name).stem
-            #print(path, file_path, cam_name, image_path)
             image = Image.open(cam_name)
+
+            depth_path = os.path.dirname(cam_name) + "_midasdepth"
+            #depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
+            if os.path.exists(os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1])):
+                depth = cv2.imread(os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]), -1) / (2 ** 16 - 1)
+                depth = depth.astype(float)
+                depth = torch.from_numpy(depth.copy())
+            else:
+                depth = None
 
 
             im_data = np.array(image.convert("RGBA"))
@@ -68,8 +76,8 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
 
 
             cam_infos.append(CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
-                            image_path=image_path, image_name=image_name, width=width, height=height,
-                            time=time))
+                            image_path=cam_name, image_name=image_name, width=width, height=height,
+                            time=time, depth=depth))
             
 
 
@@ -100,8 +108,7 @@ def readCamerasFromTransforms_flow(path, transformsfile, white_background, exten
                 assert previous_time <= time, "Breaks the time ascending assumption!"
             previous_time = time
 
-            image_path = os.path.join(path, cam_name)
-            #print(path, cam_name, image_path)
+            
             image_name = Path(cam_name).stem
             frame_dicts[image_name]=idx # "r_000": certain id in frames
 
@@ -120,11 +127,19 @@ def readCamerasFromTransforms_flow(path, transformsfile, white_background, exten
             R[:,0] = -R[:,0]
             T = -matrix[:3, 3]
 
-            image_path = os.path.join(path, cam_name)
-            #print(path, cam_name, image_path)
+            
             image_name = Path(cam_name).stem
-            #print(path, file_path, cam_name, image_path)
             image = Image.open(cam_name)
+
+            depth_path = os.path.dirname(cam_name) + "_midasdepth"
+            #depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
+            print(cam_name, image_name, depth_path, os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]))
+            if os.path.exists(os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1])):
+                depth = cv2.imread(os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]), -1) / (2 ** 16 - 1)
+                depth = depth.astype(float)
+                depth = torch.from_numpy(depth.copy())
+            else:
+                depth = None
 
 
             im_data = np.array(image.convert("RGBA"))
@@ -239,7 +254,8 @@ def readCamerasFromTransforms_flow(path, transformsfile, white_background, exten
                 fwd_flow_mask = F.interpolate(fwd_flow_mask.unsqueeze(0).unsqueeze(0).float(), size=(new_height, new_width), mode='nearest').squeeze(0).squeeze(0).bool()
             
             cam_infos.append(CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
-                              image_path=image_path, image_name=image_name, width=new_width, height=new_height, time=time,
+                              image_path=cam_name, image_name=image_name, width=new_width, height=new_height, time=time,
+                              depth=depth,
                               R_prev=R_prev, T_prev=T_prev, FovY_prev=FovY_prev, FovX_prev=FovX_prev, time_prev=time_prev,
                               R_post=R_post, T_post=T_post, FovY_post=FovY_post, FovX_post=FovX_post, time_post=time_post,
                               fwd_flow=fwd_flow, fwd_flow_mask=fwd_flow_mask,

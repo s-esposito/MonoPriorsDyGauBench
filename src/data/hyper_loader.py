@@ -261,9 +261,9 @@ class Load_hyper_data(Dataset):
         image_name = self.all_img[idx].split("/")[-1]
 
         depth_path = image_path + "_midasdepth"
-        depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
-        if os.path.exists(os.path.join(depth_path, depth_name)):
-            depth = cv.imread(os.path.join(depth_path, depth_name), -1) / (2 ** 16 - 1)
+        #depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
+        if os.path.exists(os.path.join(depth_path, image_name)):
+            depth = cv.imread(os.path.join(depth_path, image_name), -1) / (2 ** 16 - 1)
             depth = depth.astype(float)
             depth = torch.from_numpy(depth.copy())
         else:
@@ -322,9 +322,9 @@ class Load_hyper_data(Dataset):
         image_name = self.all_img[idx].split("/")[-1]
 
         depth_path = image_path + "_midasdepth"
-        depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
-        if os.path.exists(os.path.join(depth_path, depth_name)):
-            depth = cv.imread(os.path.join(depth_path, depth_name), -1) / (2 ** 16 - 1)
+        #depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
+        if os.path.exists(os.path.join(depth_path, image_name)):
+            depth = cv.imread(os.path.join(depth_path, image_name), -1) / (2 ** 16 - 1)
             depth = depth.astype(float)
             depth = torch.from_numpy(depth.copy())
         else:
