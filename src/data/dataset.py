@@ -99,7 +99,6 @@ class FourDGSdataset(Dataset):
                 "full_proj_transform": camera.full_proj_transform,
                 "camera_center": camera.camera_center,
                 "original_image": camera.original_image,
-                "depth": camera.depth,
                 #'rayo': camera.rayo,
                 #"rayd": camera.rayd,
                 "rays": camera.rays,
@@ -132,13 +131,15 @@ class FourDGSdataset(Dataset):
                 "fwd_flow_mask": camera.fwd_flow_mask,
                 "bwd_flow": camera.bwd_flow, 
                 "bwd_flow_mask": camera.bwd_flow_mask,
-                "depth": camera.depth,
+                #"depth": camera.depth,
                 #'rayo': camera.rayo,
                 #"rayd": camera.rayd,
                 "rays": camera.rays,
                 "image_name": camera.image_name,
                 "split": self.split
             }
+        if camera.depth is not None:
+            result["depth"] = camera.depth
         '''
         if fwd_flow is not None:
             #if (fwd_flow_mask is None) or (bwd_flow_mask is None) or (bwd_flow is None):
