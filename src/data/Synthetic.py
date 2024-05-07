@@ -133,7 +133,7 @@ def readCamerasFromTransforms_flow(path, transformsfile, white_background, exten
 
             depth_path = os.path.dirname(cam_name) + "_midasdepth"
             #depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
-            print(cam_name, image_name, depth_path, os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]))
+            #print(cam_name, image_name, depth_path, os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]))
             if os.path.exists(os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1])):
                 depth = cv2.imread(os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]), -1) / (2 ** 16 - 1)
                 depth = depth.astype(float)
@@ -165,11 +165,17 @@ def readCamerasFromTransforms_flow(path, transformsfile, white_background, exten
 
 
             prefix, idx = image_name.split("_")
-            assert len(idx) == 3, "assume three-digit number"
-            idx = int(idx)
+            if len(idx) == 3:
+                #    assert False, [image_name, prefix, idx]
+                #assert len(idx) == 3, "assume three-digit number"
+                idx = int(idx)
 
-            idx_prev = f"{prefix}_{idx-1:03d}"
-            idx_post = f"{prefix}_{idx+1:03d}"
+                idx_prev = f"{prefix}_{idx-1:03d}"
+                idx_post = f"{prefix}_{idx+1:03d}"
+            else:
+                idx = int(idx)
+                idx_prev = f"{prefix}_{idx-1}"
+                idx_post = f"{prefix}_{idx+1}"
             #assert False, [idx_prev, idx_post]
 
             # cam_name: full path to rgb image

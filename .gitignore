@@ -21,3 +21,6 @@ src/models/GS3d_flow_old.py
 visualize/*.pkl
 visualize/*.png
 **/*.pt
+*.png
+check_run.sh
+
