@@ -1138,7 +1138,7 @@ class GS3d_flow(MyModelBaseClass):
 
                 # Project the points at time onto the image plane of the camera at time
                 points = result["means3D"]
-                viewmatrix = batch["world_view_transform"][idx]
+                viewmatrix = batch["world_view_transform"][idx].transpose(0, 1)
                 points_camera = torch.matmul(viewmatrix[:3, :3], points.T).T + viewmatrix[:3, 3]
                 points_uv = torch.zeros_like(points_camera[:, :3])
                 points_uv[:, 0] = points_camera[:, 0] * focal_x / points_camera[:, 2]
@@ -1149,7 +1149,7 @@ class GS3d_flow(MyModelBaseClass):
                 # Project the points at time_prev onto the image plane of the camera at time
                 if batch["time_prev"][idx] >= 0.0:
                     points_prev = result["means3D_bwd"]
-                    viewmatrix_prev = batch["world_view_transform_prev"][idx]#.cuda()
+                    viewmatrix_prev = batch["world_view_transform_prev"][idx].transpose(0, 1)#.cuda()
                     points_prev_camera = torch.matmul(viewmatrix_prev[:3, :3], points_prev.T).T + viewmatrix_prev[:3, 3]
                     points_prev_uv = torch.zeros_like(points_prev_camera[:, :3])
                     points_prev_uv[:, 0] = points_prev_camera[:, 0] * focal_x / points_prev_camera[:, 2]
@@ -1170,7 +1170,7 @@ class GS3d_flow(MyModelBaseClass):
 
                 if batch["time_post"][idx] >= 0.0:
                     points_post = result["means3D_fwd"]
-                    viewmatrix_post = batch["world_view_transform_post"][idx]
+                    viewmatrix_post = batch["world_view_transform_post"][idx].transpose(0, 1)
                     points_post_camera = torch.matmul(viewmatrix_post[:3, :3], points_post.T).T + viewmatrix_post[:3, 3]
                     points_post_uv = torch.zeros_like(points_post_camera[:, :3])
                     points_post_uv[:, 0] = points_post_camera[:, 0] * focal_x / points_post_camera[:, 2]

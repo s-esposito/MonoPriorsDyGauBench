@@ -62,8 +62,12 @@ def run(args, images, input_path, output_path):
     model.eval()
 
     with torch.no_grad():
-
-        images = sorted(images)
+        if args.dataset_path.endswith("lego"):
+            for item in images:
+                assert item.split("/")[-1].startswith("r_")
+            images.sort(key=lambda item: int(item.split("/")[-1][2:-4]))
+        else:
+            images = sorted(images)
         #i = len(images)-2
         #assert False, [len(images), images[0], images[1], images[i], images[i+1]]
         for i in range(len(images) - 1):
@@ -112,10 +116,15 @@ if __name__ == '__main__':
     create_dir(output_path)
     #create_dir(output_img_path)
 
+    
+
+
     left_images = glob.glob(os.path.join(input_path, '*left*.png')) + glob.glob(os.path.join(input_path, '*left*.jpg'))
     right_images = glob.glob(os.path.join(input_path, '*right*.png')) + glob.glob(os.path.join(input_path, '*right*.jpg'))
     rest_images = [os.path.join(input_path, img) for img in os.listdir(input_path) if (img.endswith('.png') or img.endswith('.jpg'))]    
     rest_images = [img for img in rest_images if img not in left_images and img not in right_images]
+    
+    #assert False, rest_images
     #assert False, [left_images[:5], right_images[:5], rest_images[:5]]
     #assert False, input_path#images
     if len(left_images):
