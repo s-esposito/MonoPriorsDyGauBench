@@ -7,6 +7,9 @@ slurms/**/*.sh
 slurms/*.out
 slurms/**/*.out
 slurms/wandb/*
+*.pyc
+*.out
+*.code-workspace
 slurms/**/wandb/*
 slurms_sc/*.sh
 slurms_sc/**/*.sh
