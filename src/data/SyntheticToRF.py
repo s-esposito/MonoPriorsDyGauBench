@@ -15,45 +15,42 @@ from torch.utils.data import DataLoader
 import torch
 import cv2
 
-def readTorfData(path, downsample=1):
+def readTorfData(path, downsample=1, nvs=False):
     cam_infos = []
-    color_files = os.listdir(osp.join(path, "color"))
+    color_files = os.listdir(osp.join(path, "color" + ("_nvs" if nvs else "")))
     frames = len(color_files)
-    extrinsics = np.load(osp.join(path, "cams", "color_extrinsics.npy"))
-    intrinsics = np.load(osp.join(path, "cams", "color_intrinsics.npy"))
+    extrinsics = np.load(osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_extrinsics.npy"))
+    intrinsics = np.load(osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_intrinsics.npy"))
     # TODO(mokunev): remove the hardcoded resolution (althought it's the same for all sequences)
-    fovx = focal2fov(intrinsics[0, 0], 640)
-    fovy = focal2fov(intrinsics[1, 1], 480)
-    for idx, fname in enumerate(frames):
+    fovx = focal2fov(intrinsics[0, 0], 240)
+    fovy = focal2fov(intrinsics[1, 1], 320)
+    for idx, fname in enumerate(color_files):
         cam_name = fname
         time = idx / frames # 0 ~ 1
         
-        # ToRF uses 4x-dilated scale for the color time moments
-        transform_matrix = extrinsics[idx * 4]
-        
-        # TODO(mokunev): check that our extrinsics format matches the expected one
-        # Leaving as is for now since the camera is static in most sequences anyways
-        matrix = np.linalg.inv(np.array(transform_matrix))
-        R = -np.transpose(matrix[:3,:3])
-        R[:,0] = -R[:,0]
-        T = -matrix[:3, 3]
+        transform_matrix = extrinsics[idx]
 
-        image_path = osp.join(path, cam_name)
+        # The extrinsics in the dataset are already converted from Blender to the opencv convention
+        R = np.transpose(transform_matrix[:3, :3])
+        T = transform_matrix[:3, 3]
+        
+        image_path = osp.join(path, "color" + ("_nvs" if nvs else ""), cam_name)
         image_name = Path(cam_name).stem
 
         # Images are [0, 1] normalized
         image = np.load(image_path)
-        image = (image * 255).astype(np.uint8)
-        # Swap the axes to match the expected format
-        image = np.swapaxes(image, 0, 1)
 
         # Resize the image to the desired resolution using opencv
         w, h = image.shape[:2]
+        image = image.swapaxes(0, 1)
         image = cv2.resize(image, (w // downsample, h // downsample), interpolation=cv2.INTER_LINEAR)
         
         FovY = fovy 
         FovX = fovx
         
+        # Permute the dimensions to (ch, w, h)
+        image = np.transpose(image, (2, 1, 0))
+
         # Convert the numpy image to a torch tensor
         image = torch.from_numpy(image).float()
         
@@ -69,15 +66,20 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
         eval: bool,
         ratio: float,
         white_background: bool,
+        num_pts_ratio: float,
+        num_pts: int,
+        M: Optional[int] = 0,
         batch_size: Optional[int]=1,
+        seed: Optional[int]=None,
         ) -> None:
-        super().__init__()
+        super().__init__(seed=seed)
 
         self.datadir = datadir
         self.eval = eval
         self.ratio = ratio
         self.white_background = white_background
         self.batch_size = batch_size
+        self.M = M
         self.save_hyperparameters()
 
     def setup(self, stage: str):
@@ -88,27 +90,30 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
         print("Reading Training Transforms")
         self.train_cam_infos = readTorfData(path, downsample=downsample)
         print("Reading Test Transforms")
-        # TODO(mokunev): ToRF dataset doesn't have the test data, so we'll just use the training data for now
-        self.test_cam_infos = self.train_cam_infos
+        self.test_cam_infos = readTorfData(path, downsample=downsample, nvs=True)
     
         nerf_normalization = getNerfppNorm(self.train_cam_infos)
         
         num_pts = 100_000
         print(f"Generating random point cloud ({num_pts})...")
         # We create random points inside the bounds of the synthetic Blender scenes
-        # TODO(mokunev): make sure the scene bounds are correct
-        xyz = np.random.random((num_pts, 3)) * 2.6 - 1.3
+        xyz = 5 * (np.random.random((num_pts, 3)) * 2.6 - 1.3)
         shs = np.random.random((num_pts, 3)) / 255.0
 
-        self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)))
+        times = [cam_info.time for cam_info in self.train_cam_infos]
+        times = np.unique(times)
+        assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]" 
+        self.time_interval = 1. / float(len(times))
+        
+        self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)), 
+                                   times=np.linspace(0., 1., self.M))
 
 
         self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train")
         self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test")
         
-        # TODO(mokunev): all the images are used for train and test
-        is_val_train = [True for _ in range(len(self.train_cam_infos))]
-        is_val_test = [True for _ in range(len(self.test_cam_infos))]
+        is_val_train = [idx for idx in range(len(self.train_cam_infos))]
+        is_val_test = [idx for idx in range(len(self.test_cam_infos))]
        
         val_1 = torch.utils.data.Subset(self.train_cameras, is_val_train)
         val_2 = torch.utils.data.Subset(self.test_cameras, is_val_test)
@@ -124,18 +129,19 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
     def train_dataloader(self):
         return InfiniteDataLoader(DataLoader(
             self.train_cameras,
-            batch_size=self.batch_size
+            batch_size=self.batch_size,
+            shuffle=True,
         ))
     
     def val_dataloader(self):
         return DataLoader(
             self.val_cameras,
-            batch_size=self.batch_size
+            batch_size=1
         )
     def test_dataloader(self):
         return DataLoader(
             self.test_cameras,
-            batch_size=self.batch_size
+            batch_size=1
         )
 
 
