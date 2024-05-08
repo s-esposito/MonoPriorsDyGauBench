@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 
 def visualize_lines_to_lookat(points, viewdirs, lookat_point, lookat_train, lookat_test, output_path, N_train):
-    endpoints = -viewdirs + points # look at negative direction of z-axis
+    endpoints = viewdirs + points # look at negative direction of z-axis
     fig = plt.figure(figsize=(8, 6))
     num_points=points.shape[0]
     
@@ -293,6 +293,7 @@ def run(train_dataset, test_dataset, ratio, fps):
 
     # visualize to a figure
     save_path = os.path.join(input_path, "lookats.png")
+    #assert False, [positions.shape, positions_train.shape[0]]
     visualize_lines_to_lookat(positions, optical_axes, lookat.reshape(-1), lookat_train.reshape(-1), lookat_test.reshape(-1), save_path, positions_train.shape[0])
 
     omega = get_omega(lookat, positions, fps)
@@ -318,10 +319,26 @@ if __name__ == "__main__":
     
 
     datasets = {
+        "iphone": {
+            "apple": (0.5, 30),
+            "backpack": (0.5, 30), 
+            "block": (0.5, 30), 
+            "creeper": (0.5, 30), 
+            "handwavy": (0.5, 30), 
+            "haru-sit": (0.5, 60), 
+            "mochi-high-five": (0.5, 60), 
+            "paper-windmill": (0.5, 30), 
+            "pillow": (0.5, 30), 
+            "space-out": (0.5, 30), 
+            "spin": (0.5, 30), 
+            "sriracha-tree": (0.5, 30), 
+            "teddy": (0.5, 30), 
+            "wheel": (0.5, 30),
+        },
         "nerfies":{
-            "tail": (0.5, 15),
             "broom": (0.5, 15), 
             "curls": (0.25, 5),
+            "tail": (0.5, 15),
             "toby-sit": (0.5, 15)
         },
         "hypernerf": {
@@ -343,22 +360,7 @@ if __name__ == "__main__":
             "vrig-chicken": (0.5, 15), 
             "vrig-peel-banana": (0.5, 15),
         },
-        "iphone": {
-            "apple": (0.5, 30),
-            "backpack": (0.5, 30), 
-            "block": (0.5, 30), 
-            "creeper": (0.5, 30), 
-            "handwavy": (0.5, 30), 
-            "haru-sit": (0.5, 60), 
-            "mochi-high-five": (0.5, 60), 
-            "paper-windmill": (0.5, 30), 
-            "pillow": (0.5, 30), 
-            "space-out": (0.5, 30), 
-            "spin": (0.5, 30), 
-            "sriracha-tree": (0.5, 30), 
-            "teddy": (0.5, 30), 
-            "wheel": (0.5, 30)
-        },
+        
         "nerfds":{
             "as": (1.0, 30),
             "basin": (1.0, 30),
@@ -431,10 +433,13 @@ if __name__ == "__main__":
             print("Loaded dataset!")
             try:
                 omega_test, omega_train, omega = run(train_dataset, test_dataset, ratio, fps)
-                content = " & " + scene + " & ? & " + str(omega_test) + " & " + str(omega_train) +  " & " + str(omega) + " \\\\"
-            
+                content = " & " + scene + " & ? & " + "%.2f" % round(omega_test, 2) + " & " + "%.2f" % round(omega_train, 2) +  " & " + "%.2f" % round(omega, 2) + " \\\\"
+        
                 print(content)
                 with open("emf.txt", "a") as f:
                     f.write(content+"\n")
             except Exception as error:
                 print(error)
+            
+            
+            #assert False, "Pause"

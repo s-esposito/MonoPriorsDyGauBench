@@ -3,7 +3,7 @@
 #SBATCH -n 1
 #SBATCH --mem=16G
 #SBATCH -t 48:00:00
-#SBATCH --partition=3090-gcondo --gres=gpu:1
+#SBATCH --partition=cs-all-gcondo --gres=gpu:1
 #SBATCH --job-name debug_effgs_flow
 #SBATCH --output debug_effgs_flow.out
 

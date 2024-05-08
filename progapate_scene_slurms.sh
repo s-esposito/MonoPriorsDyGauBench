@@ -2,9 +2,9 @@
 
 # Array of subfolders
 #subfolders=("bouncingballs" "hellwarrior" "hook" "jumpingjacks" "lego" "mutant" "standup" "trex")
-subfolders=("aleks-teapot" "americano" "broom2" "chickchicken" "cross-hands1" "cut-lemon1" "espresso" "hand1-dense-v2" "keyboard" "oven-mitts" "slice-banana" "split-cookie" "tamping" "torchocolate" "vrig-3dprinter" "vrig-chicken" "vrig-peel-banana")
+#subfolders=("aleks-teapot" "americano" "broom2" "chickchicken" "cross-hands1" "cut-lemon1" "espresso" "hand1-dense-v2" "keyboard" "oven-mitts" "slice-banana" "split-cookie" "tamping" "torchocolate" "vrig-3dprinter" "vrig-chicken" "vrig-peel-banana")
 #subfolders=("apple" "backpack" "block" "creeper" "handwavy" "haru-sit" "mochi-high-five" "paper-windmill" "pillow" "space-out" "spin" "sriracha-tree" "teddy" "wheel") 
-
+subfolders=("broom" "curls" "tail" "toby-sit")
 
 # Array of files to copy
 files=("AST.sh" "decoder.sh" "noAST.sh")
@@ -16,10 +16,10 @@ do
     for file in "${files[@]}"
     do
         # Check if the current subfolder is not "trex"
-        if [ "$subfolder" != "aleks-teapot" ]; then
+        if [ "$subfolder" != "broom" ]; then
             
             # Copy the file to the destination subfolder and replace "trex" with the subfolder name
-            sed "s/aleks-teapot/$subfolder/g" "slurms/hypernerf/aleks-teapot/$file" > "slurms/hypernerf/$subfolder/$file"
+            sed "s/broom/$subfolder/g" "slurms/nerfies/broom/$file" > "slurms/nerfies/$subfolder/$file"
         fi
     done
 done

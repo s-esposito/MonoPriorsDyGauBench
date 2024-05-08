@@ -85,19 +85,20 @@ else:
                         local_path = os.path.join(scene_dir, big_name, small_name+run_id)
                         
                         # skip this experiment if train run or test run is not found, or local path does not exist
-                        if (len(train_run) < 1) or (len(test_run) < 1) or (not os.path.isdir(local_path)):
-                            print(["Exp incomplete: ", local_path, len(train_run), len(test_run), os.path.isdir(local_path)])
-                            continue
+                        #if (len(train_run) < 1) or (len(test_run) < 1) or (not os.path.isdir(local_path)):
+                        #    print(["Exp incomplete: ", local_path, len(train_run), len(test_run), os.path.isdir(local_path)])
+                        #    continue
                         if not os.path.exists(os.path.join(local_path, "test.txt")):
                             print("text.txt not found locally: ", os.path.join(local_path, "test.txt"))
                             continue 
 
                         # if there is one experiment that is killed during train or test and rerun, there would be 2 train, 0 test or 2 train, 1 test
                         
-                        test_run = test_run[-1]
+                        
 
                         
                         try:
+                            test_run = test_run[-1]
                             # skip this experiment if psnr is lower than 10 (means crashed)
                             test_psnr = float(test_run.history(keys=['test/avg_psnr'], pandas=False)[0]["test/avg_psnr"])
                             test_ssim = float(test_run.history(keys=["test/avg_ssim"], pandas=False)[0]["test/avg_ssim"])
