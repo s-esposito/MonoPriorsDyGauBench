@@ -247,7 +247,7 @@ def tringulate_rays(
 
 
 
-def run(train_dataset, test_dataset, ratio, fps):
+def run(train_dataset, test_dataset, ratio, fps, negative_zaxis=True):
     
 
 
@@ -283,13 +283,22 @@ def run(train_dataset, test_dataset, ratio, fps):
     
     
     ############ step 3: get optical_axes and compute global lookat point #####################
-    optical_axes = orientations[:, 2, :] # N, 3
-    lookat = tringulate_rays(positions, optical_axes)  
-    optical_axes_test = orientations_test[:, 2, :]
-    lookat_test = tringulate_rays(positions_test, optical_axes_test)
-    optical_axes_train = orientations_train[:, 2, :]
-    lookat_train = tringulate_rays(positions_train, optical_axes_train)
+    if negative_zaxis:
+        optical_axes = -orientations[:, 2, :] # N, 3
+        lookat = tringulate_rays(positions, optical_axes)  
+        optical_axes_test = -orientations_test[:, 2, :]
+        lookat_test = tringulate_rays(positions_test, optical_axes_test)
+        optical_axes_train = -orientations_train[:, 2, :]
+        lookat_train = tringulate_rays(positions_train, optical_axes_train)
+    else:
+        optical_axes = orientations[:, 2, :] # N, 3
+        lookat = tringulate_rays(positions, optical_axes)  
+        optical_axes_test = orientations_test[:, 2, :]
+        lookat_test = tringulate_rays(positions_test, optical_axes_test)
+        optical_axes_train = orientations_train[:, 2, :]
+        lookat_train = tringulate_rays(positions_train, optical_axes_train)
     
+
 
     # visualize to a figure
     save_path = os.path.join(input_path, "lookats.png")
@@ -387,6 +396,10 @@ if __name__ == "__main__":
     except:
         pass
     for dataset in datasets:
+        if dataset in ["dnerf", "iphone"]:
+            negative_zaxis = False
+        else:
+            negative_zaxis = True
         for scene in tqdm(datasets[dataset]):
             ratio, fps = datasets[dataset][scene]
             input_path = os.path.join("data", dataset, scene)
@@ -432,7 +445,7 @@ if __name__ == "__main__":
             '''
             print("Loaded dataset!")
             try:
-                omega_test, omega_train, omega = run(train_dataset, test_dataset, ratio, fps)
+                omega_test, omega_train, omega = run(train_dataset, test_dataset, ratio, fps, negative_zaxis=negative_zaxis)
                 content = " & " + scene + " & ? & " + "%.2f" % round(omega_test, 2) + " & " + "%.2f" % round(omega_train, 2) +  " & " + "%.2f" % round(omega, 2) + " \\\\"
         
                 print(content)

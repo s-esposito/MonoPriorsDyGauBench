@@ -7,7 +7,8 @@
 subfolders=("broom" "curls" "tail" "toby-sit")
 
 # Array of files to copy
-files=("AST.sh" "decoder.sh" "noAST.sh")
+#files=("AST.sh" "decoder.sh" "noAST.sh")
+files=("vanilla.sh" "nodecoder.sh")
 
 # Iterate over each subfolder
 for subfolder in "${subfolders[@]}"
