@@ -349,6 +349,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         self.pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((xyz.shape[0], 3)),
             times=np.linspace(0., 1., self.M))
 
+        self.num_static = len(xyz)//2
 
         #scene_info = SceneInfo(point_cloud=pcd,
         #                   train_cameras=train_cam_infos,
