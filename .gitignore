@@ -26,4 +26,4 @@ visualize/*.png
 **/*.pt
 *.png
 check_run.sh
-
+download_from_orion.sh

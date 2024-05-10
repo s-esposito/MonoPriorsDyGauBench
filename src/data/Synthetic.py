@@ -298,6 +298,8 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         self.batch_size = batch_size
         self.M = M
         self.load_flow = load_flow
+        self.num_pts = num_pts
+        self.num_pts_ratio = num_pts_ratio
         self.save_hyperparameters()
 
 
