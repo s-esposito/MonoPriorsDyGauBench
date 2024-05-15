@@ -79,3 +79,5 @@ pip install matplotlib
 
 
 pip install timm==0.4.5
+
+pip install open3d==0.16.0

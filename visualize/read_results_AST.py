@@ -10,7 +10,7 @@ import math
 import matplotlib.cm as cm
 import multiprocessing
 
-exp_prefix="batch"
+exp_prefix="AST"
 os.makedirs(exp_prefix, exist_ok=True)
 
 
@@ -24,11 +24,11 @@ tineuvox_root_dir="../../TiNeuVox/logs"
 # specify experiments to track
 methods=[
         "TiNeuVox/vanilla",
-        "Curve/vanilla", "Curve/twobatch", "Curve/fourbatch", 
-        "FourDim/onebatch", "FourDim/twobatch", "FourDim/vanilla", 
-        "HexPlane/onebatch", "HexPlane/vanilla", "HexPlane/fourbatch",
-        "MLP/vanilla", "MLP/twobatch", "MLP/fourbatch", 
-        "TRBF/onebatch", "TRBF/nodecoder", "TRBF/fourbatch",
+        "Curve/vanilla", "Curve/AST",
+        "FourDim/vanilla", "FourDim/AST", 
+        "HexPlane/vanilla", "HexPlane/AST",
+        "MLP/noAST", "MLP/vanilla", 
+        "TRBF/nodecoder", "TRBF/AST",
         "TRBF/vanilla"
         ]
 #methods=["Curve/vanilla", "FourDim/vanilla", "HexPlane/vanilla", "MLP/vanilla", "TRBF/nodecoder", "TRBF/vanilla"]
@@ -275,11 +275,11 @@ for dataset in datasets:
 '''
 
 method_colors = [color for color in cm.pink(np.linspace(0.2, 0.8, 1))] +\
-    [color for color in cm.Blues(np.linspace(0.2, 0.8, 3))] +\
-    [color for color in cm.Reds(np.linspace(0.2, 0.8, 3))] +\
-    [color for color in cm.Purples(np.linspace(0.2, 0.8, 3))] +\
-    [color for color in cm.Greens(np.linspace(0.2, 0.8, 3))] +\
-    [color for color in cm.Oranges(np.linspace(0.2, 0.8, 3))] +\
+    [color for color in cm.Blues(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Reds(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Purples(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Greens(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Oranges(np.linspace(0.2, 0.8, 2))] +\
     [color for color in cm.Grays(np.linspace(0.2, 0.8, 1))] 
 
 #method_colors = ['steelblue', "red", "yellow", "green", "orange", "purple", ""]

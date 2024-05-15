@@ -391,10 +391,11 @@ if __name__ == "__main__":
             "trex": (0.5, 60)
         },
     }
-    try:
-        os.remove("emf.txt")
-    except:
-        pass
+    if os.path.exists("emf.txt"):
+        assert False, "emf.txt already exists!"
+    #    os.remove("emf.txt")
+    #except:
+    #   pass
     for dataset in datasets:
         if dataset in ["dnerf", "iphone"]:
             negative_zaxis = False
