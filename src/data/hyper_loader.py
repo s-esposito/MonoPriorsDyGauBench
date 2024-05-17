@@ -43,7 +43,7 @@ def extract_prefix_and_id(image_name):
         return prefix, image_id
     
     # If neither format matches, try to extract the integer ID from the beginning of the name
-    match = re.search(r'^(\d+)', image_name)
+    match = re.search(r'^(\d+)\.(png|jpg)', image_name)
     if match:
         image_id = int(match.group(1))
         return None, image_id

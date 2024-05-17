@@ -16,8 +16,8 @@ subfolders=("aleks-teapot" "americano" "broom2" "chickchicken" "cross-hands1" "c
 # Array of files to copy
 #files=("AST.sh" "decoder.sh" "noAST.sh")
 #files=("vanilla.sh" "nodecoder.sh")
-files=("randinit.sh" "sfminit.sh" "static.sh")
-
+#files=("randinit.sh" "sfminit.sh" "static.sh")
+files=("flow.sh")
 
 # Iterate over each subfolder
 for subfolder in "${subfolders[@]}"

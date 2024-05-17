@@ -1287,13 +1287,13 @@ class GS3d_flow(MyModelBaseClass):
                     self.plane_tv_weight)
             if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
                 if "fwd_flow" in batch:
-                    if batch["time_post"] >=0:
+                    if batch["time_post"][idx] >=0:
                         fwd_flow = fwd_flows[idx] 
                         fwd_flow_mask = fwd_flow_masks[idx]
                     else:
                         fwd_flow = None
                         fwd_flow_mask = None
-                    if batch["time_prev"] >=0:
+                    if batch["time_prev"][idx] >=0:
                         bwd_flow = bwd_flows[idx]
                         bwd_flow_mask = bwd_flow_masks[idx]
                     else:
