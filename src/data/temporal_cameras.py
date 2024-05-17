@@ -125,8 +125,8 @@ class TemporalCamera_Flow(nn.Module):
         super(TemporalCamera_Flow, self).__init__()
 
         if fwd_flow is None:
-            fwd_flow = np.zeros_like(bwd_flow)
-            fwd_flow_mask = ~np.ones_like(bwd_flow_mask) # all false
+            fwd_flow = torch.from_numpy(np.zeros_like(bwd_flow).astype(float))
+            fwd_flow_mask = 1. - torch.from_numpy(np.ones_like(bwd_flow_mask).astype(float)) # all false
             time_post = -1. # negative time denotes no post
             R_post = np.zeros_like(R)
             T_post = np.zeros_like(T)
@@ -134,8 +134,8 @@ class TemporalCamera_Flow(nn.Module):
             FoVy_post = np.zeros_like(FoVy)
 
         if bwd_flow is None:
-            bwd_flow = np.zeros_like(fwd_flow)
-            bwd_flow_mask = ~np.ones_like(fwd_flow_mask) # all false
+            bwd_flow = torch.from_numpy(np.zeros_like(fwd_flow).astype(float))
+            bwd_flow_mask = 1. - torch.from_numpy(np.ones_like(fwd_flow_mask).astype(float)) # all false
             time_prev = -1. # negative time denotes no prev
             R_prev = np.zeros_like(R)
             T_prev = np.zeros_like(T)
@@ -149,10 +149,10 @@ class TemporalCamera_Flow(nn.Module):
         self.time_post = time_post
         self.depth = depth
         
-        self.fwd_flow=torch.from_numpy(fwd_flow.astype(float))
-        self.fwd_flow_mask=torch.from_numpy(fwd_flow_mask.astype(float))
-        self.bwd_flow=torch.from_numpy(bwd_flow.astype(float))
-        self.bwd_flow_mask=torch.from_numpy(bwd_flow_mask.astype(float))
+        self.fwd_flow=fwd_flow
+        self.fwd_flow_mask=fwd_flow_mask
+        self.bwd_flow=bwd_flow
+        self.bwd_flow_mask=bwd_flow_mask
         #assert (fwd_flow is not None), "fwd_flow should not be None"
         #assert (fwd_flow_mask is not None), "fwd_flow_mask should not be None"
         #assert (bwd_flow is not None), "bwd_flow should not be None"

@@ -1203,7 +1203,8 @@ class GS3d_flow(MyModelBaseClass):
             if idx == 0:
                 #results.update(result)
                 for key in result:
-                    results[key] = [result[key]] 
+                    if (not (key.endswith("_fwd") or key.endswith("_bwd"))) or (key in ["render_flow_fwd", "render_flow_bwd"]):
+                        results[key] = [result[key]] 
             else:
                 for key in results:
                     results[key].append(result[key])
