@@ -29,6 +29,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         batch_size: Optional[int]=1,
         seed: Optional[int]=None,
         load_flow: Optional[bool]=False,
+        eval_train: Optional[bool]=False,
         #sample_interval: int,
         #num_pts: int,
         #num_pts_stat: int, 
@@ -45,6 +46,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         self.num_pts = num_pts
         self.M = M
         self.load_flow = load_flow
+        self.eval_train = eval_train
         if num_pts > 0:
             assert self.num_pts_ratio == 0
         if num_pts_ratio > 0:
@@ -168,6 +170,11 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             batch_size=1
         )
     def test_dataloader(self):
+        if self.eval_train:
+            return DataLoader(
+                self.train_cameras,
+                batch_size=1,
+            )
         return DataLoader(
             self.test_cameras,
             batch_size=1

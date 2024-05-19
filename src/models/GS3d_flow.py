@@ -1740,7 +1740,12 @@ class GS3d_flow(MyModelBaseClass):
         os.makedirs(self.log_dir_depth, exist_ok=True)
         os.makedirs(self.log_dir_flow, exist_ok=True)
         os.makedirs(self.log_dir_error, exist_ok=True)
-        self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
+        if self.trainer.datamodule.eval_train:
+            self.log_txt = os.path.join(self.logger.save_dir, "train.txt")
+            self.video_path = os.path.join(self.logger.save_dir, "train.mp4")
+        else:
+            self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
+            self.video_path = os.path.join(self.logger.save_dir, "test.mp4")
 
     def test_step(self, batch, batch_idx):
         render_rgb, render_flow, time_offset = True, True, self.trainer.datamodule.time_interval#self.get_render_mode(eval=True)
@@ -1829,7 +1834,7 @@ class GS3d_flow(MyModelBaseClass):
         
         # save a mp4
         fps = 10
-        writer = imageio.get_writer(os.path.join(self.logger.save_dir, "test.mp4"), fps=fps)
+        writer = imageio.get_writer(self.video_path, fps=fps)
         for i in range(self.test_num_batches):
             gt = imageio.imread(f"{self.logger.save_dir}/gt/%05d.png" % i)
             depth = imageio.imread(f"{self.logger.save_dir}/depth/%05d.png" % i)
