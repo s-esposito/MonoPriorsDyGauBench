@@ -24,10 +24,10 @@ tineuvox_root_dir="../../TiNeuVox/logs"
 # specify experiments to track
 methods=[
         "TiNeuVox/vanilla",
+        "MLP/nodeform", "MLP/vanilla", "MLP/decoder", 
         "Curve/vanilla", "Curve/decoder",
         "FourDim/vanilla", "FourDim/decoder", 
         "HexPlane/vanilla", "HexPlane/decoder",
-        "MLP/vanilla", "MLP/decoder", 
         "TRBF/nodecoder", "TRBF/vanilla"
         ]
 #methods=["Curve/vanilla", "FourDim/vanilla", "HexPlane/vanilla", "MLP/vanilla", "TRBF/nodecoder", "TRBF/vanilla"]
@@ -274,10 +274,10 @@ for dataset in datasets:
 '''
 
 method_colors = [color for color in cm.pink(np.linspace(0.2, 0.8, 1))] +\
+    [color for color in cm.Greens(np.linspace(0.2, 0.8, 3))] +\
     [color for color in cm.Blues(np.linspace(0.2, 0.8, 2))] +\
     [color for color in cm.Reds(np.linspace(0.2, 0.8, 2))] +\
     [color for color in cm.Purples(np.linspace(0.2, 0.8, 2))] +\
-    [color for color in cm.Greens(np.linspace(0.2, 0.8, 2))] +\
     [color for color in cm.Oranges(np.linspace(0.2, 0.8, 2))] #+\
 #    [color for color in cm.Grays(np.linspace(0.2, 0.8, 1))] 
 
