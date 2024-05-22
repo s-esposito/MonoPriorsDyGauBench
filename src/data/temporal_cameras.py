@@ -124,18 +124,18 @@ class TemporalCamera_Flow(nn.Module):
                  ):
         super(TemporalCamera_Flow, self).__init__()
 
-        if fwd_flow is None:
-            fwd_flow = torch.from_numpy(np.zeros_like(bwd_flow).astype(float))
-            fwd_flow_mask = 1. - torch.from_numpy(np.ones_like(bwd_flow_mask).astype(float)) # all false
+        if fwd_flow is None or fwd_flow.dim() == 0:
+            fwd_flow = torch.from_numpy(np.zeros((image.shape[1], image.shape[2], 2)).astype(float))
+            fwd_flow_mask = 1. - torch.from_numpy(np.ones((image.shape[1], image.shape[2])).astype(float)) # all false
             time_post = -1. # negative time denotes no post
             R_post = np.zeros_like(R)
             T_post = np.zeros_like(T)
             FoVx_post = np.zeros_like(FoVx)
             FoVy_post = np.zeros_like(FoVy)
 
-        if bwd_flow is None:
-            bwd_flow = torch.from_numpy(np.zeros_like(fwd_flow).astype(float))
-            bwd_flow_mask = 1. - torch.from_numpy(np.ones_like(fwd_flow_mask).astype(float)) # all false
+        if bwd_flow is None or bwd_flow.dim() == 0:
+            bwd_flow = torch.from_numpy(np.zeros((image.shape[1], image.shape[2], 2)).astype(float))
+            bwd_flow_mask = 1. - torch.from_numpy(np.ones((image.shape[1], image.shape[2])).astype(float)) # all false
             time_prev = -1. # negative time denotes no prev
             R_prev = np.zeros_like(R)
             T_prev = np.zeros_like(T)

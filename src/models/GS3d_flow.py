@@ -1308,7 +1308,10 @@ class GS3d_flow(MyModelBaseClass):
                         fwd_flow_mask, bwd_flow_mask
                     )
                     flow_loss += flow_loss_
-                    flow_loss_list.append(flow_loss_.item())
+                    if isinstance(flow_loss_, float):
+                        flow_loss_list.append(flow_loss_)
+                    else:
+                        flow_loss_list.append(flow_loss_.item())
                 
                 '''
                 M_fwd = fwd_flow_mask[idx:idx+1]

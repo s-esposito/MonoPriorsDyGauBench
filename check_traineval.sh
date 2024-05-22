@@ -12,23 +12,23 @@ scenes=("bouncingballs" "hellwarrior" "hook" "jumpingjacks" "lego" "mutant" "sta
 #scenes=("broom" "curls" "tail" "toby-sit")
 
 
-exps=("nodeform")
-declare -A method_exps=(
-	["Curve"]=""
-	["FourDim"]=""
-	["HexPlane"]=""
-	["MLP"]="nodeform"
-	["TRBF"]=""
-)
-
-#exps=("vanilla" "nodecoder")
+#exps=("nodeform")
 #declare -A method_exps=(
-#	["Curve"]="vanilla"
-#	["FourDim"]="vanilla"
-#	["HexPlane"]="vanilla"
-#	["MLP"]="vanilla"
-#	["TRBF"]="nodecoder vanilla"
+#	["Curve"]=""
+#	["FourDim"]=""
+#	["HexPlane"]=""
+#	["MLP"]="nodeform"
+#	["TRBF"]=""
 #)
+
+exps=("vanilla" "nodecoder")
+declare -A method_exps=(
+	["Curve"]="vanilla"
+	["FourDim"]="vanilla"
+	["HexPlane"]="vanilla"
+	["MLP"]="vanilla"
+	["TRBF"]="nodecoder vanilla"
+)
 
 
 #exps=("onebatch" "twobatch" "fourbatch" "vanilla" "nodecoder")

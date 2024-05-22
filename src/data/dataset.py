@@ -113,6 +113,10 @@ class FourDGSdataset(Dataset):
                             R_post=R_post, T_post=T_post, FoVx_post=FovX_post, FoVy_post=FovY_post, time_post=time_post,
                             fwd_flow=fwd_flow, fwd_flow_mask=fwd_flow_mask,
                             bwd_flow=bwd_flow, bwd_flow_mask=bwd_flow_mask)
+            
+            print(index, camera.fwd_flow.shape if camera.fwd_flow is not None else None,
+                camera.bwd_flow.shape if camera.bwd_flow is not None else None)
+
             result = {
                 "time": camera.time,
                 "time_prev": camera.time_prev,

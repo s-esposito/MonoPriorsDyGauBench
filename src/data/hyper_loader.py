@@ -140,20 +140,22 @@ class Load_hyper_data(Dataset):
             # Populate self.i_train_prev and self.i_train_post
             for idx, train_idx in enumerate(self.i_train):
                 prefix, image_id = extract_prefix_and_id(self.all_img[train_idx])
-                if (prefix, image_id - 1) in all_dict:
-                    self.i_train_prev[idx] = all_dict[(prefix, image_id - 1)]
-                if (prefix, image_id + 1) in all_dict:
-                    self.i_train_post[idx] = all_dict[(prefix, image_id + 1)]
+                if image_id is not None:
+                    if (prefix, image_id - 1) in all_dict:
+                        self.i_train_prev[idx] = all_dict[(prefix, image_id - 1)]
+                    if (prefix, image_id + 1) in all_dict:
+                        self.i_train_post[idx] = all_dict[(prefix, image_id + 1)]
 
             # Populate self.i_test_prev and self.i_test_post
             for idx, test_idx in enumerate(self.i_test):
                 prefix, image_id = extract_prefix_and_id(self.all_img[test_idx])
-                if (prefix, image_id - 1) in all_dict:
-                    self.i_test_prev[idx] = all_dict[(prefix, image_id - 1)]
-                if (prefix, image_id + 1) in all_dict:
-                    self.i_test_post[idx] = all_dict[(prefix, image_id + 1)]
-                    #    # strictly sort ids by time
-            
+                if image_id is not None:
+                    if (prefix, image_id - 1) in all_dict:
+                        self.i_test_prev[idx] = all_dict[(prefix, image_id - 1)]
+                    if (prefix, image_id + 1) in all_dict:
+                        self.i_test_post[idx] = all_dict[(prefix, image_id + 1)]
+                        #    # strictly sort ids by time
+                
             '''
             for idx_prev, idx, idx_post in zip(self.i_train_prev, self.i_train, self.i_train_post):
                 if idx_prev is not None and idx_post is not None:
