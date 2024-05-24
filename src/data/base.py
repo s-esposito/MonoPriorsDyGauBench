@@ -42,6 +42,7 @@ class CameraInfo(NamedTuple):
     height: int
     time : float
     depth: Optional[np.array] = None
+    mask: Optional[np.array] = None
     # previous camera info
     R_prev: Optional[np.array] = None
     T_prev: Optional[np.array] = None

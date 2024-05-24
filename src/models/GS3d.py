@@ -12,12 +12,13 @@ from src.models.modules.Init import create_from_pcd_func
 from src.models.modules.Deform import create_motion_model
 from src.models.modules.Postprocess import getcolormodel
 from src.utils.loss_utils import l1_loss, kl_divergence, ssim, l2_loss, compute_depth_loss, compute_flow_loss
+from src.utils.loss_utils_mask import ssim as ssim_mask, ms_ssim as ms_ssim_mask
 from src.utils.sh_utils import RGB2SH
 import src.utils.imutils as imutils
 from src.utils.flow_viz import flow_to_image
 from simple_knn._C import distCUDA2
 from pytorch_msssim import ms_ssim
-from src.utils.image_utils import psnr
+from src.utils.image_utils import psnr, psnr_mask
 import torchvision
 import heapq
 import time
@@ -107,6 +108,7 @@ class GS3d(MyModelBaseClass):
         post_act: Optional[bool]=True,
         rot_4d: Optional[bool]=False,
         verbose: Optional[bool]=False,
+        eval_mask: Optional[bool]=False,
         **kwargs
     ):
         super().__init__()
@@ -256,7 +258,7 @@ class GS3d(MyModelBaseClass):
 
         #LPIPS evaluation
         self.lpips_mode = lpips_mode
-        self.lpips = lpips.LPIPS(net=lpips_mode) # if spatial is True, keep dim 
+        self.lpips = lpips.LPIPS(net=lpips_mode, spatial=eval_mask) # if spatial is True, keep dim 
 
 
         self.raystart = raystart
@@ -309,6 +311,8 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode in ["TRBF"]:
             if self.rgbdecoder is None:
                 assert not self.deform_feature, "Not supporting feature deformation for TRBF SH mode"
+        
+        self.eval_mask = eval_mask
     #@torch.inference_mode()
     #def compute_lpips(
     #    self, image: torch.Tensor, gt: torch.Tensor 
@@ -1581,7 +1585,8 @@ class GS3d(MyModelBaseClass):
         torch.cuda.empty_cache()
 
     def on_test_epoch_start(self):
-        
+        if self.eval_mask:
+            assert self.trainer.datamodule.load_mask, "Cannot evaluation masked results if mask is not loaded!"
         self.test_image_name = []
         self.test_times = []
         self.test_render_time = []
@@ -1605,11 +1610,19 @@ class GS3d(MyModelBaseClass):
         os.makedirs(self.log_dir_flow, exist_ok=True)
         os.makedirs(self.log_dir_error, exist_ok=True)
         if self.trainer.datamodule.eval_train:
-            self.log_txt = os.path.join(self.logger.save_dir, "train.txt")
-            self.video_path = os.path.join(self.logger.save_dir, "train.mp4")
+            if self.eval_mask:
+                self.log_txt = os.path.join(self.logger.save_dir, "train_mask.txt")
+                self.video_path = os.path.join(self.logger.save_dir, "train_mask.mp4")
+            else:
+                self.log_txt = os.path.join(self.logger.save_dir, "train.txt")
+                self.video_path = os.path.join(self.logger.save_dir, "train.mp4")
         else:
-            self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
-            self.video_path = os.path.join(self.logger.save_dir, "test.mp4")
+            if self.eval_mask:
+                self.log_txt = os.path.join(self.logger.save_dir, "test_mask.txt")
+                self.video_path = os.path.join(self.logger.save_dir, "test_mask.mp4")
+            else:
+                self.log_txt = os.path.join(self.logger.save_dir, "test.txt")
+                self.video_path = os.path.join(self.logger.save_dir, "test.mp4")
 
     def test_step(self, batch, batch_idx):
         render_rgb, render_flow, time_offset = True, True, self.trainer.datamodule.time_interval#self.get_render_mode(eval=True)
@@ -1641,6 +1654,10 @@ class GS3d(MyModelBaseClass):
         #run_id = self.logger.experiment.id
         #print("Run ID:", run_id)
 
+        if self.eval_mask:
+            mask = batch["mask"][0].view(gt.shape[-2],gt.shape[-1])
+        
+
         depth = render_pkg["depth"][0]
         depth = imutils.np2png_d( [depth[0, ...].cpu().numpy()], None, colormap="jet")
         depth = torch.from_numpy(depth).permute(2, 0, 1)
@@ -1666,20 +1683,43 @@ class GS3d(MyModelBaseClass):
         #    image)
         #assert False, "Save image and gt and depth and flow to disk instead of to Wandb"
         #image_name = batch["image_name"][0]
-        torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
-        torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
-        error_map = torch.norm(torch.abs(image - gt), dim=0)
-        torchvision.utils.save_image(error_map[None], os.path.join(self.log_dir_error, "%05d.png" % batch_idx))
-        torchvision.utils.save_image(depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
-        torchvision.utils.save_image(rendered_flow_fwd[None], os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx))
-        torchvision.utils.save_image(rendered_flow_bwd[None], os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx))
 
-        _, _, flow_loss_list = self.compute_loss(render_pkg, batch, mode="test")
-        _psnr = psnr(image[None], gt[None]).mean()
-        _ssim = ssim(image, gt)
-        _msssim = ms_ssim(image[None], gt[None], data_range=1, size_average=False).item()
-        _lpips = self.lpips(image[None]*2.-1., gt[None]*2. - 1.).item()
-        
+        if self.eval_mask:
+            torchvision.utils.save_image(image[None]*(1.-mask[None, None]), os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
+            torchvision.utils.save_image(gt[None]*(1.-mask[None, None]), os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
+            error_map = torch.norm(torch.abs(image - gt), dim=0)
+            torchvision.utils.save_image(error_map[None]*(1.-mask[None, None]), os.path.join(self.log_dir_error, "%05d.png" % batch_idx))
+            torchvision.utils.save_image(depth[None]*(1.-mask.cpu()[None, None]), os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
+            torchvision.utils.save_image(rendered_flow_fwd[None]*(1.-mask.cpu()[None, None]), os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx))
+            torchvision.utils.save_image(rendered_flow_bwd[None]*(1.-mask.cpu()[None, None]), os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx))
+
+            #_, _, flow_loss_list = self.compute_loss(render_pkg, batch, mode="test")
+            flow_loss_list = None
+            
+            _psnr = psnr_mask(image[None], gt[None], mask[None]).mean()
+            _ssim = ssim_mask(image[None], gt[None], data_range=1, mask=1.-mask[None, None].repeat(1, 3, 1, 1)).item()
+            _msssim = ms_ssim_mask(image[None], gt[None], data_range=1, size_average=False, mask=1.-mask[None, None].repeat(1, 3, 1, 1)).item()
+            
+            _lpips = self.lpips(image[None]*2.-1., gt[None]*2. - 1.)#, mask=mask[None, None]).item()
+            _lpips = _lpips[mask[None, None] == 0].mean()
+
+            #_lpips = self.lpips(image[None]*2.-1., gt[None]*2. - 1.).item()
+         
+        else:
+            torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
+            torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
+            error_map = torch.norm(torch.abs(image - gt), dim=0)
+            torchvision.utils.save_image(error_map[None], os.path.join(self.log_dir_error, "%05d.png" % batch_idx))
+            torchvision.utils.save_image(depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
+            torchvision.utils.save_image(rendered_flow_fwd[None], os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx))
+            torchvision.utils.save_image(rendered_flow_bwd[None], os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx))
+
+            _, _, flow_loss_list = self.compute_loss(render_pkg, batch, mode="test")
+            _psnr = psnr(image[None], gt[None]).mean()
+            _ssim = ssim(image, gt)
+            _msssim = ms_ssim(image[None], gt[None], data_range=1, size_average=False).item()
+            _lpips = self.lpips(image[None]*2.-1., gt[None]*2. - 1.).item()
+            
         self.test_psnr_total.append(_psnr)
         self.test_ssim_total.append(_ssim)
         self.test_msssim_total.append(_msssim)

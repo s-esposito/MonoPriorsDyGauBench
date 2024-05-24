@@ -30,6 +30,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         seed: Optional[int]=None,
         load_flow: Optional[bool]=False,
         eval_train: Optional[bool]=False,
+        load_mask: Optional[bool]=False,
         #sample_interval: int,
         #num_pts: int,
         #num_pts_stat: int, 
@@ -47,6 +48,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         self.M = M
         self.load_flow = load_flow
         self.eval_train = eval_train
+        self.load_mask = load_mask
         if num_pts > 0:
             assert self.num_pts_ratio == 0
         if num_pts_ratio > 0:
@@ -59,8 +61,8 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         datadir = self.datadir
         ratio = self.ratio
         use_bg_points = False
-        self.train_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split ="train", eval=eval, load_flow=self.load_flow)
-        self.test_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split="test", eval=eval, load_flow=self.load_flow)
+        self.train_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split ="train", eval=eval, load_flow=self.load_flow, load_mask=self.load_mask)
+        self.test_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split="test", eval=eval, load_flow=self.load_flow, load_mask=self.load_mask)
 
         train_cam = format_hyper_data(self.train_cam_infos,"train")
         max_time = self.train_cam_infos.max_time
@@ -131,8 +133,8 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         #                   #maxtime=max_time
         #                   )
 
-        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train", load_flow=self.load_flow)
-        self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test", load_flow=self.load_flow)
+        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train", load_flow=self.load_flow, load_mask=self.load_mask)
+        self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test", load_flow=self.load_flow, load_mask=self.load_mask)
         #print([len(self.train_cameras), len(self.test_cameras)])
         # evenly sample 5 from train_cameras
         # evenly sample 5 from test_cameras

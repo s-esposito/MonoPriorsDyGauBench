@@ -12,6 +12,7 @@ class FourDGSdataset(Dataset):
         dataset,
         split,
         load_flow=False,
+        load_mask=False,
         #args,
     ):
         self.dataset = dataset
@@ -19,6 +20,7 @@ class FourDGSdataset(Dataset):
         #self.args = args
         self.kernel_size = 1.
         self.load_flow = load_flow
+        self.load_mask = load_mask
     def __getitem__(self, index):
 
         try:
@@ -35,6 +37,10 @@ class FourDGSdataset(Dataset):
         except:
             caminfo = self.dataset[index]
             image = caminfo.image
+            if self.load_mask:
+                mask = caminfo.mask
+            else:
+                mask = None
             R = caminfo.R
             T = caminfo.T
             FovX = caminfo.FovX
@@ -144,6 +150,8 @@ class FourDGSdataset(Dataset):
             }
         if camera.depth is not None:
             result["depth"] = camera.depth
+        if mask is not None:
+            result["mask"] = mask
         '''
         if fwd_flow is not None:
             #if (fwd_flow_mask is None) or (bwd_flow_mask is None) or (bwd_flow is None):

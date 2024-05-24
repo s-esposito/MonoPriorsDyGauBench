@@ -59,6 +59,7 @@ class Load_hyper_data(Dataset):
                  split="train",
                  eval=False,
                  load_flow=False,
+                 load_mask=False,
                  ):
         
         from .utils import Camera
@@ -117,6 +118,11 @@ class Load_hyper_data(Dataset):
             camera.position -=  self.scene_center
             camera.position *=  self.coord_scale
             self.all_cam_params.append(camera)
+        
+        self.load_mask = load_mask
+        if self.load_mask:
+            self.all_masks = [f'{datadir}/resized_mask/{int(1/ratio)}x/{i}.png.png' for i in self.all_img]
+
 
         self.all_img = [f'{datadir}/rgb/{int(1/ratio)}x/{i}.png' for i in self.all_img]
         self.h, self.w = self.all_cam_params[0].image_shape
@@ -185,6 +191,7 @@ class Load_hyper_data(Dataset):
             
             assert False
             '''
+        
         #    self.i_train = sorted(self.i_train, key=lambda x: self.all_time[x])
         #    self.i_test = sorted(self.i_test, key=lambda x: self.all_time[x])
         #    self.first_ids = [idx for idx in range(len(self.all_time)) if (self.all_time[idx] == self.min_rand_xyz)]
@@ -216,6 +223,7 @@ class Load_hyper_data(Dataset):
             # return len(self.i_video)
             return len(self.video_v2)
     def load_video(self, idx):
+        assert False, "Not debugged for long"
         if idx in self.map.keys():
             return self.map[idx]
         camera = self.all_cam_params[idx]
@@ -248,7 +256,12 @@ class Load_hyper_data(Dataset):
         h = image.size[1]
         image = PILtoTorch(image,None)
         image = image.to(torch.float32)
-        
+
+        if self.load_mask:
+            mask = Image.open(self.all_masks[idx]).convert('1')
+            mask = torch.tensor(np.array(mask)).view(-1).bool().to(torch.float32)
+        else:
+            mask = None
 
         time = self.all_time[idx]
         R = camera.orientation.T
@@ -294,7 +307,7 @@ class Load_hyper_data(Dataset):
 
         caminfo = CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=w, height=h, time=time,
-                              depth=depth, 
+                              depth=depth, mask=mask
                               )
         self.map[idx] = caminfo
         return caminfo  
@@ -309,6 +322,12 @@ class Load_hyper_data(Dataset):
         h = image.size[1]
         image = PILtoTorch(image,None)
         image = image.to(torch.float32)
+
+        if self.load_mask:
+            mask = Image.open(self.all_masks[idx]).convert('1')
+            mask = torch.tensor(np.array(mask)).view(-1).bool().to(torch.float32)
+        else:
+            mask = None
         
 
         time = self.all_time[idx]
@@ -390,7 +409,7 @@ class Load_hyper_data(Dataset):
 
         caminfo = CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=w, height=h, time=time,
-                              depth=depth, 
+                              depth=depth, mask=mask,
                               R_prev=R_prev, T_prev=T_prev, FovY_prev=FovY_prev, FovX_prev=FovX_prev, time_prev=time_prev,
                               R_post=R_post, T_post=T_post, FovY_post=FovY_post, FovX_post=FovX_post, time_post=time_post,
                               fwd_flow=fwd_flow, fwd_flow_mask=fwd_flow_mask,
