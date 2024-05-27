@@ -20,20 +20,34 @@ declare -a methods=( \
     "HexPlane" \
     "MLP" \
     "TRBF_nodecoder" \
-    "TRBF" \
+    #"TRBF" \
 )
 
 declare -a scenes=( \
     #"static_cube_moving_camera_textured" \
     #"static_cube_moving_camera_textured_brick" \
     #"dynamic_cube_moving_camera_textured" \
-    'dynamic_cube_dynamic_camera_textured_motion_range_0.0' \
-    'dynamic_cube_dynamic_camera_textured_motion_range_0.5' \
-    'dynamic_cube_dynamic_camera_textured_motion_range_1.0' \
-    'dynamic_cube_dynamic_camera_textured_motion_range_2.0' \
-    'dynamic_cube_dynamic_camera_textured_motion_range_5.0' \
-    'dynamic_cube_dynamic_camera_textured_motion_range_10.0' \
-    'dynamic_cube_dynamic_camera_textured_motion_range_20.0' \
+    # 'dynamic_cube_dynamic_camera_textured_motion_range_0.0' \
+    # 'dynamic_cube_dynamic_camera_textured_motion_range_0.5' \
+    # 'dynamic_cube_dynamic_camera_textured_motion_range_1.0' \
+    # 'dynamic_cube_dynamic_camera_textured_motion_range_2.0' \
+    # 'dynamic_cube_dynamic_camera_textured_motion_range_5.0' \
+    # 'dynamic_cube_dynamic_camera_textured_motion_range_10.0' \
+    # 'dynamic_cube_dynamic_camera_textured_motion_range_20.0' \
+    #"dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_0.0" \
+    #"dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_2.0" \
+    #"dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_5.0" \
+    #"dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_10.0" \
+    #"dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_20.0" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_0.0_baseline_scale_0.1" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_0.0_baseline_scale_0.5" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_0.0_baseline_scale_2.0" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_5.0_baseline_scale_0.1" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_5.0_baseline_scale_0.5" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_5.0_baseline_scale_2.0" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_10.0_baseline_scale_0.1" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_10.0_baseline_scale_0.5" \
+    "dynamic_cube_dynamic_camera_textured_motion_range_nvs_no_spiral_radius_1.0_motion_range_10.0_baseline_scale_2.0" \
 )
 
 for scene in "${scenes[@]}"
