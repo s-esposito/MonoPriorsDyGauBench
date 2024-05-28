@@ -71,6 +71,8 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
         M: Optional[int] = 0,
         batch_size: Optional[int]=1,
         seed: Optional[int]=None,
+        load_flow: Optional[bool]=False,
+        eval_train: Optional[bool]=False,
         ) -> None:
         super().__init__(seed=seed)
 
@@ -80,6 +82,10 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
         self.white_background = white_background
         self.batch_size = batch_size
         self.M = M
+        self.num_pts_ratio = num_pts_ratio
+        self.num_pts = num_pts
+        self.load_flow = load_flow
+        self.eval_train = eval_train
         self.save_hyperparameters()
 
     def setup(self, stage: str):
@@ -139,6 +145,11 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
             batch_size=1
         )
     def test_dataloader(self):
+        if self.eval_train:
+            return DataLoader(
+                self.train_cameras,
+                batch_size=1,
+            )
         return DataLoader(
             self.test_cameras,
             batch_size=1
