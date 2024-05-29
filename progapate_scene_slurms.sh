@@ -13,13 +13,13 @@
 #dataset="iphone"
 #subfolders=("apple" "backpack" "block" "creeper" "handwavy" "haru-sit" "mochi-high-five" "paper-windmill" "pillow" "space-out" "spin" "sriracha-tree" "teddy" "wheel") 
 
-#template="broom"
-#dataset="nerfies"
-#subfolders=("broom" "curls" "tail" "toby-sit")
+template="broom"
+dataset="nerfies"
+subfolders=("broom" "curls" "tail" "toby-sit")
 
-template="basin"
-dataset="nerfds"
-subfolders=("as" "basin" "bell" "cup" "plate" "press" "sieve")
+#template="basin"
+#dataset="nerfds"
+#subfolders=("as" "basin" "bell" "cup" "plate" "press" "sieve")
 
 # Array of files to copy
 #files=("AST.sh" "decoder.sh" "noAST.sh")
@@ -27,8 +27,9 @@ subfolders=("as" "basin" "bell" "cup" "plate" "press" "sieve")
 #files=("randinit.sh" "sfminit.sh" "static.sh")
 #files=("randinit.sh" "static.sh")
 #files=("flow.sh")
-files=("maskeval.sh")
+#files=("maskeval.sh")
 #files=("3dgseval.sh")
+files=("3dgsmeval.sh" "maskeval.sh")
 
 # Iterate over each subfolder
 for subfolder in "${subfolders[@]}"

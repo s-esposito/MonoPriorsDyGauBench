@@ -20,7 +20,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-def visualize_lines_to_lookat(points, viewdirs, lookat_point, lookat_train, lookat_test, output_path, N_train):
+def visualize_lines_to_lookat(points, viewdirs, lookat_point, lookat_train, lookat_test, output_path, N_train, pcd):
     endpoints = viewdirs + points # look at negative direction of z-axis
     fig = plt.figure(figsize=(8, 6))
     num_points=points.shape[0]
@@ -38,6 +38,11 @@ def visualize_lines_to_lookat(points, viewdirs, lookat_point, lookat_train, look
     
     
     ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the points from pcd
+    pcd_xs, pcd_ys, pcd_zs = pcd[:, 0], pcd[:, 1], pcd[:, 2]
+    ax.scatter(pcd_xs, pcd_ys, pcd_zs, c='green', marker='o', alpha=0.2, s=10)
+  
 
     # Plot the 3D points
     xs, ys, zs = points[:, 0], points[:, 1], points[:, 2]
@@ -67,6 +72,8 @@ def visualize_lines_to_lookat(points, viewdirs, lookat_point, lookat_train, look
     for point in points[N_train:]:
         ax.plot([point[0], lookat_test[0]], [point[1], lookat_test[1]], [point[2], lookat_test[2]], 'gray', linestyle='-', linewidth=0.5, alpha=0.3)
 
+     
+    
 
     # Set labels and title
     ax.set_xlabel('X')
@@ -75,7 +82,19 @@ def visualize_lines_to_lookat(points, viewdirs, lookat_point, lookat_train, look
     ax.set_title('3D Points and Lookat Point')
 
     # Adjust the aspect ratio
-    ax.set_box_aspect((np.ptp(xs), np.ptp(ys), np.ptp(zs)))
+    #ax.set_box_aspect((np.ptp(xs), np.ptp(ys), np.ptp(zs)))
+    # Calculate the range for each axis considering all points
+    all_xs = np.concatenate([xs, xe, [lookat_point[0]], [lookat_train[0]], [lookat_test[0]], pcd_xs])
+    all_ys = np.concatenate([ys, ye, [lookat_point[1]], [lookat_train[1]], [lookat_test[1]], pcd_ys])
+    all_zs = np.concatenate([zs, ze, [lookat_point[2]], [lookat_train[2]], [lookat_test[2]], pcd_zs])
+    
+    max_range = np.array([all_xs.max() - all_xs.min(), all_ys.max() - all_ys.min(), all_zs.max() - all_zs.min()]).max()
+    mid_x = (all_xs.max() + all_xs.min()) * 0.5
+    mid_y = (all_ys.max() + all_ys.min()) * 0.5
+    mid_z = (all_zs.max() + all_zs.min()) * 0.5
+    ax.set_xlim(mid_x - max_range / 2, mid_x + max_range / 2)
+    ax.set_ylim(mid_y - max_range / 2, mid_y + max_range / 2)
+    ax.set_zlim(mid_z - max_range / 2, mid_z + max_range / 2)
 
     # Set the backend to a non-interactive one
     #plt.switch_backend('Agg')
@@ -247,7 +266,7 @@ def tringulate_rays(
 
 
 
-def run(train_dataset, test_dataset, ratio, fps, negative_zaxis=True):
+def run(pcd, train_dataset, test_dataset, ratio, fps, negative_zaxis=True):
     
 
 
@@ -303,7 +322,7 @@ def run(train_dataset, test_dataset, ratio, fps, negative_zaxis=True):
     # visualize to a figure
     save_path = os.path.join(input_path, "lookats.png")
     #assert False, [positions.shape, positions_train.shape[0]]
-    visualize_lines_to_lookat(positions, optical_axes, lookat.reshape(-1), lookat_train.reshape(-1), lookat_test.reshape(-1), save_path, positions_train.shape[0])
+    visualize_lines_to_lookat(positions, optical_axes, lookat.reshape(-1), lookat_train.reshape(-1), lookat_test.reshape(-1), save_path, positions_train.shape[0], pcd)
 
     omega = get_omega(lookat, positions, fps)
     omega_train = get_omega(lookat_train, positions_train, fps)
@@ -391,16 +410,15 @@ if __name__ == "__main__":
             "trex": (0.5, 60)
         },
     }
-    if os.path.exists("emf.txt"):
-        assert False, "emf.txt already exists!"
+    #if os.path.exists("emf.txt"):
+    #    assert False, "emf.txt already exists!"
     #    os.remove("emf.txt")
     #except:
     #   pass
     for dataset in datasets:
-        if dataset in ["dnerf", "iphone"]:
-            negative_zaxis = False
-        else:
-            negative_zaxis = True
+        negative_zaxis = False
+        #else:
+        #    negative_zaxis = True
         for scene in tqdm(datasets[dataset]):
             ratio, fps = datasets[dataset][scene]
             input_path = os.path.join("data", dataset, scene)
@@ -430,6 +448,7 @@ if __name__ == "__main__":
                 )
 
             all_dataset.setup("")
+            pcd = all_dataset.pcd.points #Nx3
 
             train_dataset = all_dataset.train_cameras
             test_dataset = all_dataset.test_cameras
@@ -446,7 +465,7 @@ if __name__ == "__main__":
             '''
             print("Loaded dataset!")
             try:
-                omega_test, omega_train, omega = run(train_dataset, test_dataset, ratio, fps, negative_zaxis=negative_zaxis)
+                omega_test, omega_train, omega = run(pcd, train_dataset, test_dataset, ratio, fps, negative_zaxis=negative_zaxis)
                 content = " & " + scene + " & ? & " + "%.2f" % round(omega_test, 2) + " & " + "%.2f" % round(omega_train, 2) +  " & " + "%.2f" % round(omega, 2) + " \\\\"
         
                 print(content)
