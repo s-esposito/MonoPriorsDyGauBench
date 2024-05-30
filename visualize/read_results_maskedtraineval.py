@@ -16,8 +16,8 @@ os.makedirs(exp_prefix, exist_ok=True)
 
 sub_class = "all"
 # specify dataset output directory
-#datasets=["iphone", "nerfies", "hypernerf",  "nerfds", "dnerf"]
-datasets=["hypernerf", "nerfds"]
+datasets=["iphone", "nerfies", "hypernerf",  "nerfds"]#, "dnerf"]
+#datasets=["hypernerf", "nerfds"]
 #datasets=["nerfies"]#, "nerfds"]#,  "hypernerf", "dnerf"]
 root_dir="../output"
 tineuvox_root_dir="../../TiNeuVox/logs"

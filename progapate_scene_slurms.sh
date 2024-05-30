@@ -9,13 +9,13 @@
 #dataset="hypernerf"
 #subfolders=("aleks-teapot" "americano" "broom2" "chickchicken" "cross-hands1" "cut-lemon1" "espresso" "hand1-dense-v2" "keyboard" "oven-mitts" "slice-banana" "split-cookie" "tamping" "torchocolate" "vrig-3dprinter" "vrig-chicken" "vrig-peel-banana")
 
-#template="apple"
-#dataset="iphone"
-#subfolders=("apple" "backpack" "block" "creeper" "handwavy" "haru-sit" "mochi-high-five" "paper-windmill" "pillow" "space-out" "spin" "sriracha-tree" "teddy" "wheel") 
+template="apple"
+dataset="iphone"
+subfolders=("apple" "backpack" "block" "creeper" "handwavy" "haru-sit" "mochi-high-five" "paper-windmill" "pillow" "space-out" "spin" "sriracha-tree" "teddy" "wheel") 
 
-template="broom"
-dataset="nerfies"
-subfolders=("broom" "curls" "tail" "toby-sit")
+#template="broom"
+#dataset="nerfies"
+#subfolders=("broom" "curls" "tail" "toby-sit")
 
 #template="basin"
 #dataset="nerfds"
