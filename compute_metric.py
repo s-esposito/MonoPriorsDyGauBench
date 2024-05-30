@@ -28,6 +28,7 @@ from scipy.stats import beta, gamma
 
 from PIL import Image
 
+num_interval = 10
 
 device = "cuda"
 
@@ -430,35 +431,36 @@ def visualize_histogram(tensor, output_path, output_path_dist, num_bins=20, igno
     # Filter out values greater than max_value from the tensor
     filtered_tensor = tensor[tensor <= max_x]
 
-    # Create a figure and axis
-    fig, ax = plt.subplots(figsize=(8, 6))
+    if output_path is not None:
+        # Create a figure and axis
+        fig, ax = plt.subplots(figsize=(8, 6))
 
-    # Plot the histogram using the filtered tensor with a fixed number of bins
-    #n, bins, patches = ax.hist(filtered_tensor.numpy(), bins=num_bins, edgecolor='black', density=True)
-    n, bins, patches = ax.hist(filtered_tensor.numpy(), bins=quantile_values.numpy(), edgecolor='black', alpha=0.6, density=True)
-    
+        # Plot the histogram using the filtered tensor with a fixed number of bins
+        #n, bins, patches = ax.hist(filtered_tensor.numpy(), bins=num_bins, edgecolor='black', density=True)
+        n, bins, patches = ax.hist(filtered_tensor.numpy(), bins=quantile_values.numpy(), edgecolor='black', alpha=0.6, density=True)
+        
 
-    # Overlay quantile markers
-    #for q_value in quantile_values[:-(ignore-1)]:
-    #    ax.axvline(x=q_value, color='red', linestyle='--')
+        # Overlay quantile markers
+        #for q_value in quantile_values[:-(ignore-1)]:
+        #    ax.axvline(x=q_value, color='red', linestyle='--')
 
-    # Set custom x-axis tick labels with quantile values
-    ax.set_xticks(quantile_values[:-(ignore-1)].numpy())
-    ax.set_xticklabels([f"{q:.2f}" for q in quantile_values[:-(ignore-1)]], rotation=90, ha='right')
+        # Set custom x-axis tick labels with quantile values
+        ax.set_xticks(quantile_values[:-(ignore-1)].numpy())
+        ax.set_xticklabels([f"{q:.2f}" for q in quantile_values[:-(ignore-1)]], rotation=90, ha='right')
 
-    # Set y-axis limits based on the maximum frequency value
-    ax.set_ylim(0, max_y)  # Multiply by 1.1 to add some padding at the top
-    ax.set_xlim(0, max_x)
-    # Set labels and title
-    ax.set_xlabel("Value")
-    ax.set_ylabel("Frequency")
-    ax.set_title("Histogram of Tensor with Quantile Values")
+        # Set y-axis limits based on the maximum frequency value
+        ax.set_ylim(0, max_y)  # Multiply by 1.1 to add some padding at the top
+        ax.set_xlim(0, max_x)
+        # Set labels and title
+        ax.set_xlabel("Value")
+        ax.set_ylabel("Frequency")
+        ax.set_title("Histogram of Tensor with Quantile Values")
 
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    # Display the plot
-    plt.savefig(output_path, dpi=300)
-    plt.close()
+        # Display the plot
+        plt.savefig(output_path, dpi=300)
+        plt.close()
 
     
 
@@ -469,8 +471,9 @@ def visualize_histogram(tensor, output_path, output_path_dist, num_bins=20, igno
     variance = filtered_tensor.var().item()
     std = filtered_tensor.std().item()
     
-    params_gamma = gamma.fit(normalized_tensor.numpy())
     
+    
+    '''
     print(f"Estimated metric params: {params_gamma}")
     print(f"Original median: {median}")
     print(f"Original mean: {mean}")
@@ -480,28 +483,31 @@ def visualize_histogram(tensor, output_path, output_path_dist, num_bins=20, igno
     print(f"Estimated mean: {gamma.mean(*params_gamma)}")
     print(f"Estimated var: {gamma.var(*params_gamma)}")
     print(f"Estimated std: {gamma.std(*params_gamma)}")
+    '''
 
-    # Generate a beta distribution with the estimated parameters
-    x = torch.linspace(0, max_x, 100)
-    gamma_pdf = gamma.pdf(x, *params_gamma)
+    if output_path_dist is not None:
+        # Generate a beta distribution with the estimated parameters
+        params_gamma = gamma.fit(normalized_tensor.numpy())
+        x = torch.linspace(0, max_x, 100)
+        gamma_pdf = gamma.pdf(x, *params_gamma)
 
-    # Plot the histogram of the normalized tensor and the beta distribution
-    fig, ax = plt.subplots(figsize=(8, 6))
-    ax.hist(filtered_tensor.numpy(), bins=quantile_values.numpy(), edgecolor='black', alpha=0.6, density=True)
-    
-    #ax.hist(normalized_tensor.numpy(), bins=20, density=True, alpha=0.7, edgecolor='black')
-    ax.plot(x, gamma_pdf, 'r-', lw=2, label='Gama Distribution')
-    # Set y-axis limits based on the maximum frequency value
-    ax.set_ylim(0, max_y)  # Multiply by 1.1 to add some padding at the top
-    ax.set_xlim(0, max_x)
-    ax.set_xlabel('Value')
-    ax.set_ylabel('Density')
-    ax.set_title('Histogram of Normalized Tensor and Beta Distribution' )
-    ax.legend()
+        # Plot the histogram of the normalized tensor and the beta distribution
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.hist(filtered_tensor.numpy(), bins=quantile_values.numpy(), edgecolor='black', alpha=0.6, density=True)
+        
+        #ax.hist(normalized_tensor.numpy(), bins=20, density=True, alpha=0.7, edgecolor='black')
+        ax.plot(x, gamma_pdf, 'r-', lw=2, label='Gama Distribution')
+        # Set y-axis limits based on the maximum frequency value
+        ax.set_ylim(0, max_y)  # Multiply by 1.1 to add some padding at the top
+        ax.set_xlim(0, max_x)
+        ax.set_xlabel('Value')
+        ax.set_ylabel('Density')
+        ax.set_title('Histogram of Normalized Tensor and Beta Distribution' )
+        ax.legend()
 
-    plt.tight_layout()
-    plt.savefig(output_path_dist, dpi=300)
-    plt.close()
+        plt.tight_layout()
+        plt.savefig(output_path_dist, dpi=300)
+        plt.close()
 
     return {
         "median": median, 
@@ -539,7 +545,7 @@ if __name__ == '__main__':
         negative_zaxis = False
         record[dataset] = {}
         for scene in tqdm(datasets[dataset]):
-            
+            record[dataset][scene] = {}
             #### load dataset ####
             ratio, fps, psnr = datasets[dataset][scene]
             input_path = os.path.join("data", dataset, scene)
@@ -571,15 +577,22 @@ if __name__ == '__main__':
             all_dataset.setup("")
 
             train_dataset = all_dataset.train_cameras
-            
-            train_dataset = [cam for cam in train_dataset][:10]
 
-            thetas = []
-            velocities = []
+            T = len(train_dataset)            
+
+            # for debug
+            T = 32
+
+            # trackers for all points' status; renew every n_interval steps
+            #thetas = []
+            #velocities = []
             metrics = []
 
 
-            for prev, post in tqdm(zip(train_dataset[:-1], train_dataset[1:])):
+            for prev_id, post_id in tqdm(zip(range(T-1), range(1, T))):
+                prev = train_dataset[prev_id]
+                post = train_dataset[post_id]
+
                 # load left and right cameras
                 w2c1 = prev["world_view_transform"].T
                 w2c2 = post["world_view_transform"].T
@@ -661,19 +674,53 @@ if __name__ == '__main__':
                 #    torch.quantile(metric_bwd, 0.4),
                 #    torch.quantile(metric_bwd, 0.2),
                 #    metric_bwd.min()]
-
-                thetas += [theta_fwd, theta_bwd]
-                velocities += [velocity_fwd, velocity_bwd]
+                #thetas += [theta_fwd, theta_bwd]
+                #velocities += [velocity_fwd, velocity_bwd]
                 metrics += [metric_fwd, metric_bwd]
 
-            thetas = torch.cat(thetas, dim=0)
-            velocities = torch.cat(velocities, dim=0)
-            metrics = torch.cat(metrics, dim=0)
+                if prev_id % num_interval == 0 and prev_id != 0:
+                    #thetas = torch.cat(thetas, dim=0)
+                    #velocities = torch.cat(velocities, dim=0)
+                    metrics = torch.cat(metrics, dim=0)
+                    result = visualize_histogram(metrics, None, None)
+                    for key in result:
+                        if key not in record[dataset][scene]:
+                            record[dataset][scene][key] = []
+                        record[dataset][scene][key] += [result[key]]
+
+                    #thetas = []
+                    #velocities = []
+                    metrics = []
+                
+            if len(metrics) != 0:
+                metrics = torch.cat(metrics, dim=0)
+                result = visualize_histogram(metrics, None, None)
+                for key in result:
+                    if key not in record[dataset][scene]:
+                        record[dataset][scene][key] = []
+                    record[dataset][scene][key] += [result[key]]
+                metrics = []
 
             #visualize_histogram(thetas, f"hist_thetas_{scene}.png", f"hist_thetas_{scene}_dist.png" )
             #visualize_histogram(velocities, f"hist_velocities_{scene}.png", f"hist_velocities_{scene}_dist.png")
-            record[dataset][scene] = visualize_histogram(metrics, f"hist_metrics_{scene}.png", f"hist_metrics_{scene}_dist.png")
+            #record[dataset][scene] = visualize_histogram(metrics, f"hist_metrics_{scene}.png", f"hist_metrics_{scene}_dist.png")
+            
+            input_path = os.path.join("data", dataset, scene)
+            if dataset == "dnerf":
+                input_path = os.path.join("data", dataset, "data", scene)
+
             record[dataset][scene]["psnr"] = psnr
+            with open(os.path.join(input_path, f"metrics_{num_interval}.json"), 'w') as json_file:
+                json.dump(record[dataset][scene], json_file, indent=4)
+            
+            
+            for key in record[dataset][scene]:
+                if key == "psnr":
+                    continue
+                value_list = record[dataset][scene][key]
+                value = sum(value_list)/float(len(value_list))
+                record[dataset][scene][key] = value
+            
 
     
 
