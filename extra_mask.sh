@@ -3,12 +3,13 @@
 #dataset="dnerf"
 #scenes=("bouncingballs" "hellwarrior" "hook" "jumpingjacks" "lego" "mutant" "standup" "trex")
 
-path="HyperNeRF_Scenes_Motion_Masks"
-dataset="hypernerf"
-scenes=("aleks-teapot" "americano" "broom2" "chickchicken" "cross-hands1" "cut-lemon1" "espresso" "hand1-dense-v2" "keyboard" "oven-mitts" "slice-banana" "split-cookie" "tamping" "torchocolate" "vrig-3dprinter" "vrig-chicken" "vrig-peel-banana")
+#path="HyperNeRF_Scenes_Motion_Masks"
+#dataset="hypernerf"
+#scenes=("aleks-teapot" "americano" "broom2" "chickchicken" "cross-hands1" "cut-lemon1" "espresso" "hand1-dense-v2" "keyboard" "oven-mitts" "slice-banana" "split-cookie" "tamping" "torchocolate" "vrig-3dprinter" "vrig-chicken" "vrig-peel-banana")
 
-#dataset="iphone"
-#scenes=("apple" "backpack" "block" "creeper" "handwavy" "haru-sit" "mochi-high-five" "paper-windmill" "pillow" "space-out" "spin" "sriracha-tree" "teddy" "wheel")
+path="motion_iphone"
+dataset="iphone"
+scenes=("apple" "backpack" "block" "creeper" "handwavy" "haru-sit" "mochi-high-five" "paper-windmill" "pillow" "space-out" "spin" "sriracha-tree" "teddy" "wheel")
 #dataset="nerfds"
 #scenes=("as" "basin" "bell" "cup" "plate" "press" "sieve")
 #dataset="nerfies"
@@ -68,10 +69,10 @@ scenes=("aleks-teapot" "americano" "broom2" "chickchicken" "cross-hands1" "cut-l
 cd $path
 
 for scene in "${scenes[@]}"; do
-  if [ ! -e ../data/hypernerf/$scene/resized_mask ]; then
+  if [ ! -e ../data/$dataset/$scene/resized_mask ]; then
     echo $scene
     unzip $scene.zip
-    mv mask-colmap ../data/hypernerf/$scene/resized_mask
+    mv mask-colmap ../data/$dataset/$scene/resized_mask
   fi
 done
 

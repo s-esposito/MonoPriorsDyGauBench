@@ -28,3 +28,6 @@ visualize/*.png
 check_run.sh
 download_from_orion.sh
 HyperNeRF_Scenes_Motion_Masks/*
+motion_iphone/*
+*.mp4
+*.png
