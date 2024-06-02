@@ -43,70 +43,72 @@ colors = {
 
 
 datasets = {
-    "nerfies":{
-        "broom": (0.5, 15, 21.), 
-        "curls": (0.25, 5, 23.),
-        "tail": (0.5, 15, 24.),
-        "toby-sit": (0.5, 15, 22.)
-    },
-    "nerfds":{
-        "as": (1.0, 30, 21.),
-        "basin": (1.0, 30, 21.),
-        "bell": (1.0, 30, 23.),
-        "cup": (1.0, 30, 20.),
-        "plate": (1.0, 30, 20.),
-        "press": (1.0, 30, 24.),
-        "sieve": (1.0, 30, 20.),
-    },
-    "iphone": {
-        "apple": (0.5, 30, 12.),
-        "backpack": (0.5, 30, 21.), 
-        "block": (0.5, 30, 15.), 
-        "creeper": (0.5, 30, 19.), 
-        "handwavy": (0.5, 30, 25.), 
-        "haru-sit": (0.5, 60, 27.), 
-        "mochi-high-five": (0.5, 60, 31), 
-        "paper-windmill": (0.5, 30, 16.), 
-        "pillow": (0.5, 30, 19.), 
-        "space-out": (0.5, 30, 16.), 
-        "spin": (0.5, 30, 13.), 
-        "sriracha-tree": (0.5, 30, 29.), 
-        "teddy": (0.5, 30, 12.), 
-        "wheel": (0.5, 30, 10.),
-    },
-    
+    #"nerfds":{
+    #    "as": (1.0, 30, 21., 0.29, 0.0, 0.0),
+    #    "basin": (1.0, 30, 21., 0.14, 0.0, 0.0),
+    #    "bell": (1.0, 30, 23., 0.16, 0.0, 0.0),
+    #    "cup": (1.0, 30, 20., 0.26, 0.0, 0.0),
+    #    "plate": (1.0, 30, 20., 0.22, 0.0, 0.0),
+    #    "press": (1.0, 30, 24., 0.18, 0.0, 0.0),
+    #    "sieve": (1.0, 30, 20., 0.25, 0.0, 0.0),
+    #},
     "hypernerf": {
-        "aleks-teapot": (0.5, 15, 24.), 
-        "americano": (0.5, 15, 28.), 
-        "broom2": (0.5, 15, 21.), 
-        "chickchicken": (0.5, 15, 28.), 
-        #"cross-hands1": (0.5, 15, 26), 
-        "cut-lemon1": (0.5, 15, 28.), 
-        "espresso": (0.5, 15, 26.), 
-        "hand1-dense-v2": (0.5, 15, 27.), 
-        "keyboard": (0.5, 15, 28.), 
-        "oven-mitts": (0.5, 15, 27.), 
-        "slice-banana": (0.5, 15, 27.), 
-        "split-cookie": (0.5, 15, 29.), 
-        "tamping": (0.25, 15, 24.), 
-        "torchocolate": (0.5, 15, 26.), 
-        "vrig-3dprinter": (0.5, 15, 23.), 
-        "vrig-chicken": (0.5, 15, 28.), 
-        "vrig-peel-banana": (0.5, 15, 24.),
+        "aleks-teapot": (0.5, 15, 24., 0.39, 0.0, 0.0), 
+        "americano": (0.5, 15, 28., 0.21, 0.0, 0.0), 
+        "broom2": (0.5, 15, 21., 0.81, 0.0, 0.0), 
+        "chickchicken": (0.5, 15, 28., 0.32, 0.0, 0.0), 
+        "cross-hands1": (0.5, 15, 26., 0.48, 0.0, 0.0), 
+        "cut-lemon1": (0.5, 15, 28., 0.46, 0.0, 0.0), 
+        "espresso": (0.5, 15, 26., 0.18, 0.0, 0.0), 
+        "hand1-dense-v2": (0.5, 15, 27., 0.42, 0.0, 0.0), 
+        "keyboard": (0.5, 15, 28., 0.22, 0.0, 0.0), 
+        "oven-mitts": (0.5, 15, 27., 0.46, 0.0, 0.0), 
+        "slice-banana": (0.5, 15, 27., 0.43, 0.0, 0.0), 
+        "split-cookie": (0.5, 15, 29., 0.25, 0.0, 0.0), 
+        "tamping": (0.25, 15, 24., 0.33, 0.0, 0.0), 
+        "torchocolate": (0.5, 15, 26., 0.31, 0.0, 0.0), 
+        "vrig-3dprinter": (0.5, 15, 23., 0.34, 3.13, 251.37), 
+        "vrig-chicken": (0.5, 15, 28., 0.35, 7.38, 212.58), 
+        "vrig-peel-banana": (0.5, 15, 24., 0.41, 1.26, 237.66),
+    },
+    "nerfies":{
+        "broom": (0.5, 15, 21., 0.81, 3.4, 128.54), 
+        "curls": (0.25, 5, 23., 0.67, 1.2, 138.55),
+        "tail": (0.5, 15, 24., 0.68, 3.3, 160.55),
+        "toby-sit": (0.5, 15, 22., 0.74, 2.18, 110.51)
+    },
+    
+    "iphone": {
+        "apple": (0.5, 30, 12., 0.82, 0.75, 3.79),
+        "backpack": (0.5, 30, 21., 0.63, 0.26, 5.59), 
+        "block": (0.5, 30, 15., 0.61, 0.04, 11.50), 
+        "creeper": (0.5, 30, 19., 0.34, 0.23, 14.05), 
+        "handwavy": (0.5, 30, 25., 0.25, 0.05, 13.66), 
+        #"haru-sit": (0.5, 60, 27., 0.19, 0.30, 30.32), 
+        "mochi-high-five": (0.5, 60, 31, 0.20, 0.07, 14.49), 
+        "paper-windmill": (0.5, 30, 16., 0.36, 0.38, 10.71), 
+        "pillow": (0.5, 30, 19., 0.44, 0.06, 13.19), 
+        "space-out": (0.5, 30, 16., 0.47, 0.13, 6.37), 
+        "spin": (0.5, 30, 13., 0.71, 0.15, 7.86), 
+        "sriracha-tree": (0.5, 30, 29., 0.26, 0.18, 18.56), 
+        "teddy": (0.5, 30, 12., 0.69, 0.20, 7.62), 
+        "wheel": (0.5, 30, 10., 0.62, 0.03, 58.45),
     },
     
     
     
-    "dnerf": {
-        "bouncingballs": (0.5, 60), 
-        "hellwarrior": (0.5, 60), 
-        "hook": (0.5, 60),
-        "jumpingjacks": (0.5, 60), 
-        "lego": (0.5, 60), 
-        "mutant": (0.5, 60),
-        "standup": (0.5, 60), 
-        "trex": (0.5, 60)
-    },
+    
+    
+    #"dnerf": {
+    #    "bouncingballs": (0.5, 60, 40, 0.01, 15.52, 1945.52), 
+    #    "hellwarrior": (0.5, 60, 28, 0.03), 
+    #    "hook": (0.5, 60, 31, 0.02),
+    #    "jumpingjacks": (0.5, 60, 34, 0.02), 
+    #    "lego": (0.5, 60, 25, 0.06), 
+    #    "mutant": (0.5, 60, 33, 0.02),
+    #    "standup": (0.5, 60, 36, 0.01), 
+    #    "trex": (0.5, 60, 32, 0.02)
+    #},
 }
 
 def warp_flow(img, flow):
@@ -279,16 +281,17 @@ def visualize_points_world(points_world_list, c2w_list, output_path):
     plt.savefig(output_path, dpi=300)  # Save the plot as an image file
     plt.close(fig)  # Close the figure to free up memory
 
-def calculate_metrics(points1, points2, fps, c2w1, c2w2, fwd_flow, height, width, k=100., epison=0.01):
+def calculate_metrics(points1, points2, fps, c2w1, c2w2, fwd_flow, fwd_mask, height, width, k=1., theta_min=.8):
     # Create a grid of pixel coordinates for image1
     y, x = torch.meshgrid(torch.arange(height), torch.arange(width))
     coords1 = torch.stack([x, y], dim=-1).float()
 
     # Warp the pixel coordinates from image1 to image2 using the forward optical flow
     coords2 = coords1 + fwd_flow
-
+    #assert False, fwd_mask.shape
     # Check if the warped coordinates are within the bounds of image2
     mask = (coords2[..., 0] >= 0) & (coords2[..., 0] < width) & (coords2[..., 1] >= 0) & (coords2[..., 1] < height)
+    mask = mask & fwd_mask
     visible = mask.flatten()
 
     # Convert the warped coordinates to integer indices
@@ -302,11 +305,7 @@ def calculate_metrics(points1, points2, fps, c2w1, c2w2, fwd_flow, height, width
     ], dim=-1)
     points2_warped = points2[coords2_int_clipped[..., 1], coords2_int_clipped[..., 0]]
 
-    # Compute the distance between the corresponding points
-    distance = torch.norm(points2_warped - points1_warped, dim=-1).flatten()
-
-    # Compute the velocity of each point
-    velocity = distance * fps
+    
 
     
     points1_warped = points1_warped.view(-1, 3)
@@ -314,29 +313,40 @@ def calculate_metrics(points1, points2, fps, c2w1, c2w2, fwd_flow, height, width
     
     # Convert points1_warped to camera space for camera 1
     points1_cam1 = torch.matmul(torch.inverse(c2w1), torch.cat([points1_warped, torch.ones_like(points1_warped[..., :1])], dim=-1).transpose(0, 1)).transpose(0, 1)[..., :3]
-
     # Convert points2_warped to camera space for camera 2
     points2_cam2 = torch.matmul(torch.inverse(c2w2), torch.cat([points2_warped, torch.ones_like(points2_warped[..., :1])], dim=-1).transpose(0, 1)).transpose(0, 1)[..., :3]
+    
+
+
+    # Compute the distance between the corresponding points
+    distance = torch.norm((points2_warped - points1_warped), dim=-1).flatten()
+
+    # Compute the velocity of each point
+    velocity = distance * fps
 
     # Normalize camera space points to get camera ray directions
     rays1 = points1_cam1 / torch.norm(points1_cam1, dim=-1, keepdim=True)
     rays2 = points2_cam2 / torch.norm(points2_cam2, dim=-1, keepdim=True)
 
     # Compute the dot product between the world pixel rays
-    dot_product = torch.sum(rays1 * rays2, dim=-1)
-
+    dot_product = torch.sum(rays1 * rays2, dim=-1) # values fall between [-1, 1] # the bigger, the worse
+    theta = torch.abs(dot_product) #[0,1], close to 1 typically is harder
+    #assert torch.all(theta >= theta_min), theta.min()
+    #theta = (theta-theta_min)/(1.-theta_min) # values fall between [0, 1]
     # Compute the angular difference in radians
-    theta = torch.acos(torch.clamp(dot_product, -1.0, 1.0)).flatten()
+    #theta = torch.acos(torch.clamp(dot_product, -1.0, 1.0)).flatten()
 
+    #velocity /= fps
+
+    max_velocity = torch.quantile(velocity, 0.9)
     # Set the metrics to zero for invisible points
-    distance[~visible] = 0.0
-    velocity[~visible] = 0.0
-    theta[~visible] = 0.0
+    #distance[~visible] = k * max_velocity / fps
+    #velocity[~visible] = k * max_velocity
+    #theta[~visible] = 1.
 
-    
-    max_velocity = velocity.max()
+    # option 1
     metric = torch.ones_like(theta) * k * max_velocity 
-    metric[visible] = velocity[visible] / (theta[visible] + 1e-2)
+    metric[visible] = velocity[visible] / theta[visible]
     metric = torch.clamp(metric, max=k * max_velocity ) 
 
     return distance, velocity, theta, visible, metric
@@ -375,6 +385,7 @@ def visualize_points_with_metrics(points, distance, velocity, theta, visible, me
     ax2.set_box_aspect((np.ptp(points[:, 0]), np.ptp(points[:, 1]), np.ptp(points[:, 2])))
     
     # Subplot for angular difference
+    print(theta.shape, theta.max(), theta.min())
     ax3 = fig.add_subplot(143, projection='3d')
     #assert False, torch.unique(theta)
     theta_norm = (theta - theta.min()) / (theta.max() - theta.min())
@@ -416,8 +427,15 @@ def visualize_points_with_metrics(points, distance, velocity, theta, visible, me
     plt.close(fig)  # Close the figure to free up memory
 
 
-def visualize_histogram(tensor, output_path, output_path_dist, num_bins=20, ignore=4, sample_interval=100, max_x=200., max_y=0.05):
-    tensor = tensor[::sample_interval]
+def visualize_histogram(tensor, visibles, output_path, output_path_dist, num_bins=20, ignore=4, sample_interval=100, max_x=200., max_y=0.05):
+    tensor = tensor[visibles]
+    # shuffle
+    random_values = torch.rand(len(tensor))
+    indices = torch.argsort(random_values)
+
+    # Use the sorted indices to shuffle the order of samples in the tensor
+    # then uniformly sample
+    tensor = tensor[indices][::sample_interval]
     
     # Calculate the quantiles for the tensor
     quantiles = torch.linspace(0, 1, num_bins+1)  # 11 evenly spaced quantiles (0.0, 0.1, ..., 1.0)
@@ -425,11 +443,12 @@ def visualize_histogram(tensor, output_path, output_path_dist, num_bins=20, igno
     
     # Get the maximum value from quantile_values (excluding the top bin)
     #assert ignore >= 1
-    #max_value = quantile_values[-ignore]
-    print(f"Quantiles: {quantile_values}")
+    #max d_value = quantile_values[-ignore]
+    #print(f"Quantiles: {quantile_values}")
     #print(f"filtered by {max_value}")
     # Filter out values greater than max_value from the tensor
-    filtered_tensor = tensor[tensor <= max_x]
+    #filtered_tensor = tensor[tensor <= max_x]
+    filtered_tensor = tensor
 
     if output_path is not None:
         # Create a figure and axis
@@ -547,175 +566,193 @@ if __name__ == '__main__':
         for scene in tqdm(datasets[dataset]):
             record[dataset][scene] = {}
             #### load dataset ####
-            ratio, fps, psnr = datasets[dataset][scene]
+            ratio, fps, psnr, lpips, Omega, omega = datasets[dataset][scene]
+            
+            # disable fps
+            fps = 1.
+            
             input_path = os.path.join("data", dataset, scene)
             if dataset == "dnerf":
                 input_path = os.path.join("data", dataset, "data", scene)
             print(input_path)
-            if os.path.exists(os.path.join(input_path, "transforms_train.json")):
-                #assert False, "Not supported for now; how to deal with FPS?"
-                all_dataset = SyntheticDataModule(
-                    datadir=input_path,
-                    eval=True,
-                    ratio=ratio,
-                    white_background=True,
-                    num_pts_ratio = 0.,
-                    num_pts =0,
-                    load_flow=False
-                )
-            elif os.path.exists(os.path.join(input_path, "metadata.json")):
-                all_dataset = NerfiesDataModule(
-                    datadir=input_path,
-                    eval=True,
-                    ratio=ratio,
-                    white_background=True,
-                    num_pts_ratio = 0.,
-                    num_pts =0,
-                    load_flow=False
-                )
+            
+            if True or not os.path.exists(os.path.join(input_path, f"metrics_optical_{num_interval}.json")):
+            
+                if os.path.exists(os.path.join(input_path, "transforms_train.json")):
+                    #assert False, "Not supported for now; how to deal with FPS?"
+                    all_dataset = SyntheticDataModule(
+                        datadir=input_path,
+                        eval=True,
+                        ratio=ratio,
+                        white_background=True,
+                        num_pts_ratio = 0.,
+                        num_pts =0,
+                        load_flow=False
+                    )
+                elif os.path.exists(os.path.join(input_path, "metadata.json")):
+                    all_dataset = NerfiesDataModule(
+                        datadir=input_path,
+                        eval=True,
+                        ratio=ratio,
+                        white_background=True,
+                        num_pts_ratio = 0.,
+                        num_pts =0,
+                        load_flow=False
+                    )
 
-            all_dataset.setup("")
+                all_dataset.setup("")
 
-            train_dataset = all_dataset.train_cameras
+                train_dataset = all_dataset.train_cameras
 
-            T = len(train_dataset)            
+                T = len(train_dataset)            
 
-            # for debug
-            T = 32
+                # for debug
+                #T = 32
 
-            # trackers for all points' status; renew every n_interval steps
-            #thetas = []
-            #velocities = []
-            metrics = []
+                # trackers for all points' status; renew every n_interval steps
+                #thetas = []
+                #velocities = []
+                metrics = []
+                visibles = []
 
 
-            for prev_id, post_id in tqdm(zip(range(T-1), range(1, T))):
-                prev = train_dataset[prev_id]
-                post = train_dataset[post_id]
+                for prev_id, post_id in tqdm(zip(range(T-1), range(1, T))):
+                    prev = train_dataset[prev_id]
+                    post = train_dataset[post_id]
 
-                # load left and right cameras
-                w2c1 = prev["world_view_transform"].T
-                w2c2 = post["world_view_transform"].T
+                    # load left and right cameras
+                    w2c1 = prev["world_view_transform"].T
+                    w2c2 = post["world_view_transform"].T
 
-                c2w1 = torch.linalg.inv(w2c1)
-                c2w2 = torch.linalg.inv(w2c2)
+                    c2w1 = torch.linalg.inv(w2c1)
+                    c2w2 = torch.linalg.inv(w2c2)
 
-                orientations1 = c2w1[:3, :3]
-                positions1 = c2w1[:3, 3]  
-                orientations2 = c2w2[:3, :3]
-                positions2 = c2w2[:3, 3]  
+                    orientations1 = c2w1[:3, :3]
+                    positions1 = c2w1[:3, 3]  
+                    orientations2 = c2w2[:3, :3]
+                    positions2 = c2w2[:3, 3]  
 
-                # load left and right images
-                image1 = prev["original_image"][None, :3].to(device)
-                image2 = post["original_image"][None, :3].to(device)
-                
-                height, width = image1.shape[-2], image1.shape[-1]
-                
-                with torch.no_grad():
-                    # compute RAFT flow, visiblity
-                    padder = InputPadder(image1.shape)
+                    # load left and right images
+                    image1 = prev["original_image"][None, :3].to(device)
+                    image2 = post["original_image"][None, :3].to(device)
+                    
+                    height, width = image1.shape[-2], image1.shape[-1]
+                    
+                    with torch.no_grad():
+                        # compute RAFT flow, visiblity
+                        padder = InputPadder(image1.shape)
 
-                    image1, image2 = padder.pad(image1, image2)
+                        image1, image2 = padder.pad(image1, image2)
 
-                    _, flow_fwd = model(image1, image2, iters=20, test_mode=True)
-                    _, flow_bwd = model(image2, image1, iters=20, test_mode=True)
+                        _, flow_fwd = model(image1, image2, iters=20, test_mode=True)
+                        _, flow_bwd = model(image2, image1, iters=20, test_mode=True)
 
-                    flow_fwd = padder.unpad(flow_fwd[0]).cpu().numpy().transpose(1, 2, 0)
-                    flow_bwd = padder.unpad(flow_bwd[0]).cpu().numpy().transpose(1, 2, 0)
+                        flow_fwd = padder.unpad(flow_fwd[0]).cpu().numpy().transpose(1, 2, 0)
+                        flow_bwd = padder.unpad(flow_bwd[0]).cpu().numpy().transpose(1, 2, 0)
 
-                    mask_fwd, mask_bwd = compute_fwdbwd_mask(flow_fwd, flow_bwd)
+                        mask_fwd, mask_bwd = compute_fwdbwd_mask(flow_fwd, flow_bwd)
 
-                # visualize optical flow and mask
-                #Image.fromarray(flow_viz.flow_to_image(flow_fwd)).save('test_fwd.png')
-                #Image.fromarray(flow_viz.flow_to_image(flow_bwd)).save('test_bwd.png')
-                #Image.fromarray(mask_fwd).save('test_fwd_mask.png')
-                #Image.fromarray(mask_bwd).save('test_bwd_mask.png')
-                #assert False
+                    # visualize optical flow and mask
+                    #Image.fromarray(flow_viz.flow_to_image(flow_fwd)).save('test_fwd.png')
+                    #Image.fromarray(flow_viz.flow_to_image(flow_bwd)).save('test_bwd.png')
+                    #Image.fromarray(mask_fwd).save('test_fwd_mask.png')
+                    #Image.fromarray(mask_bwd).save('test_bwd_mask.png')
+                    #assert False
 
-                # compute ZoeDepth for both frames
-                with torch.no_grad():
-                    depth1 = model_zoe_nk.infer(image1)
-                    depth2 = model_zoe_nk.infer(image2)
+                    # compute ZoeDepth for both frames
+                    with torch.no_grad():
+                        depth1 = model_zoe_nk.infer(image1)
+                        depth2 = model_zoe_nk.infer(image2)
 
-                depth1 = F.interpolate(depth1, (height, width), mode="nearest")
-                depth2 = F.interpolate(depth2, (height, width), mode="nearest")
-                # visualize depth
-                #colored1 = colorize(depth1)
-                #colored2 = colorize(depth2)
-                #Image.fromarray(colored1).save("test_depth1.png")
-                #Image.fromarray(colored2).save("test_depth2.png")
-                
-                
-                # projects left and right pixels to world space                
-                points1 = lift_scene_point(c2w1, height, width, depth1)
-                points2 = lift_scene_point(c2w2, height, width, depth2)
-                #visualize_points_world([points1, points2], [c2w1, c2w2], "test.png")
+                    depth1 = F.interpolate(depth1, (height, width), mode="nearest")
+                    depth2 = F.interpolate(depth2, (height, width), mode="nearest")
+                    # visualize depth
+                    #colored1 = colorize(depth1)
+                    #colored2 = colorize(depth2)
+                    #Image.fromarray(colored1).save("test_depth1.png")
+                    #Image.fromarray(colored2).save("test_depth2.png")
+                    
+                    
+                    # projects left and right pixels to world space                
+                    points1 = lift_scene_point(c2w1, height, width, depth1)
+                    points2 = lift_scene_point(c2w2, height, width, depth2)
+                    #visualize_points_world([points1, points2], [c2w1, c2w2], "test.png")
 
-   
-                # for each pixel of the image1, read corresponding points1 3d location. # depend on optical flow fwd_flow from image1 to image2, try to warp to get corresponding pixel in image2. # if the corresponding pixel falls outside of image2 scope, set visible=False # otherwise set visible=True, query the closest integar pixel, and read corresponding points2 3d location # calculate the distance between these two points, and given time = 1/fps, calculate the velocity of this point v
-                # calculate the world pixel ray connecting the pixel of the image1 to camera 1, and the world pixel ray connecting the pixel of the image2 to camera 2.
-                # compute the angular difference theta between these two world space pixel rays that should falls in [-pi, pi]
+    
+                    # for each pixel of the image1, read corresponding points1 3d location. # depend on optical flow fwd_flow from image1 to image2, try to warp to get corresponding pixel in image2. # if the corresponding pixel falls outside of image2 scope, set visible=False # otherwise set visible=True, query the closest integar pixel, and read corresponding points2 3d location # calculate the distance between these two points, and given time = 1/fps, calculate the velocity of this point v
+                    # calculate the world pixel ray connecting the pixel of the image1 to camera 1, and the world pixel ray connecting the pixel of the image2 to camera 2.
+                    # compute the angular difference theta between these two world space pixel rays that should falls in [-pi, pi]
 
-                distance_fwd, velocity_fwd, theta_fwd, visible_fwd, metric_fwd = calculate_metrics(points1, points2, fps, c2w1, c2w2, torch.from_numpy(flow_fwd), height, width)
-                distance_bwd, velocity_bwd, theta_bwd, visible_bwd, metric_bwd = calculate_metrics(points2, points1, fps, c2w2, c2w1, torch.from_numpy(flow_bwd), height, width)
-                
-                
-                #visualize_points_with_metrics(points1.reshape((-1, 3)), distance_fwd, velocity_fwd, theta_fwd, visible_fwd, metric_fwd, f"test_fwd_{scene}.png")
-                #visualize_points_with_metrics(points2.reshape((-1, 3)), distance_bwd, velocity_bwd, theta_bwd, visible_fwd, metric_bwd, f"test_bwd_{scene}.png")
-                #assert False, [metric_fwd.max(), 
-                #    torch.quantile(metric_fwd, 0.8),
-                #    torch.quantile(metric_fwd, 0.6),
-                #    torch.quantile(metric_fwd, 0.4),
-                #    torch.quantile(metric_fwd, 0.2),
-                #    metric_fwd.min(), 
-                #    metric_bwd.max(), 
-                #    torch.quantile(metric_bwd, 0.8),
-                #    torch.quantile(metric_bwd, 0.6),
-                #    torch.quantile(metric_bwd, 0.4),
-                #    torch.quantile(metric_bwd, 0.2),
-                #    metric_bwd.min()]
-                #thetas += [theta_fwd, theta_bwd]
-                #velocities += [velocity_fwd, velocity_bwd]
-                metrics += [metric_fwd, metric_bwd]
+                    distance_fwd, velocity_fwd, theta_fwd, visible_fwd, metric_fwd = calculate_metrics(points1, points2, fps, c2w1, c2w2, torch.from_numpy(flow_fwd), torch.from_numpy(mask_fwd), height, width)
+                    distance_bwd, velocity_bwd, theta_bwd, visible_bwd, metric_bwd = calculate_metrics(points2, points1, fps, c2w2, c2w1, torch.from_numpy(flow_bwd), torch.from_numpy(mask_bwd), height, width)
+                    
+                    
+                    #visualize_points_with_metrics(points1.reshape((-1, 3)), distance_fwd, velocity_fwd, theta_fwd, visible_fwd, metric_fwd, f"test_fwd_{scene}.png")
+                    #visualize_points_with_metrics(points2.reshape((-1, 3)), distance_bwd, velocity_bwd, theta_bwd, visible_fwd, metric_bwd, f"test_bwd_{scene}.png")
+                    #assert False
+                    #assert False, [metric_fwd.max(), 
+                    #    torch.quantile(metric_fwd, 0.8),
+                    #    torch.quantile(metric_fwd, 0.6),
+                    #    torch.quantile(metric_fwd, 0.4),
+                    #    torch.quantile(metric_fwd, 0.2),
+                    #    metric_fwd.min(), 
+                    #    metric_bwd.max(), 
+                    #    torch.quantile(metric_bwd, 0.8),
+                    #    torch.quantile(metric_bwd, 0.6),
+                    #    torch.quantile(metric_bwd, 0.4),
+                    #    torch.quantile(metric_bwd, 0.2),
+                    #    metric_bwd.min()]
+                    #thetas += [theta_fwd, theta_bwd]
+                    #velocities += [velocity_fwd, velocity_bwd]
+                    visibles += [visible_fwd, visible_bwd]
+                    metrics += [metric_fwd, metric_bwd]
 
-                if prev_id % num_interval == 0 and prev_id != 0:
-                    #thetas = torch.cat(thetas, dim=0)
-                    #velocities = torch.cat(velocities, dim=0)
+                    if prev_id % num_interval == 0 and prev_id != 0:
+                        #visualize_points_with_metrics(points1.reshape((-1, 3)), distance_fwd, velocity_fwd, theta_fwd, visible_fwd, metric_fwd, f"test_fwd_{scene}.png")
+                        #thetas = torch.cat(thetas, dim=0)
+                        #velocities = torch.cat(velocities, dim=0)
+                        print(torch.quantile(theta_fwd, 0.2), torch.quantile(theta_fwd, 0.4), theta_fwd.median(), velocity_fwd.median(), metric_fwd.median())
+                        metrics = torch.cat(metrics, dim=0)
+                        visibles = torch.cat(visibles, dim=0)
+                        result = visualize_histogram(metrics, visibles, None, None)
+                        for key in result:
+                            if key not in record[dataset][scene]:
+                                record[dataset][scene][key] = []
+                            record[dataset][scene][key] += [result[key]]
+
+                        #thetas = []
+                        #velocities = []
+                        visibles = []
+                        metrics = []
+                    
+                if len(metrics) != 0:
                     metrics = torch.cat(metrics, dim=0)
-                    result = visualize_histogram(metrics, None, None)
+                    visibles = torch.cat(visibles, dim=0)
+                    result = visualize_histogram(metrics, visibles, None, None)
                     for key in result:
                         if key not in record[dataset][scene]:
                             record[dataset][scene][key] = []
                         record[dataset][scene][key] += [result[key]]
-
-                    #thetas = []
-                    #velocities = []
                     metrics = []
+
+                #visualize_histogram(thetas, f"hist_thetas_{scene}.png", f"hist_thetas_{scene}_dist.png" )
+                #visualize_histogram(velocities, f"hist_velocities_{scene}.png", f"hist_velocities_{scene}_dist.png")
+                #record[dataset][scene] = visualize_histogram(metrics, f"hist_metrics_{scene}.png", f"hist_metrics_{scene}_dist.png")
                 
-            if len(metrics) != 0:
-                metrics = torch.cat(metrics, dim=0)
-                result = visualize_histogram(metrics, None, None)
-                for key in result:
-                    if key not in record[dataset][scene]:
-                        record[dataset][scene][key] = []
-                    record[dataset][scene][key] += [result[key]]
-                metrics = []
+                
 
-            #visualize_histogram(thetas, f"hist_thetas_{scene}.png", f"hist_thetas_{scene}_dist.png" )
-            #visualize_histogram(velocities, f"hist_velocities_{scene}.png", f"hist_velocities_{scene}_dist.png")
-            #record[dataset][scene] = visualize_histogram(metrics, f"hist_metrics_{scene}.png", f"hist_metrics_{scene}_dist.png")
-            
-            input_path = os.path.join("data", dataset, scene)
-            if dataset == "dnerf":
-                input_path = os.path.join("data", dataset, "data", scene)
-
-            record[dataset][scene]["psnr"] = psnr
-            with open(os.path.join(input_path, f"metrics_{num_interval}.json"), 'w') as json_file:
-                json.dump(record[dataset][scene], json_file, indent=4)
-            
+                record[dataset][scene]["psnr"] = psnr
+                record[dataset][scene]["lpips"] = lpips
+                record[dataset][scene]["Omega"] = Omega
+                record[dataset][scene]["omega"] = omega
+                with open(os.path.join(input_path, f"metrics_optical_{num_interval}.json"), 'w') as json_file:
+                    json.dump(record[dataset][scene], json_file, indent=4)
+            else:
+                with open(os,path.join(input_path, f"metrics_optical_{num_interval}.json"), 'r') as json_file:
+                    record[dataset][scene] = json.load(json_file)
             
             for key in record[dataset][scene]:
-                if key == "psnr":
+                if key in ["psnr", "lpips", "Omega", "omega"]:
                     continue
                 value_list = record[dataset][scene][key]
                 value = sum(value_list)/float(len(value_list))
@@ -725,58 +762,106 @@ if __name__ == '__main__':
     
 
             
-        # Plotting
-        fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+            # Plotting
+            fig, axes = plt.subplots(3, 4, figsize=(20, 15))
 
-        
-        # Iterate through the datasets and scenes to plot the data
-        for dataset, scenes in record.items():
-            for scene, metrics in scenes.items():
-                with open(os.path.join("data", dataset, scene, "dataset.json"), "r") as f:
-                    dataset_json = json.load(f)
-                    if len(dataset_json["val_ids"]) == 0:
-                        interpolate = True
-                    else:
-                        interpolate = False
-                psnr = metrics['psnr']
-                median = metrics['median']
-                variance = metrics['variance']
-                std = metrics['std']
+            
+            # Iterate through the datasets and scenes to plot the data
+            for dataset, scenes in record.items():
+                for scene, metrics in scenes.items():
+                    with open(os.path.join("data", dataset, scene, "dataset.json"), "r") as f:
+                        dataset_json = json.load(f)
+                        if len(dataset_json["val_ids"]) == 0:
+                            interpolate = True
+                        else:
+                            interpolate = False
+                    psnr = metrics['psnr']
+                    lpips = metrics['lpips']
+                    median = metrics['median']
+                    variance = metrics['variance']
+                    std = metrics['std']
+                    mean = metrics['mean']
+                    Omega = metrics['Omega']
+                    omega = metrics['omega']
 
-                color = colors[dataset]
+                    color = colors[dataset]
 
-                # Plot each metric on the respective subplot
-                axes[0].scatter(psnr, median, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
-                axes[1].scatter(psnr, variance, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
-                axes[2].scatter(psnr, std, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
-                axes[3].scatter(psnr, metrics['mean'], color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    # Plot each metric on the respective subplot
+                    axes[0, 0].scatter(psnr, median, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[0, 1].scatter(psnr, variance, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[0, 2].scatter(psnr, std, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[0, 3].scatter(psnr, mean, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
 
-        # Adding titles and labels
-        axes[0].set_title('PSNR vs Median')
-        axes[0].set_xlabel('PSNR')
-        axes[0].set_ylabel('Median')
+                    axes[1, 0].scatter(lpips, median, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[1, 1].scatter(lpips, variance, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[1, 2].scatter(lpips, std, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[1, 3].scatter(lpips, mean, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
 
-        axes[1].set_title('PSNR vs Variance')
-        axes[1].set_xlabel('PSNR')
-        axes[1].set_ylabel('Variance')
+                    axes[2, 0].scatter(psnr, Omega, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[2, 1].scatter(psnr, omega, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[2, 2].scatter(lpips, Omega, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
+                    axes[2, 3].scatter(lpips, omega, color=color, label=dataset if scene == list(scenes.keys())[0] else "", edgecolor='black', linewidth=0.0 if interpolate else 1.0)
 
-        axes[2].set_title('PSNR vs Std Dev')
-        axes[2].set_xlabel('PSNR')
-        axes[2].set_ylabel('Standard Deviation')
+                    # Adding titles and labels
+                    axes[0, 0].set_title('PSNR vs Median')
+                    axes[0, 0].set_xlabel('PSNR')
+                    axes[0, 0].set_ylabel('Median')
 
-        axes[3].set_title('PSNR vs Mean')
-        axes[3].set_xlabel('PSNR')
-        axes[3].set_ylabel('Mean')
+                    axes[0, 1].set_title('PSNR vs Variance')
+                    axes[0, 1].set_xlabel('PSNR')
+                    axes[0, 1].set_ylabel('Variance')
 
-        # Adding legend
-        for ax in axes:
-            ax.legend()
+                    axes[0, 2].set_title('PSNR vs Std Dev')
+                    axes[0, 2].set_xlabel('PSNR')
+                    axes[0, 2].set_ylabel('Standard Deviation')
 
-        plt.tight_layout()
+                    axes[0, 3].set_title('PSNR vs Mean')
+                    axes[0, 3].set_xlabel('PSNR')
+                    axes[0, 3].set_ylabel('Mean')
 
-        # Save the figure to disk
-        plt.savefig('psnr_metrics_plot.png')
+                    axes[1, 0].set_title('LPIPS vs Median')
+                    axes[1, 0].set_xlabel('LPIPS')
+                    axes[1, 0].set_ylabel('Median')
 
-        # Optional: Close the plot if you're running this in an environment where plots are displayed
-        plt.close()
+                    axes[1, 1].set_title('LPIPS vs Variance')
+                    axes[1, 1].set_xlabel('LPIPS')
+                    axes[1, 1].set_ylabel('Variance')
+
+                    axes[1, 2].set_title('LPIPS vs Std Dev')
+                    axes[1, 2].set_xlabel('LPIPS')
+                    axes[1, 2].set_ylabel('Standard Deviation')
+
+                    axes[1, 3].set_title('LPIPS vs Mean')
+                    axes[1, 3].set_xlabel('LPIPS')
+                    axes[1, 3].set_ylabel('Mean')
+
+                    axes[2, 0].set_title('PSNR vs Omega')
+                    axes[2, 0].set_xlabel('PSNR')
+                    axes[2, 0].set_ylabel('Omega')
+
+                    axes[2, 1].set_title('PSNR vs omega')
+                    axes[2, 1].set_xlabel('PSNR')
+                    axes[2, 1].set_ylabel('omega')
+
+                    axes[2, 2].set_title('LPIPS vs Omega')
+                    axes[2, 2].set_xlabel('LPIPS')
+                    axes[2, 2].set_ylabel('Omega')
+
+                    axes[2, 3].set_title('LPIPS vs omega')
+                    axes[2, 3].set_xlabel('LPIPS')
+                    axes[2, 3].set_ylabel('omega')
+
+                    # Adding legend
+                    for row in axes:
+                        for ax in row:
+                            ax.legend()
+
+
+            plt.tight_layout()
+
+            # Save the figure to disk
+            plt.savefig('psnr_metrics_plot_optical.png')
+
+            # Optional: Close the plot if you're running this in an environment where plots are displayed
+            plt.close()
 

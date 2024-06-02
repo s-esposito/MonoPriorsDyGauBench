@@ -161,14 +161,23 @@ def process_methods(dataset, methods_subset):
                     exp["train-test_lpips"] = train_lpips - test_lpips
                     
                     if big_name == "TiNeuVox":
-                        train_run = train_run[-1]
-                        start_time = train_run.created_at
-                        end_time = train_run.heartbeatAt
-                        start_datetime = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S')
-                        end_datetime = datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S')
-                        total_time = end_datetime - start_datetime
-                        exp["train_time"] = total_time.total_seconds()
-                        exp["OOM"] = 0.
+                        train_iter = len(train_run) - 1
+                        while train_iter >= 0:
+                            if len(train_run[train_iter].history(keys=["global_step"], pandas=False)) >= 1:
+                                break
+                            train_iter -= 1
+                        if train_iter < 0:
+                            print(["No trainer record!", local_path, test_psnr])
+                        else:
+                            train_run = train_run[train_iter]
+                            
+                            start_time = train_run.created_at
+                            end_time = train_run.heartbeatAt
+                            start_datetime = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S')
+                            end_datetime = datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S')
+                            total_time = end_datetime - start_datetime
+                            exp["train_time"] = total_time.total_seconds()
+                            exp["OOM"] = 0.
                     else:
                         train_iter = len(train_run) - 1
                         while train_iter >= 0:
@@ -333,7 +342,7 @@ for color, method in zip(method_colors[:len(methods)], methods):
 
 
 for key in result_final[datasets[0]][methods[0]]["all"]:
-    plt.rcParams['font.family'] = 'Arial'
+    #plt.rcParams['font.family'] = 'Arial'
     plt.rcParams['font.size'] = 12
 
     # Calculate the width of the plot based on the number of datasets and methods
@@ -352,8 +361,8 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
     for dataset in result_final:
         dataset_id = datasets.index(dataset)
         for method in result_final[dataset]:
-            if (dataset == "dnerf") and (method == "TRBF/vanilla"):
-                continue
+            #if (dataset == "dnerf") and (method == "TRBF/vanilla"):
+            #    continue
             method_id = methods.index(method)
             bar_positions.append(dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width)
             if (key not in result_final[dataset][method][sub_class]) or (len(result_final[dataset][method][sub_class][key]) == 0):
@@ -420,7 +429,7 @@ for dataset in datasets:
     common_scenes = [scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"]
 
     for key in result_final[datasets[0]][methods[0]]["all"]:
-        plt.rcParams['font.family'] = 'Arial'
+        #plt.rcParams['font.family'] = 'Arial'
         plt.rcParams['font.size'] = 12
 
         # Calculate the width of the plot based on the number of scenes and methods
