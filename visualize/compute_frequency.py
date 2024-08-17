@@ -6,10 +6,16 @@ from tqdm import tqdm
 from scipy.ndimage import sobel
 import pickle
 import os
+import json
 
 def load_image(image_path):
     """Load an image and convert it to grayscale."""
     image = Image.open(image_path).convert('L')
+    width, height = image.size
+    max_edge = max(width, height)
+    scale = 480 / max_edge
+    new_size = (int(width * scale), int(height * scale))
+    image = image.resize(new_size, Image.Resampling.LANCZOS)
     return np.array(image)
 
 def compute_magnitude_spectrum(image_array):
@@ -19,7 +25,8 @@ def compute_magnitude_spectrum(image_array):
     magnitude_spectrum = np.abs(fft_shifted)
     return magnitude_spectrum
 
-def aggregate_magnitude_spectrums(image_paths, batch_size=10, sample_rate=1000):
+
+def aggregate_magnitude_spectrums(image_paths, batch_size=10, sample_rate=1):
     """Aggregate magnitude spectrums from a list of images."""
     aggregated_magnitudes = []
 
@@ -29,9 +36,11 @@ def aggregate_magnitude_spectrums(image_paths, batch_size=10, sample_rate=1000):
             image_array = load_image(image_path)
             magnitude_spectrum = compute_magnitude_spectrum(image_array)
             magnitude_spectrum = magnitude_spectrum.flatten()
-            np.random.shuffle(magnitude_spectrum)
-            subsample = magnitude_spectrum[::sample_rate]
-            aggregated_magnitudes.extend(subsample)
+            #magnitude_sum = np.sum(magnitude_spectrum)
+            aggregated_magnitudes.append(magnitude_spectrum)
+            #np.random.shuffle(magnitude_spectrum)
+            #subsample = magnitude_spectrum[::sample_rate]
+            #aggregated_magnitudes.extend(subsample)
 
     return np.array(aggregated_magnitudes)
 
@@ -42,7 +51,7 @@ def plot_histogram(aggregated_magnitudes, outpath, bins=50):
     mean_value = np.mean(aggregated_magnitudes)
 
     plt.figure(figsize=(10, 6))
-    plt.hist(aggregated_magnitudes, bins=bins, range=(min_value, max_value), log=True, edgecolor='black')
+    #plt.hist(aggregated_magnitudes, bins=bins, range=(min_value, max_value), log=True, edgecolor='black')
     plt.axvline(mean_value, color='r', linestyle='dashed', linewidth=1)
     plt.text(mean_value * 1.1, plt.ylim()[1] * 0.9, 'Mean: {:.2f}'.format(mean_value), color='r')
    
@@ -51,6 +60,7 @@ def plot_histogram(aggregated_magnitudes, outpath, bins=50):
     plt.ylabel('Frequency (Log Scale)')
     plt.grid(True)
     plt.savefig(outpath)
+    plt.close()
 
 # Example usage
 #image_folder = 'data/hypernerf/americano/rgb/1x/*.png'  # Replace with your image folder path
@@ -59,6 +69,14 @@ save_dir = "freq"
 os.makedirs(save_dir, exist_ok=True)
 
 image_folders = {
+    "dnerf/bouncingballs": "data/dnerf/data/bouncingballs/train/*.png",
+    "dnerf/hellwarrior": "data/dnerf/data/hellwarrior/train/*.png",
+    "dnerf/hook": "data/dnerf/data/hook/train/*.png",
+    "dnerf/jumpingjacks": "data/dnerf/data/jumpingjacks/train/*.png",
+    "dnerf/lego": "data/dnerf/data/lego/train/*.png",
+    "dnerf/mutant": "data/dnerf/data/mutant/train/*.png",
+    "dnerf/standup": "data/dnerf/data/standup/train/*.png",
+    "dnerf/trex": "data/dnerf/data/trex/train/*.png",
     "nerfds/as": 'data/nerfds/as/rgb/1x/*.png',
     "nerfds/basin": 'data/nerfds/basin/rgb/1x/*.png',
     "nerfds/bell": 'data/nerfds/bell/rgb/1x/*.png',
@@ -101,14 +119,7 @@ image_folders = {
     "iphone/sriracha-tree": "data/iphone/sriracha-tree/rgb/2x/*.png",
     "iphone/teddy": "data/iphone/teddy/rgb/2x/*.png",
     "iphone/wheel": "data/iphone/wheel/rgb/2x/*.png",
-    "dnerf/bouncingballs": "data/dnerf/data/bouncingballs/train/*.png",
-    "dnerf/hellwarrior": "data/dnerf/data/hellwarrior/train/*.png",
-    "dnerf/hook": "data/dnerf/data/hook/train/*.png",
-    "dnerf/jumpingjacks": "data/dnerf/data/jumpingjacks/train/*.png",
-    "dnerf/lego": "data/dnerf/data/lego/train/*.png",
-    "dnerf/mutant": "data/dnerf/data/mutant/train/*.png",
-    "dnerf/standup": "data/dnerf/data/standup/train/*.png",
-    "dnerf/trex": "data/dnerf/data/trex/train/*.png",
+    
 }
 
 
@@ -118,27 +129,30 @@ results = {}
 for scene_name, image_folder in image_folders.items():
     dataset, scene = scene_name.split("/")
     if dataset not in results:
-        results[dataset] = []
+        results[dataset] = {}
     
     image_paths = glob.glob(os.path.join(root_dir, image_folder))
    
 
-    if os.path.exists(f"{save_dir}/{dataset}_{scene}.pkl"):
-        with open(f'{save_dir}/{dataset}_{scene}.pkl', 'rb') as file:
-            aggregated_magnitudes = pickle.load(file)
-    else:
-        aggregated_magnitudes = aggregate_magnitude_spectrums(image_paths, batch_size)    
-        with open(f'{save_dir}/{dataset}_{scene}.pkl', 'wb') as file:
-            pickle.dump(aggregated_magnitudes, file)
+    #if os.path.exists(f"{save_dir}/{dataset}_{scene}.pkl"):
+        #with open(f'{save_dir}/{dataset}_{scene}.pkl', 'rb') as file:
+        #    aggregated_magnitudes = pickle.load(file)
+    #else:
+    aggregated_magnitudes = aggregate_magnitude_spectrums(image_paths, batch_size)    
+        #with open(f'{save_dir}/{dataset}_{scene}.pkl', 'wb') as file:
+        #    pickle.dump(aggregated_magnitudes, file)
     outpath = f"{save_dir}/{dataset}_{scene}.png"
     plot_histogram(aggregated_magnitudes, outpath)
 
     mean_value = np.mean(aggregated_magnitudes)
-    results[dataset].append(mean_value)
+    results[dataset][scene] = mean_value
 
-for dataset in results:
-    means = results[dataset]
-    results[dataset] = sum(means)/float(len(means))
+    with open("freq/freq.json", "w") as outfile:
+        json.dump(results, outfile, indent=4)
 
-for dataset in  results:
-    print(dataset, results[dataset])
+#for dataset in results:
+#    means = results[dataset]
+#    results[dataset] = sum(means)/float(len(means))
+
+#for dataset in  results:
+#    print(dataset, results[dataset])

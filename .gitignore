@@ -1,6 +1,7 @@
 __pycache__/*
 output/*
 data/*
+data_compressed/*
 submodules/*/build/*
 slurms/*.sh
 slurms/**/*.sh
@@ -23,6 +24,8 @@ src/models/GS3d_flow_old.py
 **/*.egg-info/**
 visualize/*.pkl
 visualize/*.png
+visualize/**/*.pkl
+visualize/**/*.png
 **/*.pt
 *.png
 check_run.sh
@@ -31,3 +34,4 @@ HyperNeRF_Scenes_Motion_Masks/*
 motion_iphone/*
 *.mp4
 *.png
+compress_datasets_log.txt

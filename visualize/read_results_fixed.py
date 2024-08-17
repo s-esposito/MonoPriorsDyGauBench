@@ -10,14 +10,17 @@ import math
 import matplotlib.cm as cm
 import multiprocessing
 
-exp_prefix="traineval"
+exp_prefix="fixed"
 os.makedirs(exp_prefix, exist_ok=True)
 
+size = 24
 
 sub_class = "all"
 # specify dataset output directory
-datasets=["iphone", "nerfies", "hypernerf",  "nerfds", "dnerf"]
-#datasets=["nerfds"]#, "nerfds"]#,  "hypernerf", "dnerf"]
+datasets=["fixed", "hypernerf"]
+#datasets=["hypernerf"]#, "nerfies", "hypernerf",  "nerfds", "dnerf"]
+#datasets=["nerfies"]#, "nerfds"]#,  "hypernerf", "dnerf"]
+raw_scenes=["chickchicken", "cut-lemon1", "keyboard", "slice-banana", "tamping", "vrig-3dprinter", "vrig-chicken"]
 root_dir="../output"
 tineuvox_root_dir="../../TiNeuVox/logs"
 
@@ -31,6 +34,16 @@ methods=[
         "TRBF/nodecoder", 
         "TRBF/vanilla"
         ]
+
+methods_to_show=[
+    "TiNeuVox",
+    "3DGS", "DeformableGS",
+    "EffGS",
+    "RTGS",
+    "4DGS",
+    "STG-decoder",
+    "STG"
+]
 #methods=["Curve/vanilla", "FourDim/vanilla", "HexPlane/vanilla", "MLP/vanilla", "TRBF/nodecoder", "TRBF/vanilla"]
 
 '''
@@ -46,7 +59,7 @@ def process_methods(dataset, methods_subset):
     result_subset = {}
     
     dataset_dir = os.path.join(root_dir, dataset)
-    scenes = [os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
+    scenes = [os.path.join(dataset_dir, scene) for scene in raw_scenes]
     scene_dirs = [scene for scene in scenes if os.path.isdir(scene)]
     tineuvox_runs_ = [run for run in tineuvox_runs if run.group == dataset]
     for scene_dir in tqdm(scene_dirs):
@@ -68,15 +81,15 @@ def process_methods(dataset, methods_subset):
                 exp = {
                     "train_time": None,
                     "render_FPS": None,
-                    "render_FPS_train": None,
+                    #"render_FPS_train": None,
                     "test_psnr": None,
                     "test_ssim": None,
                     "test_msssim": None,
                     "test_lpips": None,
-                    "train-test_psnr": None,
-                    "train-test_ssim": None,
-                    "train-test_msssim": None,
-                    "train-test_lpips": None,
+                    #"train-test_psnr": None,
+                    #"train-test_ssim": None,
+                    #"train-test_msssim": None,
+                    #"train-test_lpips": None,
                     "crash": None,
                     "OOM": None
                 }
@@ -96,9 +109,9 @@ def process_methods(dataset, methods_subset):
                 if not os.path.exists(os.path.join(local_path, "test.txt")):
                     print("text.txt not found locally: ", os.path.join(local_path, "test.txt"))
                     continue
-                if not os.path.exists(os.path.join(local_path, "train.txt")):
-                    print("train.txt not found locally: ", os.path.join(local_path, "train.txt"))
-                    continue
+                #if not os.path.exists(os.path.join(local_path, "train.txt")):
+                #    print("train.txt not found locally: ", os.path.join(local_path, "train.txt"))
+                #    continue
                 #try:
                 #    test_run = test_run[-1]
                 #    test_psnr = float(test_run.history(keys=['test/avg_psnr'], pandas=False)[0]["test/avg_psnr"])
@@ -121,7 +134,7 @@ def process_methods(dataset, methods_subset):
                         if line.startswith("Average Render Time:"):
                             test_render_time = float(line.strip().split(" ")[-1])
                         line = f.readline()
-                
+                '''
                 with open(os.path.join(local_path, "train.txt"), "r") as f:
                     line = f.readline()
                     while line:
@@ -136,12 +149,12 @@ def process_methods(dataset, methods_subset):
                         if line.startswith("Average Render Time:"):
                             train_render_time = float(line.strip().split(" ")[-1])
                         line = f.readline()
-
+                '''
 
                 test_FPS = 1./test_render_time
                 exp["render_FPS"] = test_FPS
-                train_FPS = 1./train_render_time
-                exp["render_FPS_train"] = train_FPS
+                #train_FPS = 1./train_render_time
+                #exp["render_FPS_train"] = train_FPS
                 
                 
                 if (test_psnr < 10.) or math.isnan(test_psnr):
@@ -155,10 +168,10 @@ def process_methods(dataset, methods_subset):
                     exp["test_msssim"] = test_msssim
                     exp["test_lpips"] = test_lpips
                     
-                    exp["train-test_psnr"] = train_psnr - test_psnr
-                    exp["train-test_ssim"] = train_ssim - test_ssim
-                    exp["train-test_msssim"] = train_msssim - test_msssim
-                    exp["train-test_lpips"] = train_lpips - test_lpips
+                    #exp["train-test_psnr"] = train_psnr - test_psnr
+                    #exp["train-test_ssim"] = train_ssim - test_ssim
+                    #exp["train-test_msssim"] = train_msssim - test_msssim
+                    #exp["train-test_lpips"] = train_lpips - test_lpips
                     
                     if big_name == "TiNeuVox":
                         train_iter = len(train_run) - 1
@@ -282,7 +295,7 @@ else:
 for dataset in datasets:
     #assert False, result_final[dataset].keys()
     dataset_dir = os.path.join(root_dir, dataset)
-    scenes=[os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
+    scenes=[os.path.join(dataset_dir, scene) for scene in raw_scenes]
     scene_dirs=[scene for scene in scenes if os.path.isdir(scene)]
     for method in methods:
         # some datasets are not containing some methods
@@ -298,6 +311,8 @@ for dataset in datasets:
                     result_final[dataset][method]["all"][key] = []
                 result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][key] # if crash/OOM, a list of numbers instead of tuple
 
+#assert False, result_final["hypernerf"]["MLP/vanilla"]["all"]
+#assert False, list(result_final["hypernerf"]["MLP/vanilla"].keys())
 '''
 for dataset in datasets:
     dataset_dir = os.path.join(root_dir, dataset)
@@ -343,10 +358,10 @@ for color, method in zip(method_colors[:len(methods)], methods):
 
 for key in result_final[datasets[0]][methods[0]]["all"]:
     #plt.rcParams['font.family'] = 'Arial'
-    plt.rcParams['font.size'] = 12
+    plt.rcParams['font.size'] = size
 
     # Calculate the width of the plot based on the number of datasets and methods
-    plot_width_multiplier = 0.4  # Adjust this multiplier to control the plot width
+    plot_width_multiplier = 0.8  # Adjust this multiplier to control the plot width
     plot_width = len(datasets) * (len(methods) * plot_width_multiplier + 1)
     fig, ax = plt.subplots(figsize=(plot_width, 6))
 
@@ -362,6 +377,9 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
         if dataset not in datasets:
             continue
         dataset_id = datasets.index(dataset)
+        #if dataset == "hypernerf":
+            #print(result_final[dataset][method][sub_class])
+            #assert False
         for method in result_final[dataset]:
             #if (dataset == "dnerf") and (method == "TRBF/vanilla"):
             #    continue
@@ -378,6 +396,9 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
                 variance = sum([x[1] for x in result_final[dataset][method][sub_class][key]]) / float(len(result_final[dataset][method][sub_class][key]))
                 means.append(mean)
                 variances.append(variance)
+                if dataset == "hypernerf":
+                    print(key, mean, variance)
+                    
             bar_colors.append(method_colors[method_id])
 
     # Adaptively set the y-axis limits based on the minimum and maximum values of the means
@@ -411,7 +432,14 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
     for i in range(1, len(datasets)):
         ax.axvline(i * (len(methods) * bar_width + gap) - gap / 2, linestyle='--', color='gray', linewidth=0.5)
 
-    plt.legend(handles=pops, loc='best')
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width , box.height])
+
+    # Put a legend to the right of the current axis
+    handles = [mpatches.Patch(color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))]
+    ax.legend(handles=handles, loc='center left', bbox_to_anchor=(1, 0.5), fontsize=size, ncol=1)
+
+    #plt.legend(handles=pops, loc='best')
 
     if key == "train_time":
         plt.ylabel(key + " (second)")
@@ -426,13 +454,13 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
 
 for dataset in datasets:
     dataset_dir = os.path.join(root_dir, dataset)
-    scenes=[os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
+    scenes=[os.path.join(dataset_dir, scene) for scene in raw_scenes]
     scene_dirs=[scene for scene in scenes if os.path.isdir(scene)]
     common_scenes = [scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"]
 
     for key in result_final[datasets[0]][methods[0]]["all"]:
         #plt.rcParams['font.family'] = 'Arial'
-        plt.rcParams['font.size'] = 12
+        plt.rcParams['font.size'] = size
 
         # Calculate the width of the plot based on the number of scenes and methods
         plot_width_multiplier = 0.4  # Adjust this multiplier to control the plot width
@@ -512,7 +540,10 @@ for dataset in datasets:
 
         ax.set_xlim(left=bar_positions[0] - bar_width*2.)
 
-        plt.legend(handles=pops, loc='best')
+        handles = [mpatches.Patch(color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))]
+        fig.legend(handles=handles, loc='upper center', fontsize=size, ncol=len(methods_to_show))
+
+        #plt.legend(handles=pops, loc='best')
 
         if key == "train_time":
             plt.ylabel(key + " (second)")
