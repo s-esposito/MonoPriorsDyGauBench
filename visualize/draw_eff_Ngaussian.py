@@ -7,6 +7,12 @@ import os
 from scipy.stats import linregress
 from matplotlib.ticker import ScalarFormatter, FuncFormatter
 
+plt.rcParams['font.size'] = 24
+#plt.rcParams["text.usetex"] = True
+plt.rcParams["font.family"] = "DejaVu Serif"
+plt.rcParams["font.serif"] = ["Times New Roman"]
+
+
 # (Load data and prepare variables as before)
 
 def scientific_notation(x, pos):

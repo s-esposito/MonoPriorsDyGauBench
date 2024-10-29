@@ -6,9 +6,13 @@ import pickle
 import os
 from scipy.stats import linregress
 
-plt.rcParams["font.size"] = 24
+
+#plt.rcParams['font.size'] = 24
+#plt.rcParams["text.usetex"] = True
 plt.rcParams["font.family"] = "DejaVu Serif"
 plt.rcParams["font.serif"] = ["Times New Roman"]
+
+
 
 # Load your data
 data = {}
@@ -42,10 +46,17 @@ for dataset in raw_data:
 
 # Create DataFrame
 df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in data.items()]))
+
+# Calculate means
 means = df.mean()
+
+# Sort based on mean values
 sorted_means = means.sort_values(ascending=False)
+
+# Create a new DataFrame sorted by mean
 sorted_df = df[sorted_means.index]
 
+# Define colors for each dataset
 colors = {
     "dnerf": 'blue',
     "hypernerf": 'orange',
@@ -56,26 +67,26 @@ colors = {
 
 os.makedirs('freq/freq_plots', exist_ok=True)
 
-methods = [
-    "TiNeuVox/vanilla",
-    "MLP/nodeform", "MLP/vanilla",
-    "Curve/vanilla",
-    "FourDim/vanilla",
-    "HexPlane/vanilla",
-    "TRBF/nodecoder",
-    "TRBF/vanilla"
-]
+methods=["TiNeuVox/vanilla",
+        "MLP/nodeform", "MLP/vanilla", 
+        "Curve/vanilla", 
+        "FourDim/vanilla", 
+        "HexPlane/vanilla", 
+        "TRBF/nodecoder", 
+        "TRBF/vanilla"]
 
-final_names = [
-    "TiNeuVox",  # TiNeuVox
-    "3DGS",  # 3DGS
-    "DeformableGS",  # DeformableGS
-    "EffGS",  # EffGS
-    "RTGS",  # RTGS
-    "4DGS",  # 4DGS 
-    "STG-nodecoder",  # SpaceTime Gaussians w/o decoder
-    "STG-decoder"  # SpaceTime Gaussians
-]
+final_names=[
+        "TiNeuVox", #TiNeuVox
+        "3DGS", # 3DGS
+        
+        "DeformableGS", # DeformableGS
+        "EffGS", # EffGS
+        "RTGS", # RTGS
+        "4DGS", # 4DGS 
+
+        "STG-nodecoder", # SpaceTime Gaussians w/o decoder
+        "STG-decoder" # SpaceTime Gaussians
+        ]
 
 dataset_names = [
     "iPhone",
@@ -85,35 +96,14 @@ dataset_names = [
     "NeRF-DS",
 ]
 
-# Create figure with extra space at top for legend
-n_rows = 2
-n_cols = 4
-fig = plt.figure(figsize=(32, 18))  # Slightly taller to accommodate legend
+for method, final_name in zip(methods, final_names):
+    fig, ax = plt.subplots(figsize=(8, 8))
 
-# Create a separate axis for the legend at the top
-legend_ax = plt.axes([0, 0.95, 1, 0.05])  # [left, bottom, width, height]
-legend_ax.axis('off')
-
-# Create dummy points for legend
-for i, dataset in enumerate(dataset_names):
-    legend_ax.scatter([], [], color=list(colors.values())[i], label=dataset, s=100)
-legend_ax.scatter([], [], color='black', marker='*', s=200, label='Mean', edgecolor='black')
-legend_ax.plot([], [], color='black', linestyle='-', linewidth=2, label='Linear Fit')
-
-# Create the legend
-legend = legend_ax.legend(ncol=7, loc='center', fontsize=24, 
-                         bbox_to_anchor=(0.5, 0.5),
-                         handletextpad=0.5, columnspacing=1.5)
-
-# Create subplots
-for idx, (method, final_name) in enumerate(zip(methods, final_names)):
-    ax = plt.subplot(n_rows, n_cols, idx + 1)
-    
     # Set axis range
     ax.set_xlim(2000, 10000)
     ax.set_ylim(0, 15000)
 
-    # Prepare y-axis positions
+    # Prepare y-axis positions based on the current method's train_time
     y_positions = {}
     all_x = []
     all_y = []
@@ -124,61 +114,63 @@ for idx, (method, final_name) in enumerate(zip(methods, final_names)):
             if method in method_data[dataset][scene]:
                 y_positions[dataset].append(method_data[dataset][scene][method])
             else:
-                y_positions[dataset].append(np.nan)
+                y_positions[dataset].append(np.nan)  # Handle cases where train_time is missing
 
     for i, dataset in enumerate(sorted_df.columns):
         y = y_positions[dataset]
         x = sorted_df[dataset].dropna()
-        y = np.array([y[idx] for idx in x.index])
-        x = x.values
+        y = np.array([y[idx] for idx in x.index])  # Align y values with x values and convert to numpy array
+        x = x.values  # Convert x to numpy array
 
         all_x.extend(x)
         all_y.extend(y)
 
-        ax.scatter(x, y, color=colors[dataset], s=100)
+        ax.scatter(x, y, color=colors[dataset], label=dataset_names[i])
 
-        # Plot mean
+        # Plot the mean with a "*" mark
         mean_value = sorted_means[dataset]
-        mean_y = np.nanmean(y_positions[dataset])
+        mean_y = np.nanmean(y_positions[dataset])  # Mean y position
         ax.scatter(mean_value, mean_y, color=colors[dataset], marker='*', s=200, edgecolor='black')
 
-    # Linear regression
+    # Convert all_x and all_y to numpy arrays
     all_x = np.array(all_x)
     all_y = np.array(all_y)
 
+    # Perform linear regression and plot the fitted line for all data points
     valid_indices = ~np.isnan(all_y)
-    if np.sum(valid_indices) > 1:
+    if np.sum(valid_indices) > 1:  # Ensure there are at least two valid data points
         x_valid = all_x[valid_indices]
         y_valid = all_y[valid_indices]
         
+        # Sort the values for better visualization
         sorted_indices = np.argsort(x_valid)
         x_valid = x_valid[sorted_indices]
         y_valid = y_valid[sorted_indices]
         
         slope, intercept, r_value, p_value, std_err = linregress(x_valid, y_valid)
         fitted_line = slope * x_valid + intercept
-        ax.plot(x_valid, fitted_line, color='black', linestyle='-', linewidth=2)
-        
-        # Add R² value to title
-        ax.set_title(f'{final_name}\nR²={r_value**2:.2f}', fontsize=24)
+        ax.plot(x_valid, fitted_line, color='black', linestyle='-', linewidth=2, label=f'Overall R²={r_value**2:.2f}')
+
+    # Set star label
+    # ax.scatter([-4000], [10000], color="white", marker='*', s=200, edgecolor='black', label="Mean")
 
     # Add grid lines
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
     # Set labels
-    if idx >= n_cols * (n_rows - 1):  # Only bottom row gets x-label
-        ax.set_xlabel('Mean Spectrum Magnitude', fontsize=24)
-    if idx % n_cols == 0:  # Only leftmost column gets y-label
-        ax.set_ylabel('TrainTime (s)', fontsize=24)
+    ax.set_xlabel('Mean Spectrum Magnitude', fontsize=38)  # X-axis label
+    ax.set_ylabel(f'Training Time (seconds)', fontsize=38)  # Y-axis label
+    ax.set_title(f'{final_name}', fontsize=38)
+
+    # Add legend
+    ax.legend(loc='upper left', fontsize=38, ncol=2)
 
     # Set ticks
     ax.set_xticks([2000, 6000, 10000])
     ax.set_yticks([1000, 7500, 14000])
-    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=38)
 
-# Adjust layout
-plt.subplots_adjust(top=0.90, bottom=0.1, left=0.1, right=0.9, hspace=0.4, wspace=0.3)
-
-# Save the figure
-plt.savefig('freq/freq_plots/all_methods_comparison.png', bbox_inches='tight', dpi=300)
-plt.close(fig)
+    # Save the figure
+    write_name = "_".join(final_name.split("/"))
+    plt.savefig(f'freq/freq_plots/sorted_table_{write_name}.png', bbox_inches='tight')
+    plt.close(fig)

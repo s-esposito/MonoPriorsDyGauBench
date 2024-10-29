@@ -70,19 +70,22 @@ for color, method in zip(method_colors[:len(methods)], methods):
     pops.append(mpatches.Patch(color=color, label=method))    
 
 metric_name_mapping = {
-    #"test_psnr": "PSNR$\\uparrow$",
-    #"test_ssim": "SSIM$\\uparrow$",
-    #"test_msssim": "MS-SSIM$\\uparrow$",
-    #"test_lpips": "LPIPS$\\downarrow$",
-    #"render_FPS": "FPS$\\uparrow$",
-    #"train_time": "TrainTime (s)$\\downarrow$",
-    #"train-test_psnr": "PSNR-gap$\\uparrow$",
+    "test_psnr": "PSNR$\\uparrow$",
+    "test_ssim": "SSIM$\\uparrow$",
+    "test_msssim": "MS-SSIM$\\uparrow$",
+    "test_lpips": "LPIPS$\\downarrow$",
+    "render_FPS": "FPS$\\uparrow$",
+    "train_time": "TrainTime (s)$\\downarrow$",
+    "train-test_psnr": "PSNR-gap$\\uparrow$",
     "train-test_msssim": "MS-SSIM-gap$\\uparrow$",
-    #"train-test_lpips": "LPIPS-gap$\\downarrow$",
+    "train-test_lpips": "LPIPS-gap$\\downarrow$",
+    "train-test_ssim": "MS-SSIM-gap$\\uparrow$",
 }
 
 for key in metric_name_mapping:
     plt.rcParams['font.size'] = 12
+    plt.rcParams["font.family"] = "DejaVu Serif"
+    plt.rcParams["font.serif"] = ["Times New Roman"]
 
     plot_width_multiplier = 0.4
     plot_width = len(methods) * (len(datasets) * plot_width_multiplier + 1)
@@ -138,19 +141,17 @@ for key in metric_name_mapping:
     for i in range(1, len(datasets)):
         ax.axvline(i * (len(methods) * bar_width + gap) - gap , linestyle='--', color='gray', linewidth=0.5)
 
-    if key == "train_time":
-        plt.ylabel(key + " (second)", fontsize=24)
-    else:
-        plt.ylabel(key, fontsize=24)
+    plt.ylabel(metric_name_mapping[key], fontsize=24)
 
     ax.tick_params(axis='both', which='major', labelsize=24)
 
     # Add legend
     legend_handles = [plt.Rectangle((0, 0), 1, 1, color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))]
-    ax.legend(handles=legend_handles, loc='upper left', fontsize=24, ncol=3)
+    ax.legend(handles=legend_handles, loc='upper right', fontsize=24, ncol=3)
 
     #plt.subplots_adjust(bottom=0.15)
 
     plt.tight_layout()
     plt.savefig(exp_prefix+"/"+exp_prefix + "_" + sub_class + "_" + key + ".png")
+    print(exp_prefix+"/"+exp_prefix + "_" + sub_class + "_" + key + ".png")
     plt.close(fig)

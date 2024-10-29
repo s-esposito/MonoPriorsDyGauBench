@@ -6,6 +6,10 @@ from datetime import datetime
 from tqdm import tqdm
 import pickle
 import matplotlib.cm as cm
+plt.rcParams["font.size"] = 24
+plt.rcParams["font.family"] = "DejaVu Serif"
+plt.rcParams["font.serif"] = ["Times New Roman"]
+
 
 sub_class = "all"
 datasets=["iphone", "nerfies", "hypernerf",  "nerfds"]
@@ -80,7 +84,7 @@ metric_name_mapping = {
 }
 
 for key in metric_name_mapping:
-    plt.rcParams['font.size'] = 12
+    #plt.rcParams['font.size'] = 12
 
     plot_width_multiplier = 0.4
     plot_width = len(methods) * (len(datasets) * plot_width_multiplier + 1)
@@ -136,10 +140,7 @@ for key in metric_name_mapping:
     for i in range(1, len(datasets)):
         ax.axvline(i * (len(methods) * bar_width + gap) - gap , linestyle='--', color='gray', linewidth=0.5)
 
-    if key == "train_time":
-        plt.ylabel(key + " (second)", fontsize=24)
-    else:
-        plt.ylabel(key, fontsize=24)
+    plt.ylabel(metric_name_mapping[key], fontsize=24)
 
     ax.tick_params(axis='both', which='major', labelsize=24)
 

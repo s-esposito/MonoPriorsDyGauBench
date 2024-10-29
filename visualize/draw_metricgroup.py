@@ -7,6 +7,10 @@ from tqdm import tqdm
 import pickle
 import matplotlib.cm as cm
 
+plt.rcParams["font.size"] = 24
+plt.rcParams["font.family"] = "DejaVu Serif"
+plt.rcParams["font.serif"] = ["Times New Roman"]
+
 size=24
 
 sub_class = "all"
@@ -73,7 +77,6 @@ metric_name_mapping = {
 }
 
 for dataset in datasets:
-    plt.rcParams['font.size'] = size
 
     num_metrics = len(metric_name_mapping)
     fig, axs = plt.subplots(1, num_metrics, figsize=(num_metrics * 6, 6), sharey=False)
@@ -126,4 +129,5 @@ for dataset in datasets:
     plt.tight_layout()
     plt.subplots_adjust(top=0.75)
     plt.savefig(f"{exp_prefix}/{exp_prefix}_{sub_class}_{dataset}.png")
+    print(f"{exp_prefix}/{exp_prefix}_{sub_class}_{dataset}.png")
     plt.close(fig)

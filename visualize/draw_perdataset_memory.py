@@ -7,7 +7,7 @@ from tqdm import tqdm
 import pickle
 import matplotlib.cm as cm
 
-size=36
+size=24
 
 sub_class = "all"
 datasets=["iphone", "nerfies", "hypernerf",  "nerfds", "dnerf"]
@@ -86,6 +86,9 @@ metric_name_mapping = {
 
 for key in metric_name_mapping:
     plt.rcParams['font.size'] = size
+    #plt.rcParams["text.usetex"] = True
+    plt.rcParams["font.family"] = "DejaVu Serif"
+    plt.rcParams["font.serif"] = ["Times New Roman"]
 
     plot_width_multiplier = 0.4
     plot_width = len(methods) * (len(datasets) * plot_width_multiplier + 1)
@@ -145,12 +148,12 @@ for key in metric_name_mapping:
     if key == "train_time":
         plt.ylabel(key + " (second)", fontsize=size)
     else:
-        plt.ylabel(key, fontsize=size)
+        plt.ylabel(metric_name_mapping[key], fontsize=size)
 
     ax.tick_params(axis='both', which='major', labelsize=size)
 
     # Add legend
-    legend_handles = [plt.Rectangle((0, 0), 1, 1, color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))]
+    legend_handles = [plt.Rectangle((0, 0), 1, 1, color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods)) if "TiNeuVox" not in methods[i]]
     #ax.legend(handles=legend_handles, loc='upper right', fontsize=size, ncol=4)
 
     # Adjust the bottom margin to make space for the x-label
