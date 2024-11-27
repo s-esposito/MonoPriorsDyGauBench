@@ -12,10 +12,52 @@ This repository is the official PyTorch implementation of the paper:
 &nbsp;&nbsp;&nbsp;[Paper](https://lynl7130.github.io/data/DyGauBench_tmp.pdf)
 
 ## Installation
+This code has been developed with Anaconda (Python 3.7), CUDA 11.8.0 on Red Hat Enterprise Linux 9.2, one NVIDIA GeForce RTX 3090 GPU.  
 
-1. check ```slurms/install.sh```
+```Shell
+conda create -p [YourEnv] python=3.7
+conda activate [YourEnv]
 
-2. initialize wandb
+conda install -c anaconda libstdcxx-ng
+conda install -c menpo opencv 
+
+conda install -c conda-forge plyfile==0.8.1
+pip install tqdm imageio
+
+pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+
+pip install torchmetrics
+
+pip install requests 
+
+pip install tensorboard 
+
+pip install scipy
+
+pip install kornia
+
+
+
+pip install lightning=2.2.1
+pip install "jsonargparse[signatures]"
+
+pip install wandb
+pip install lpips
+
+pip install pytorch-msssim
+
+pip install ninja
+pip install timm==0.4.5
+
+# install from local folders 
+pip install submodules/diff-gaussian-rasterization
+pip install submodules/depth-diff-gaussian-rasterization
+pip install submodules/gaussian-rasterization_ch3
+pip install submodules/gaussian-rasterization_ch9
+pip install submodules/simple-knn
+
+```
+
 
 After activating conda environment
 ```
@@ -24,7 +66,6 @@ wandb init
 paste API key and create first project following instruction
 ```
 
-3. PytorchLightning version was tested on 2.2.1
 
 ## Usage
 
