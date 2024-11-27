@@ -113,6 +113,12 @@ for idx, (method, final_name) in enumerate(zip(methods, final_names)):
     ax.set_xlim(2000, 10000)
     ax.set_ylim(0, 15000)
 
+    # Add spines and ticks
+    ax.spines['top'].set_visible(True)
+    ax.spines['right'].set_visible(True)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(True)
+
     # Prepare y-axis positions
     y_positions = {}
     all_x = []
@@ -159,26 +165,25 @@ for idx, (method, final_name) in enumerate(zip(methods, final_names)):
         fitted_line = slope * x_valid + intercept
         ax.plot(x_valid, fitted_line, color='black', linestyle='-', linewidth=2)
         
-        # Add R² value to title
         ax.set_title(f'{final_name}\nR²={r_value**2:.2f}', fontsize=24)
 
     # Add grid lines
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
-    # Set labels
-    if idx >= n_cols * (n_rows - 1):  # Only bottom row gets x-label
-        ax.set_xlabel('Mean Spectrum Magnitude', fontsize=24)
-    if idx % n_cols == 0:  # Only leftmost column gets y-label
-        ax.set_ylabel('TrainTime (s)', fontsize=24)
+    # Set labels for all subplots
+    ax.set_xlabel('Mean Spectrum Magnitude', fontsize=24)
+    ax.set_ylabel('Train Time (s)', fontsize=24)
 
-    # Set ticks
-    ax.set_xticks([2000, 6000, 10000])
-    ax.set_yticks([1000, 7500, 14000])
+    # Set ticks for all subplots
+    ax.set_xticks([2000, 4000, 6000, 8000, 10000])
+    ax.set_yticks([0, 3000, 6000, 9000, 12000, 15000])
     ax.tick_params(axis='both', which='major', labelsize=20)
-
+    
+    # Rotate tick labels for better readability
+    plt.setp(ax.get_xticklabels(), rotation=45)
 # Adjust layout
 plt.subplots_adjust(top=0.90, bottom=0.1, left=0.1, right=0.9, hspace=0.4, wspace=0.3)
 
 # Save the figure
-plt.savefig('freq/freq_plots/all_methods_comparison.png', bbox_inches='tight', dpi=300)
+plt.savefig('freq/freq_plots/all_methods_comparison.png', bbox_inches='tight', dpi=80)
 plt.close(fig)

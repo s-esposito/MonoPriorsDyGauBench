@@ -14,6 +14,9 @@ exp_prefix="fixed"
 os.makedirs(exp_prefix, exist_ok=True)
 
 size = 24
+plt.rcParams["font.size"] = size
+plt.rcParams["font.family"] = "DejaVu Serif"
+plt.rcParams["font.serif"] = ["Times New Roman"]
 
 sub_class = "all"
 # specify dataset output directory
@@ -52,6 +55,16 @@ with open('vanilla.pkl', 'rb') as file:
     # Use pickle.load() to load the nested dictionary from the file
     result_vanilla_final = pickle.load(file)
 '''
+metric_name_mapping = {
+    "test_psnr": "PSNR$\\uparrow$",
+    "test_ssim": "SSIM$\\uparrow$",
+    "test_msssim": "MS-SSIM$\\uparrow$",
+    "test_lpips": "LPIPS$\\downarrow$",
+    "render_FPS": "FPS$\\uparrow$",
+    "train_time": "TrainTime (s)$\\downarrow$",
+    "crash": "Crash$\\downarrow$",
+    "OOM": "Out of Memory$\\downarrow$"
+}
 
 N = 13
 
@@ -358,7 +371,7 @@ for color, method in zip(method_colors[:len(methods)], methods):
 
 for key in result_final[datasets[0]][methods[0]]["all"]:
     #plt.rcParams['font.family'] = 'Arial'
-    plt.rcParams['font.size'] = size
+    
 
     # Calculate the width of the plot based on the number of datasets and methods
     plot_width_multiplier = 0.8  # Adjust this multiplier to control the plot width
@@ -441,10 +454,7 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
 
     #plt.legend(handles=pops, loc='best')
 
-    if key == "train_time":
-        plt.ylabel(key + " (second)")
-    else:
-        plt.ylabel(key)
+    plt.ylabel(metric_name_mapping[key])
 
     plt.tight_layout()
     plt.savefig(exp_prefix+"/"+exp_prefix + "_" + sub_class + "_" + key + ".png")
@@ -545,10 +555,7 @@ for dataset in datasets:
 
         #plt.legend(handles=pops, loc='best')
 
-        if key == "train_time":
-            plt.ylabel(key + " (second)")
-        else:
-            plt.ylabel(key)
+        plt.ylabel(metric_name_mapping[key])
 
         plt.title(f"{dataset}")
 

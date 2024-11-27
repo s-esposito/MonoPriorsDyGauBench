@@ -8,23 +8,17 @@ from scipy.stats import linregress
 from matplotlib.ticker import ScalarFormatter, FuncFormatter
 
 plt.rcParams['font.size'] = 24
-#plt.rcParams["text.usetex"] = True
 plt.rcParams["font.family"] = "DejaVu Serif"
 plt.rcParams["font.serif"] = ["Times New Roman"]
 
-
-# (Load data and prepare variables as before)
-
 def scientific_notation(x, pos):
-    # Format the number in scientific notation
     if x == 0:
         return '0'
     exp = int(np.log10(abs(x)))
     coef = x / 10**exp
     return r'${:.0f} \times 10^{{{:d}}}$'.format(coef, exp)
 
-
-# Load your data
+# Load data
 with open("memory.pkl", "rb") as file:
     memory_data = pickle.load(file)
 
@@ -72,7 +66,6 @@ colors = {
     "iphone": 'purple'
 }
 
-# Create output directory
 os.makedirs('eff_Ngaussian', exist_ok=True)
 
 def prepare_data(x_key, y_key):
@@ -85,13 +78,11 @@ def prepare_data(x_key, y_key):
                 if scene == 'all':
                     continue
                 try:
-                    # average gaussian number averaged over all runs
                     x = np.mean(memory_data[dataset][method][scene][x_key])
                     if y_key == 'freq':
                         y = freq_data[dataset][scene]
                     elif y_key == 'render_FPS':
-                        # Correctly extract FPS value
-                        y = traineval_data[dataset][method][scene][y_key][0][0]  # First element is the mean
+                        y = traineval_data[dataset][method][scene][y_key][0][0]
                     else:
                         assert False, "Not a valid class!"
                     data.append((dataset, method, x, y))
@@ -99,119 +90,142 @@ def prepare_data(x_key, y_key):
                     print(f"Error processing {dataset} {method} {scene}: {e}")
     return data
 
-def plot_scatter(data, x_label, y_label, title, output_file):
-    fig, ax = plt.subplots(figsize=(12, 10))
+# Create figure with extra space at top for legend
+n_rows = 2
+n_cols = 4
+fig = plt.figure(figsize=(32, 18))
 
-    all_x = []
-    all_y = []
+# Create a separate axis for the legend at the top
+legend_ax = plt.axes([0, 0.95, 1, 0.05])
+legend_ax.axis('off')
 
-    for i, dataset in enumerate(datasets):
-        dataset_data = [d for d in data if d[0] == dataset]
-        x = [d[2] for d in dataset_data]
-        y = [d[3] for d in dataset_data]
-        all_x.extend(x)
-        all_y.extend(y)
-        ax.scatter(x, y, color=colors[dataset], label=dataset_names[i], alpha=0.7, s=80)  # Increased marker size
+# Create dummy points for legend
+for i, dataset in enumerate(dataset_names):
+    legend_ax.scatter([], [], color=list(colors.values())[i], label=dataset, s=100)
+legend_ax.plot([], [], color='black', linestyle='-', linewidth=2, label='Linear Fit')
 
-    # Perform linear regression and plot the fitted line
-    all_x = np.array(all_x)
-    all_y = np.array(all_y)
-    mask = ~np.isnan(all_x) & ~np.isnan(all_y)
-    if np.sum(mask) > 1:
-        slope, intercept, r_value, _, _ = linregress(all_x[mask], all_y[mask])
-        fitted_line = slope * all_x[mask] + intercept
-        ax.plot(all_x[mask], fitted_line, color='black', linestyle='-', linewidth=2, label=f'Overall R²={r_value**2:.2f}')
+# Create the legend
+legend = legend_ax.legend(ncol=6, loc='center', fontsize=24, 
+                         bbox_to_anchor=(0.5, 0.5),
+                         handletextpad=0.5, columnspacing=1.5)
 
-    ax.set_xlabel(x_label, fontsize=24)
-    ax.set_ylabel(y_label, fontsize=24)
-    ax.set_title(title, fontsize=24)
-    ax.legend(loc='upper left', fontsize=24)
-    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-    # Adjust tick labels and use scientific notation
-    ax.tick_params(axis='both', which='major', labelsize=24)
-    x_formatter = FuncFormatter(scientific_notation)
-    y_formatter = FuncFormatter(scientific_notation)
-    ax.xaxis.set_major_formatter(x_formatter)
-    ax.yaxis.set_major_formatter(y_formatter)
-    
-    # Adjust number of ticks
-    ax.xaxis.set_major_locator(plt.MaxNLocator(5))
-    ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-    '''
-    # Adjust tick labels
-    ax.tick_params(axis='both', which='major', labelsize=24)
-    x_ticks = ax.get_xticks()
-    ax.set_xticks(x_ticks[::2])  # Show every other tick
-    y_ticks = ax.get_yticks()
-    ax.set_yticks(y_ticks[::2])  # Show every other tick
-    '''
-    plt.tight_layout()
-    plt.savefig(output_file, bbox_inches='tight', dpi=300)
-    plt.close(fig)
+fps_data = prepare_data('num_gaussians', 'render_FPS')
 
-def plot_scatter_per_method(data, x_label, y_label, base_title, base_output_file, loc='upper left'):
-    for method, final_name in zip(methods, final_names):
+def create_plot(data, y_label, output_file, is_fps=False):
+    # Reduce figure size
+    fig = plt.figure(figsize=(32, 18))
+
+    # Legend setup remains the same
+    legend_ax = plt.axes([0, 0.95, 1, 0.05])
+    legend_ax.axis('off')
+    for i, dataset in enumerate(dataset_names):
+        legend_ax.scatter([], [], color=list(colors.values())[i], label=dataset, s=100)
+    legend_ax.plot([], [], color='black', linestyle='-', linewidth=2, label='Linear Fit')
+    legend = legend_ax.legend(ncol=6, loc='center', fontsize=24, 
+                             bbox_to_anchor=(0.5, 0.5),
+                             handletextpad=0.5, columnspacing=1.5)
+
+    # Find global min/max for consistent axis limits
+    all_x_values = []
+    all_y_values = []
+    for method in methods[1:]:  # Skip TiNeuVox
         method_data = [d for d in data if d[1] == method]
-        if not method_data:
+        all_x_values.extend([d[2] for d in method_data])
+        all_y_values.extend([d[3] for d in method_data])
+    
+    x_min, x_max = min(all_x_values), max(all_x_values)
+    y_min, y_max = min(all_y_values), max(all_y_values)
+    
+    # Add padding to limits
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+    x_min -= x_range * 0.05
+    x_max += x_range * 0.05
+    y_min -= y_range * 0.05
+    y_max += y_range * 0.05
+
+    # Create subplots
+    for idx, (method, final_name) in enumerate(zip(methods, final_names)):
+        ax = plt.subplot(n_rows, n_cols, idx + 1)
+        
+        # Handle TiNeuVox position
+        if idx == 0:
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.text(0.5, 0.5, 'TiNeuVox \nnot-applicable', 
+                   horizontalalignment='center',
+                   verticalalignment='center',
+                   fontsize=24,
+                   transform=ax.transAxes)
+            if is_fps:
+                ax.set_xlim(0, 1e7)
+                ax.set_ylim(0, 300)
             continue
-
-        fig, ax = plt.subplots(figsize=(12, 10))
-
-        for i, dataset in enumerate(datasets):
+            
+        # Plot data points and regression line
+        method_data = [d for d in data if d[1] == method]
+        all_x = []
+        all_y = []
+        
+        for dataset in datasets:
             dataset_data = [d for d in method_data if d[0] == dataset]
             x = [d[2] for d in dataset_data]
             y = [d[3] for d in dataset_data]
-            ax.scatter(x, y, color=colors[dataset], label=dataset_names[i], alpha=0.7, s=80)  # Increased marker size
+            all_x.extend(x)
+            all_y.extend(y)
+            ax.scatter(x, y, color=colors[dataset], alpha=0.7, s=80)
 
-        all_x = [d[2] for d in method_data]
-        all_y = [d[3] for d in method_data]
+        # Linear regression
+        all_x = np.array(all_x)
+        all_y = np.array(all_y)
         mask = ~np.isnan(all_x) & ~np.isnan(all_y)
         if np.sum(mask) > 1:
-            slope, intercept, r_value, _, _ = linregress(np.array(all_x)[mask], np.array(all_y)[mask])
-            fitted_line = slope * np.array(all_x)[mask] + intercept
-            ax.plot(np.array(all_x)[mask], fitted_line, color='black', linestyle='-', linewidth=2, label=f'R²={r_value**2:.2f}')
+            slope, intercept, r_value, _, _ = linregress(all_x[mask], all_y[mask])
+            if is_fps:
+                x_fit = np.linspace(0, 1e7, 100)
+            else:
+                x_fit = np.linspace(x_min, x_max, 100)
+            fitted_line = slope * x_fit + intercept
+            ax.plot(x_fit, fitted_line, color='black', linestyle='-', linewidth=2)
+            ax.set_title(f'{final_name}\nR²={r_value**2:.2f}', fontsize=24)
+        else:
+            ax.set_title(final_name, fontsize=24)
 
-        ax.set_xlabel(x_label, fontsize=24)
-        ax.set_ylabel(y_label, fontsize=24)
-        ax.set_title(f"{base_title} - {final_name}", fontsize=24)
-        ax.legend(loc=loc, fontsize=24)
+        # Set consistent axis limits
+        if is_fps:
+            ax.set_xlim(0, 1e7)
+            ax.set_ylim(0, 300)
+        else:
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_min, y_max)
+
+        # Add grid and labels
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax.set_xlabel('Number of Gaussians', fontsize=24)
+        ax.set_ylabel(y_label, fontsize=24)
         
-        # Adjust tick labels and use scientific notation
-        ax.tick_params(axis='both', which='major', labelsize=24)
+        # Scientific notation formatting
+        ax.tick_params(axis='both', which='major', labelsize=20)
         x_formatter = FuncFormatter(scientific_notation)
         y_formatter = FuncFormatter(scientific_notation)
         ax.xaxis.set_major_formatter(x_formatter)
         ax.yaxis.set_major_formatter(y_formatter)
-        
-        # Adjust number of ticks
         ax.xaxis.set_major_locator(plt.MaxNLocator(5))
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-        '''
-        # Adjust tick labels
-        ax.tick_params(axis='both', which='major', labelsize=24)
-        x_ticks = ax.get_xticks()
-        ax.set_xticks(x_ticks[::2])  # Show every other tick
-        y_ticks = ax.get_yticks()
-        ax.set_yticks(y_ticks[::2])  # Show every other tick
-        '''
-        plt.tight_layout()
-        output_file = f"{base_output_file}_{final_name.replace('/', '_')}.png"
-        plt.savefig(output_file, bbox_inches='tight', dpi=300)
-        plt.close(fig)
 
-# Generate overall FPS vs. number of Gaussians plot
+    plt.subplots_adjust(top=0.90, bottom=0.1, left=0.1, right=0.9, 
+        hspace=0.3, 
+        wspace=0.4)
+    plt.savefig(output_file, bbox_inches='tight', dpi=80)
+    plt.close(fig)
+
+# Create the plots
 fps_data = prepare_data('num_gaussians', 'render_FPS')
-plot_scatter(fps_data, 'Number of Gaussians', 'FPS', 'FPS vs. Number of Gaussians', 'eff_Ngaussian/fps_vs_gaussians.png')
+create_plot(fps_data, 'FPS', 'eff_Ngaussian/combined_fps_vs_gaussians.png', is_fps=True)
 
-# Generate overall frequency vs. number of Gaussians plot
 freq_data = prepare_data('num_gaussians', 'freq')
-plot_scatter(freq_data, 'Number of Gaussians', 'Mean Spectrum Magnitude', 'Frequency vs. Number of Gaussians', 'eff_Ngaussian/freq_vs_gaussians.png')
-
-# Generate per-method FPS vs. number of Gaussians plots
-plot_scatter_per_method(fps_data, 'Number of Gaussians', 'FPS', 'FPS vs. Number of Gaussians', 'eff_Ngaussian/fps_vs_gaussians', loc='upper right')
-
-# Generate per-method frequency vs. number of Gaussians plots
-plot_scatter_per_method(freq_data, 'Number of Gaussians', 'Mean Spectrum Magnitude', 'Frequency vs. Number of Gaussians', 'eff_Ngaussian/freq_vs_gaussians', loc='upper left')
-
-print("Plots have been generated and saved in the 'eff_Ngaussian' folder.")
+create_plot(freq_data, 'Mean Spectrum Magnitude', 'eff_Ngaussian/combined_freq_vs_gaussians.png', is_fps=False)

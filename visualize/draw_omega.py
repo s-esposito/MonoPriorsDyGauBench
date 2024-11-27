@@ -9,6 +9,11 @@ from matplotlib.ticker import ScalarFormatter, FuncFormatter
 
 # (Load data and prepare variables as before)
 
+plt.rcParams["font.size"] = 24
+plt.rcParams["font.family"] = "DejaVu Serif"
+plt.rcParams["font.serif"] = ["Times New Roman"]
+
+
 def scientific_notation(x, pos):
     # Format the number in scientific notation
     if x == 0:
@@ -69,6 +74,16 @@ colors = {
     "iphone": 'purple'
 }
 
+metric_name_mapping = {
+    "PSNR": "PSNR$\\uparrow$",
+    "SSIM": "SSIM$\\uparrow$",
+    "MS-SSIM": "MS-SSIM$\\uparrow$",
+    "LPIPS": "LPIPS$\\downarrow$",
+#    "render_FPS": "FPS$\\uparrow$",
+#    "train_time": "TrainTime (s)$\\downarrow$",
+#    "train-test_lpips": "LPIPS-gap$\\downarrow$",
+}
+
 # Create output directory
 os.makedirs('omega_plots', exist_ok=True)
 
@@ -126,62 +141,23 @@ def prepare_omega_data(omega_data, metric_key):
                     print(f"Data structure: {traineval_data[dataset][method][scene]}")
     return data
 
-def plot_scatter_omega(data, y_label, title, output_file):
-    fig, ax = plt.subplots(figsize=(12, 10))
+def create_combined_plot(omega_data):
+    # Create figure with 2x2 subplots
+    fig = plt.figure(figsize=(18, 18))
 
+    # Create a separate axis for the legend at the top
+    legend_ax = plt.axes([0, 0.95, 1, 0.05])
+    legend_ax.axis('off')
+
+    # Create dummy points for legend
     for i, dataset in enumerate(datasets):
-        dataset_data = [d for d in data if d[0] == dataset]
-        x = [d[2] for d in dataset_data]
-        y = [d[3] for d in dataset_data]
-        ax.scatter(x, y, color=colors[dataset], label=dataset_names[i], alpha=0.7, s=80)
+        legend_ax.scatter([], [], color=colors[dataset], label=dataset_names[i], alpha=0.7, s=100)
 
-    ax.set_xlabel('ω', fontsize=24)  # Changed to ω
-    ax.set_ylabel(y_label, fontsize=24)
-    ax.set_title(title.replace("Omega", "ω"), fontsize=24)  # Replace Omega with ω in title
-    ax.legend(loc='best', fontsize=24)
-    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-    
-    ax.tick_params(axis='both', which='major', labelsize=24)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(5))
-    ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+    # Create the legend
+    legend = legend_ax.legend(ncol=len(datasets), loc='center', fontsize=24, 
+                             bbox_to_anchor=(0.5, 0.5),
+                             handletextpad=0.5, columnspacing=1.5)
 
-    plt.tight_layout()
-    plt.savefig(output_file, bbox_inches='tight', dpi=300)
-    plt.close(fig)
-
-def plot_scatter_omega_per_method(data, y_label, title, output_file):
-    fig, ax = plt.subplots(figsize=(12, 10))
-
-    for i, dataset in enumerate(datasets):
-        dataset_data = [d for d in data if d[0] == dataset]
-        x = [d[2] for d in dataset_data]
-        y = [d[3] for d in dataset_data]
-        ax.scatter(x, y, color=colors[dataset], label=dataset_names[i], alpha=0.7, s=80)
-
-    ax.set_xlabel('ω', fontsize=24)  # Changed to ω
-    ax.set_ylabel(y_label, fontsize=24)
-    ax.set_title(title.replace("Omega", "ω"), fontsize=24)  # Replace Omega with ω in title
-    ax.legend(loc='best', fontsize=24)
-    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-    
-    ax.tick_params(axis='both', which='major', labelsize=24)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(5))
-    ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-
-    plt.tight_layout()
-    plt.savefig(output_file, bbox_inches='tight', dpi=300)
-    plt.close(fig)
-
-# Main execution
-if __name__ == "__main__":
-    # Read omega data
-    omega_data = read_emf_file("emf.txt")
-
-    # Create new directories for omega plots
-    os.makedirs('omega_plots', exist_ok=True)
-    os.makedirs('omega_plots/per_method', exist_ok=True)
-
-    # Generate omega vs. metric plots
     metrics = {
         "test_psnr": "PSNR",
         "test_ssim": "SSIM",
@@ -189,30 +165,49 @@ if __name__ == "__main__":
         "test_lpips": "LPIPS"
     }
 
-    # Overall plots
-    for metric_key, metric_name in metrics.items():
-        print(f"\nProcessing overall {metric_name}:")
+    for idx, (metric_key, metric_name) in enumerate(metrics.items()):
+        ax = plt.subplot(2, 2, idx + 1)
+        
         data = prepare_omega_data(omega_data, metric_key)
-        if data:
-            plot_scatter_omega(data, metric_name, f'{metric_name} vs. ω', f'omega_plots/omega_vs_{metric_key}.png')
-        else:
-            print(f"No valid data for {metric_name}. Skipping plot.")
+        
+        # Plot data for each dataset
+        for i, dataset in enumerate(datasets):
+            dataset_data = [d for d in data if d[0] == dataset]
+            x = [d[2] for d in dataset_data]
+            y = [d[3] for d in dataset_data]
+            ax.scatter(x, y, color=colors[dataset], alpha=0.7, s=80)
 
-    # Per-method plots
-    for method, final_name in zip(methods, final_names):
-        print(f"\nProcessing {final_name}:")
-        for metric_key, metric_name in metrics.items():
-            print(f"  Processing {metric_name}:")
-            data = prepare_omega_data(omega_data, metric_key)
-            method_data = [d for d in data if d[1] == method]
-            if method_data:
-                plot_scatter_omega_per_method(
-                    method_data, 
-                    metric_name, 
-                    f'{metric_name} vs. ω - {final_name}', 
-                    f'omega_plots/per_method/omega_vs_{metric_key}_{final_name.replace("/", "_")}.png'
-                )
-            else:
-                print(f"    No valid data for {metric_name} in {final_name}. Skipping plot.")
+        # Formatting
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        
+        # Set labels
+        ax.set_xlabel('ω', fontsize=24)
+        ax.set_ylabel(metric_name_mapping[metric_name], fontsize=24)
+        ax.set_title(f'{metric_name} vs. ω', fontsize=24)
+        
+        # Adjust ticks
+        ax.xaxis.set_major_locator(plt.MaxNLocator(5))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(5))
 
-    print("\nω plots have been generated and saved in the 'omega_plots' folder and 'omega_plots/per_method' subfolder.")
+    # Adjust layout
+    plt.subplots_adjust(
+        top=0.90, bottom=0.1, left=0.1, right=0.9, 
+        hspace=0.2, wspace=0.2)
+
+    # Save the combined figure
+    plt.savefig('omega_plots/combined_metrics.png', bbox_inches='tight', dpi=80)
+    plt.close(fig)
+
+# Main execution
+if __name__ == "__main__":
+    # Read omega data
+    omega_data = read_emf_file("emf.txt")
+
+    # Create output directory
+    os.makedirs('omega_plots', exist_ok=True)
+
+    # Generate combined plot
+    create_combined_plot(omega_data)
+
+    print("\nCombined ω plot has been generated and saved as 'omega_plots/combined_metrics.png'.")
