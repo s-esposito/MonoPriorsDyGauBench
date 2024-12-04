@@ -2,14 +2,14 @@
 
 This repository is the official PyTorch(Lightning) implementation of the paper:
 
-&nbsp;&nbsp;[**Monocular Dynamic Gaussian Splatting is Fast and Brittle but Smooth Motion Helps**](https://lynl7130.github.io/MonoDyGauBench.github.io/)  
+[**Monocular Dynamic Gaussian Splatting is Fast and Brittle but Smooth Motion Helps**](https://lynl7130.github.io/MonoDyGauBench.github.io/)  
 [Yiqing Liang](https://lynl7130.github.io), [Mikhail Okunev](https://mmehas.github.io/), [Mikaela Angelina Uy](https://mikacuy.github.io/)†‡, [Runfeng Li](https://www.linkedin.com/in/runfeng-l-a41b6a204/), [Leonidas Guibas](https://profiles.stanford.edu/leonidas-guibas)‡, [James Tompkin](https://jamestompkin.com/), [Adam W Harley](https://adamharley.com/)‡  
 
 <img width="12%"  text-align="center" margin="auto" src=images/brownlogo.svg> &nbsp;&nbsp;
 †<img width="20%"  text-align="center" margin="auto" src=images/nvidia_logo.png>  &nbsp;&nbsp;
 ‡<img width="8%"  text-align="center" margin="auto" src=images/stanfordlogo.png>
 
-&nbsp;&nbsp;&nbsp;[Paper](https://lynl7130.github.io/data/DyGauBench_tmp.pdf)
+&nbsp;&nbsp;[Paper](https://lynl7130.github.io/data/DyGauBench_tmp.pdf) &nbsp;| &nbsp;[Data](https://1drv.ms/f/c/4dd35d8ee847a247/EpmindtZTxxBiSjYVuaaiuUBr7w3nOzEl6GjrWjmVPuBFw?e=cW5gg1)
 
 We aim to <strong>benchmark</strong> Monocular View Dynamic Gaussian Splatting from motion perspective.
 
@@ -23,13 +23,60 @@ We aim to <strong>benchmark</strong> Monocular View Dynamic Gaussian Splatting f
 <input type="checkbox" disabled checked /> [Spacetime Gaussian Feature Splatting for Real-Time Dynamic View Synthesis](https://arxiv.org/abs/2312.16812) (CVPR 2024) | TRBF |
 
 
-### Datasets Included 
+### Existing Datasets Included 
 
 | Dataset                                              | Abbrev Name in this Repo |
 | ------------------------------------------------- | ---- |
 <input type="checkbox" disabled checked /> [D-NeRF: Neural Radiance Fields for Dynamic Scenes](https://arxiv.org/abs/2011.13961) (CVPR 2021) | dnerf |
+<input type="checkbox" disabled checked /> [Nerfies: Deformable Neural Radiance Fields](https://arxiv.org/abs/2011.12948) (ICCV 2021) | nerfies |
+<input type="checkbox" disabled checked /> [A Higher-Dimensional Representation for Topologically Varying Neural Radiance Fields](https://arxiv.org/abs/2106.13228) (SIGGRAPH Asia 2021) | hypernerf |
+<input type="checkbox" disabled checked /> [Monocular Dynamic View Synthesis: A Reality Check](https://arxiv.org/abs/2210.13445) (NeurIPS 2022) | iphone |
+<input type="checkbox" disabled checked /> [NeRF-DS: Neural Radiance Fields for Dynamic Specular Objects](https://arxiv.org/abs/2303.14435) (CVPR 2023) | nerfds |
 
+### Our Created Datasets
+| Dataset                                              | Abbrev Name in this Repo |
+| ------------------------------------------------- | ---- |
+Camera-Pose-Rectified HyperNeRF | fixed |
+Instructive Dataset | dnerf/custom |
 
+All data could be prepared by downloading [this folder](https://1drv.ms/f/c/4dd35d8ee847a247/EpmindtZTxxBiSjYVuaaiuUBr7w3nOzEl6GjrWjmVPuBFw?e=cW5gg1) and extracted as follow diagram:
+```
+this_repo
+│   README.md  
+└───data
+│    │ 
+│    └───dnerf
+│    │    │ 
+│    │    └───data
+│    │         │ 
+│    │         └───bouncingballs
+│    │         └───...
+│    └───fixed
+│    │    │ 
+│    │    └───chickchicken
+│    │    └───...
+│    └───hypernerf 
+│    │    │ 
+│    │    └───aleks-teapot
+│    │    └───...
+│    └───iphone
+│    │    │ 
+│    │    └───apple
+│    │    └───...
+│    └───nerfds
+│    │    │ 
+│    │    └───as
+│    │    └───...
+│    └───nerfies
+│    │     │ 
+│    │     └───broom
+│    │     └───...
+│    │              
+│    └───dynamic_cube_dynamic_camera_textured_motion_range_0.0
+│    └───...
+└...       
+...
+```
 
 ## Installation
 This code has been developed with Anaconda (Python 3.7), CUDA 11.8.0 on Red Hat Enterprise Linux 9.2, one NVIDIA GeForce RTX 3090 GPU.  
