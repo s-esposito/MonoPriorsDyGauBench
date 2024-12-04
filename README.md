@@ -11,7 +11,7 @@ This repository is the official PyTorch(Lightning) implementation of the paper:
 
 &nbsp;&nbsp;&nbsp;[Paper](https://lynl7130.github.io/data/DyGauBench_tmp.pdf)
 
-This repo aims to unifiedly <strong>benchmark</strong> Monocular View Dynamic Gaussian Splatting on various settings from a motion perspective.
+We aim to <strong>benchmark</strong> Monocular View Dynamic Gaussian Splatting on various settings from motion perspective.
 
 ### Methods Included
 | Method                                              | Abbrev Name in this Repo |
