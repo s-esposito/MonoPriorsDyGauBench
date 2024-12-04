@@ -137,13 +137,43 @@ paste API key and create first project following instruction
 ## Usage
 
 
-Default usage following PytorchLightning:
+### On Our Instrutive Dataset
 
-```python main.py [before] [subcommand] [after]```
+For training and testing method ```${method}``` on the instructive dataset scene ```${scene}```,
 
-As do not want to customize arguments by subcommand (fit/test), pass the config after the subcommand
+```bash
+variant="dnerf/custom/${method}/${scene}"
+exp_group_name="vanilla"
+exp_name="${scene}_${method}"
 
-```python main.py [subcommand] --config path/to/config.yaml```
+python runner.py \
+    --config_file configs/dnerf/custom/${method}/vanilla1.yaml \
+    --group ${exp_group_name}_${scene} \
+    --name ${exp_name} \
+    --dataset data/${scene} \
+    --slurm_script slurms/dnerf_custom.sh \
+    --output_dir output/dnerf/${exp_group_name}/${scene}/${method}
+```
 
-Note: when building extension using pip install, have to run on the cluster where the pytorch is installed.
-After building, can switch to different cluster.
+### On All Other Datasets
+
+For training and testing method ```${method}``` on dataset ```${dataset}```'s scene ```${scene}```,
+
+```bash
+base="${dataset}/${scene}/${method}"
+name="vanilla1"
+variant="${base}/${name%?}1"
+output_path="./output/${base}"
+
+python main.py fit \
+    --config configs/${variant}.yaml \
+    --output ${output_path} \
+    --name "${base##*/}_$name" 
+
+python main.py test \
+    --config configs/${variant}.yaml \
+    --ckpt_path  last \
+    --output ${output_path} \
+    --name "${base##*/}_$name" 
+```
+
