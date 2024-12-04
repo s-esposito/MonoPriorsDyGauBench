@@ -1,6 +1,6 @@
 # Monocular Dynamic Gaussian Splatting is Fast and Brittle but Smooth Motion Helps
 
-This repository is the official PyTorch implementation of the paper:
+This repository is the official PyTorch(Lightning) implementation of the paper:
 
 &nbsp;&nbsp;[**Monocular Dynamic Gaussian Splatting is Fast and Brittle but Smooth Motion Helps**](https://lynl7130.github.io/MonoDyGauBench.github.io/)  
 [Yiqing Liang](https://lynl7130.github.io), [Mikhail Okunev](https://mmehas.github.io/), [Mikaela Angelina Uy](https://mikacuy.github.io/)†‡, [Runfeng Li](https://www.linkedin.com/in/runfeng-l-a41b6a204/), [Leonidas Guibas](https://profiles.stanford.edu/leonidas-guibas)‡, [James Tompkin](https://jamestompkin.com/), [Adam W Harley](https://adamharley.com/)‡  
@@ -10,6 +10,26 @@ This repository is the official PyTorch implementation of the paper:
 ‡<img width="8%"  text-align="center" margin="auto" src=images/stanfordlogo.png>
 
 &nbsp;&nbsp;&nbsp;[Paper](https://lynl7130.github.io/data/DyGauBench_tmp.pdf)
+
+This repo aims to unifiedly <strong>benchmark</strong> Monocular View Dynamic Gaussian Splatting on various settings from a motion perspective.
+
+### Methods Included
+| Method                                              | Abbrev Name in this Repo |
+| ------------------------------------------------- | ---- |
+<input type="checkbox" disabled checked />  [Real-time Photorealistic Dynamic Scene Representation and Rendering with 4D Gaussian Splatting](https://arxiv.org/abs/2310.10642) (ICLR 2024) | FourDim |
+<input type="checkbox" disabled checked /> [A Compact Dynamic 3D Gaussian Representation for Real-Time Dynamic View Synthesis](https://arxiv.org/pdf/2311.12897) (ECCV 2024) | Curve |
+<input type="checkbox" disabled checked /> [4D Gaussian Splatting for Real-Time Dynamic Scene Rendering](https://arxiv.org/abs/2310.08528) (CVPR 2024)| HexPlane |
+<input type="checkbox" disabled checked /> [Deformable 3D Gaussians for High-Fidelity Monocular Dynamic Scene Reconstruction](https://arxiv.org/abs/2309.13101) (CVPR 2024) | MLP |
+<input type="checkbox" disabled checked /> [Spacetime Gaussian Feature Splatting for Real-Time Dynamic View Synthesis](https://arxiv.org/abs/2312.16812) (CVPR 2024) | TRBF |
+
+
+### Datasets Included 
+
+| Dataset                                              | Abbrev Name in this Repo |
+| ------------------------------------------------- | ---- |
+<input type="checkbox" disabled checked /> [D-NeRF: Neural Radiance Fields for Dynamic Scenes](https://arxiv.org/abs/2011.13961) (CVPR 2021) | dnerf |
+
+
 
 ## Installation
 This code has been developed with Anaconda (Python 3.7), CUDA 11.8.0 on Red Hat Enterprise Linux 9.2, one NVIDIA GeForce RTX 3090 GPU.  
