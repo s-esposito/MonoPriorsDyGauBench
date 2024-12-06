@@ -15,15 +15,24 @@ from torch.utils.data import DataLoader
 import torch
 import cv2
 
-def readTorfData(path, downsample=1, nvs=False):
+def decompose_extrinsics(matrix):
+    R = matrix[:3, :3]
+    T = matrix[:3, 3]
+    return np.transpose(R), T
+
+def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True):
     cam_infos = []
     color_files = os.listdir(osp.join(path, "color" + ("_nvs" if nvs else "")))
     frames = len(color_files)
     extrinsics = np.load(osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_extrinsics.npy"))
     intrinsics = np.load(osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_intrinsics.npy"))
-    # TODO(mokunev): remove the hardcoded resolution (althought it's the same for all sequences)
-    fovx = focal2fov(intrinsics[0, 0], 240)
-    fovy = focal2fov(intrinsics[1, 1], 320)
+    forward_flow_dir = osp.join(path, "estimated_forward_flow" + ("_nvs" if nvs else ""))
+    backward_flow_dir = osp.join(path, "estimated_backward_flow" + ("_nvs" if nvs else ""))
+
+    # Focal: 519.49
+    fovx = focal2fov(intrinsics[0, 0], intrinsics[0, 2] * 2)
+    fovy = focal2fov(intrinsics[1, 1], intrinsics[1, 2] * 2)
+
     for idx, fname in enumerate(color_files):
         cam_name = fname
         time = idx / frames # 0 ~ 1
@@ -31,15 +40,15 @@ def readTorfData(path, downsample=1, nvs=False):
         transform_matrix = extrinsics[idx]
 
         # The extrinsics in the dataset are already converted from Blender to the opencv convention
-        R = np.transpose(transform_matrix[:3, :3])
-        T = transform_matrix[:3, 3]
+        R, T = decompose_extrinsics(transform_matrix)
         
         image_path = osp.join(path, "color" + ("_nvs" if nvs else ""), cam_name)
         image_name = Path(cam_name).stem
 
         # Images are [0, 1] normalized
         image = np.load(image_path)
-
+        # BGR -> RGB
+        image = image[..., ::-1]
         # Resize the image to the desired resolution using opencv
         w, h = image.shape[:2]
         image = image.swapaxes(0, 1)
@@ -54,13 +63,71 @@ def readTorfData(path, downsample=1, nvs=False):
         # Convert the numpy image to a torch tensor
         image = torch.from_numpy(image).float()
         
-        cam_infos.append(CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+        fwd_flow = None
+        time_post = None
+        R_post = None
+        T_post = None
+        bwd_flow = None
+        time_prev = None
+        R_prev = None
+        T_prev = None
+        FovX_post = None
+        FovY_post = None
+        FovX_prev = None
+        FovY_prev = None
+        fwd_flow_mask = None
+        bwd_flow_mask = None
+        mask = None
+        # Read flows
+        if load_mask:
+            mask = 1 - np.load(osp.join(path, "dynamic_masks" + ("_nvs" if nvs else ""), f"{idx + 1:04d}.npy"))
+            mask = torch.from_numpy(mask).float()
+        if load_flow:
+            flow_name = f"flow_{idx:04d}.npy"
+            fwd_flow_path = osp.join(forward_flow_dir, flow_name)
+            bwd_flow_path = osp.join(backward_flow_dir, flow_name)
+            if os.path.exists(fwd_flow_path):
+                print(f"Reading flow {fwd_flow_path}")
+                fwd_flow = np.load(fwd_flow_path)
+                time_post = (idx + 1) / frames
+                # cwh -> whc
+                fwd_flow = np.transpose(fwd_flow, (1, 2, 0))
+                # Resize the flow to the desired resolution using opencv and downscale the flow
+                fwd_flow = cv2.resize(fwd_flow, (w // downsample, h // downsample), interpolation=cv2.INTER_LINEAR)
+                fwd_flow /= downsample
+                fwd_flow = np.transpose(fwd_flow, (1, 0, 2))
+
+                fwd_flow = torch.from_numpy(fwd_flow).float()
+                R_post, T_post = decompose_extrinsics(extrinsics[idx + 1])
+                FovX_post = FovX
+                FovY_post = FovY
+                fwd_flow_mask = torch.from_numpy(np.ones_like(fwd_flow[..., 0]))
+            else:
+                print(f"Flow {fwd_flow_path} not found")
+            if os.path.exists(bwd_flow_path):
+                bwd_flow = np.load(bwd_flow_path)
+                time_prev = (idx - 1) / frames
+
+                bwd_flow = np.transpose(bwd_flow, (1, 2, 0))
+                bwd_flow = cv2.resize(bwd_flow, (w // downsample, h // downsample), interpolation=cv2.INTER_LINEAR)
+                bwd_flow /= downsample
+                bwd_flow = np.transpose(bwd_flow, (1, 0, 2))
+                bwd_flow = torch.from_numpy(bwd_flow).float()
+                R_prev, T_prev = decompose_extrinsics(extrinsics[idx - 1])
+                FovX_prev = FovX
+                FovY_prev = FovY
+                bwd_flow_mask = torch.from_numpy(np.ones_like(bwd_flow[..., 0]))
+
+        cam_infos.append(CameraInfo(uid=idx, R=R, T=T, R_post=R_post, T_post=T_post, R_prev=R_prev, T_prev=T_prev,
+                        FovY=FovY, FovX=FovX, FovX_post=FovX_post, FovY_post=FovY_post, FovX_prev=FovX_prev, FovY_prev=FovY_prev,
+                        image=image,
                         image_path=image_path, image_name=image_name, width=w, height=h,
-                        time=time))
+                        time=time, time_prev=time_prev, time_post=time_post,
+                        fwd_flow=fwd_flow, bwd_flow=bwd_flow, fwd_flow_mask=fwd_flow_mask, bwd_flow_mask=bwd_flow_mask, mask=mask))
          
     return cam_infos
 
-class SyntheticToRFDataModule(MyDataModuleBaseClass):
+class CustomDataModule(MyDataModuleBaseClass):
     def __init__(self,
         datadir: str,
         eval: bool,
@@ -71,8 +138,9 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
         M: Optional[int] = 0,
         batch_size: Optional[int]=1,
         seed: Optional[int]=None,
-        load_flow: Optional[bool]=False,
+        load_flow: Optional[bool]=True,
         eval_train: Optional[bool]=False,
+        load_mask: Optional[bool]=True,
         ) -> None:
         super().__init__(seed=seed)
 
@@ -86,6 +154,7 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
         self.num_pts = num_pts
         self.load_flow = load_flow
         self.eval_train = eval_train
+        self.load_mask = load_mask
         self.save_hyperparameters()
 
     def setup(self, stage: str):
@@ -94,13 +163,13 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
         downsample = int(1./self.ratio)
 
         print("Reading Training Transforms")
-        self.train_cam_infos = readTorfData(path, downsample=downsample)
+        self.train_cam_infos = readCustomData(path, downsample=downsample, load_flow=self.load_flow, load_mask=self.load_mask)
         print("Reading Test Transforms")
-        self.test_cam_infos = readTorfData(path, downsample=downsample, nvs=True)
+        self.test_cam_infos = readCustomData(path, downsample=downsample, nvs=True, load_flow=self.load_flow, load_mask=self.load_mask)
     
         nerf_normalization = getNerfppNorm(self.train_cam_infos)
         
-        num_pts = 100_000
+        num_pts = 100000
         print(f"Generating random point cloud ({num_pts})...")
         # We create random points inside the bounds of the synthetic Blender scenes
         xyz = 5 * (np.random.random((num_pts, 3)) * 2.6 - 1.3)
@@ -115,8 +184,8 @@ class SyntheticToRFDataModule(MyDataModuleBaseClass):
                                    times=np.linspace(0., 1., self.M))
 
 
-        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train")
-        self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test")
+        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train", load_flow=self.load_flow, load_mask=self.load_mask)
+        self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test", load_flow=self.load_flow, load_mask=self.load_mask)
         
         is_val_train = [idx for idx in range(len(self.train_cam_infos))]
         is_val_test = [idx for idx in range(len(self.test_cam_infos))]

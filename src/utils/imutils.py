@@ -49,7 +49,7 @@ def torch2png(arr, fname, norm_input=True):
         
     np2png(arr, fname, norm_input)
 
-def np2png_d(arr, fname, vmin=-1, vmax=-1, colormap="jet"):
+def np2png_d(arr, fname=None, vmin=-1, vmax=-1, colormap="jet"):
     if type(arr) == list:
         arr = np.concatenate(arr, 1)
     

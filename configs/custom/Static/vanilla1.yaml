@@ -1,7 +1,7 @@
 seed_everything: false
-name: 'Curve_vanilla1'
+name: 'Static_vanilla1'
 ckpt_path: null
-output: './output/dnerf/static_cube/Curve'
+output: './output/dnerf/static_cube/Static'
 group: 'static_cube' 
 logger: 'wandb'
 project: 'GaussianDiff_dnerf'
@@ -9,14 +9,14 @@ model:
   class_path: src.models.GS3d
   init_args:
     is_blender: true
-    deform_scale: false
+    deform_scale: true
     deform_opacity: false
     deform_feature: false
     log_image_interval: 1000
     sh_degree: 3
     sh_degree_t: 2
     percent_dense: 0.01
-    warm_up: 3000 # turn on warmup if 3000
+    warm_up: 3000000 # turn on warmup if 3000
     trbfc_lr: 0.0001
     trbfs_lr: 0.03
     trbfslinit: -2.0
@@ -42,8 +42,8 @@ model:
     lambda_dssim: 0.2
     lambda_flow: 0. # default to disable flow loss
     flow_start: 5000
-    plane_tv_weight: 0.0001 # if real, 0.0002, else 0.0001
-    time_smoothness_weight: 0.01 # if real, 0.001 else 0.01
+    plane_tv_weight: 0.0002 # if real, 0.0002
+    time_smoothness_weight: 0.001 # if real, 0.001
     l1_time_planes_weight: 0.0001
     densification_interval: 100
     opacity_reset_interval: 3000 # if deforming opacity, 30000000
@@ -59,23 +59,24 @@ model:
     emsstartfromiterations: 5000000000  # turn off guided sampling if 5000000
     selectedlength: 5000
     use_static: false
-    use_AST: false
-    init_mode: "EffGS"
-    motion_mode: "EffGS"
+    use_AST: true
+    init_mode: "D3G"
+    motion_mode: "MLP"
     color_mode: "rgb"
     rot_4d: true
 data:
-  class_path: src.data.SyntheticToRFDataModule
+  class_path: src.data.CustomDataModule
   init_args:
     seed: null
     datadir: 'data'
     eval: True
     ratio: 1.0
     white_background: true
-    batch_size: 1 # 1 if syntethic, 2 if real
+    batch_size: 1
     num_pts_ratio: 0.0
     num_pts: 0
     M: 10
+    load_flow: false
 trainer:
   logger: true
   enable_checkpointing: true
