@@ -10,37 +10,37 @@ declare -a methods=( \
 
 declare -a scenes=( \
     "sliding_cube_motion_range_10.0_baseline_scale_0.1_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_0.1_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_1.0_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_1.0_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_2.0_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_2.0_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_0.5_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_0.5_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_0.3_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_10.0_baseline_scale_0.3_rotation_angle_3.14" \
+    "sliding_cube_motion_range_10.0_baseline_scale_0.1_rotation_angle_3.14" \
+    "sliding_cube_motion_range_10.0_baseline_scale_1.0_rotation_angle_0.0" \
+    "sliding_cube_motion_range_10.0_baseline_scale_1.0_rotation_angle_3.14" \
+    "sliding_cube_motion_range_10.0_baseline_scale_2.0_rotation_angle_0.0" \
+    "sliding_cube_motion_range_10.0_baseline_scale_2.0_rotation_angle_3.14" \
+    "sliding_cube_motion_range_10.0_baseline_scale_0.5_rotation_angle_0.0" \
+    "sliding_cube_motion_range_10.0_baseline_scale_0.5_rotation_angle_3.14" \
+    "sliding_cube_motion_range_10.0_baseline_scale_0.3_rotation_angle_0.0" \
+    "sliding_cube_motion_range_10.0_baseline_scale_0.3_rotation_angle_3.14" \
 
-    # "sliding_cube_motion_range_5.0_baseline_scale_0.1_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_0.1_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_1.0_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_1.0_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_2.0_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_2.0_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_0.5_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_0.5_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_0.3_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_5.0_baseline_scale_0.3_rotation_angle_3.14" \
+    "sliding_cube_motion_range_5.0_baseline_scale_0.1_rotation_angle_0.0" \
+    "sliding_cube_motion_range_5.0_baseline_scale_0.1_rotation_angle_3.14" \
+    "sliding_cube_motion_range_5.0_baseline_scale_1.0_rotation_angle_0.0" \
+    "sliding_cube_motion_range_5.0_baseline_scale_1.0_rotation_angle_3.14" \
+    "sliding_cube_motion_range_5.0_baseline_scale_2.0_rotation_angle_0.0" \
+    "sliding_cube_motion_range_5.0_baseline_scale_2.0_rotation_angle_3.14" \
+    "sliding_cube_motion_range_5.0_baseline_scale_0.5_rotation_angle_0.0" \
+    "sliding_cube_motion_range_5.0_baseline_scale_0.5_rotation_angle_3.14" \
+    "sliding_cube_motion_range_5.0_baseline_scale_0.3_rotation_angle_0.0" \
+    "sliding_cube_motion_range_5.0_baseline_scale_0.3_rotation_angle_3.14" \
 
-    # "sliding_cube_motion_range_0.0_baseline_scale_0.1_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_0.1_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_1.0_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_1.0_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_0.5_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_0.5_rotation_angle_3.14" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_0.3_rotation_angle_0.0" \
-    # "sliding_cube_motion_range_0.0_baseline_scale_0.3_rotation_angle_3.14" \
+    "sliding_cube_motion_range_0.0_baseline_scale_0.1_rotation_angle_0.0" \
+    "sliding_cube_motion_range_0.0_baseline_scale_0.1_rotation_angle_3.14" \
+    "sliding_cube_motion_range_0.0_baseline_scale_1.0_rotation_angle_0.0" \
+    "sliding_cube_motion_range_0.0_baseline_scale_1.0_rotation_angle_3.14" \
+    "sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0" \
+    "sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_3.14" \
+    "sliding_cube_motion_range_0.0_baseline_scale_0.5_rotation_angle_0.0" \
+    "sliding_cube_motion_range_0.0_baseline_scale_0.5_rotation_angle_3.14" \
+    "sliding_cube_motion_range_0.0_baseline_scale_0.3_rotation_angle_0.0" \
+    "sliding_cube_motion_range_0.0_baseline_scale_0.3_rotation_angle_3.14" \
 )
 
 for batch in 1
