@@ -10,26 +10,27 @@ import math
 import matplotlib.cm as cm
 import multiprocessing
 
-exp_prefix="traineval"
+exp_prefix="peer"
 os.makedirs(exp_prefix, exist_ok=True)
 
 
 sub_class = "all"
 # specify dataset output directory
-datasets=["iphone", "nerfies", "hypernerf",  "nerfds", "dnerf"]
-#datasets=["nerfds"]#, "nerfds"]#,  "hypernerf", "dnerf"]
+datasets=["hypernerf",  "nerfds", "dnerf"]
+#datasets=["nerfies"]#, "nerfds"]#,  "hypernerf", "dnerf"]
 root_dir="../output"
 tineuvox_root_dir="../../TiNeuVox/logs"
 
 # specify experiments to track
 methods=[
-        "TiNeuVox/vanilla",
-        "MLP/nodeform", "MLP/vanilla", 
-        "Curve/vanilla", 
+        #"TiNeuVox/vanilla",
+        #"MLP/nodeform", 
+        "MLP/vanilla", 
+        "Curve/vanilla",
         "FourDim/vanilla", 
-        "HexPlane/vanilla", 
-        "TRBF/nodecoder", 
-        "TRBF/vanilla"
+        "HexPlane/vanilla",        
+        #"TRBF/nodecoder",
+        #"TRBF/vanilla"
         ]
 #methods=["Curve/vanilla", "FourDim/vanilla", "HexPlane/vanilla", "MLP/vanilla", "TRBF/nodecoder", "TRBF/vanilla"]
 
@@ -47,6 +48,8 @@ def process_methods(dataset, methods_subset):
     
     dataset_dir = os.path.join(root_dir, dataset)
     scenes = [os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
+    if dataset == "hypernerf":
+        scenes = [os.path.join(dataset_dir, scene) for scene in ["broom2", "vrig-3dprinter", "vrig-peel-banana", "vrig-chicken"]]
     scene_dirs = [scene for scene in scenes if os.path.isdir(scene)]
     tineuvox_runs_ = [run for run in tineuvox_runs if run.group == dataset]
     for scene_dir in tqdm(scene_dirs):
@@ -68,15 +71,10 @@ def process_methods(dataset, methods_subset):
                 exp = {
                     "train_time": None,
                     "render_FPS": None,
-                    "render_FPS_train": None,
                     "test_psnr": None,
                     "test_ssim": None,
                     "test_msssim": None,
                     "test_lpips": None,
-                    "train-test_psnr": None,
-                    "train-test_ssim": None,
-                    "train-test_msssim": None,
-                    "train-test_lpips": None,
                     "crash": None,
                     "OOM": None
                 }
@@ -96,9 +94,7 @@ def process_methods(dataset, methods_subset):
                 if not os.path.exists(os.path.join(local_path, "test.txt")):
                     print("text.txt not found locally: ", os.path.join(local_path, "test.txt"))
                     continue
-                if not os.path.exists(os.path.join(local_path, "train.txt")):
-                    print("train.txt not found locally: ", os.path.join(local_path, "train.txt"))
-                    continue
+                
                 #try:
                 #    test_run = test_run[-1]
                 #    test_psnr = float(test_run.history(keys=['test/avg_psnr'], pandas=False)[0]["test/avg_psnr"])
@@ -122,28 +118,8 @@ def process_methods(dataset, methods_subset):
                             test_render_time = float(line.strip().split(" ")[-1])
                         line = f.readline()
                 
-                with open(os.path.join(local_path, "train.txt"), "r") as f:
-                    line = f.readline()
-                    while line:
-                        if line.startswith("Average PSNR:"):
-                            train_psnr = float(line.strip().split(" ")[-1])
-                        if line.startswith("Average SSIM:"):
-                            train_ssim = float(line.strip().split(" ")[-1])
-                        if line.startswith("Average MS-SSIM:"):
-                            train_msssim = float(line.strip().split(" ")[-1])
-                        if line.startswith("Average LPIPS:"):
-                            train_lpips = float(line.strip().split(" ")[-1])
-                        if line.startswith("Average Render Time:"):
-                            train_render_time = float(line.strip().split(" ")[-1])
-                        line = f.readline()
-
-
                 test_FPS = 1./test_render_time
                 exp["render_FPS"] = test_FPS
-                train_FPS = 1./train_render_time
-                exp["render_FPS_train"] = train_FPS
-                
-                
                 if (test_psnr < 10.) or math.isnan(test_psnr):
                     print(["crashed! ", local_path, test_psnr])
                     exp["crash"] = 1.
@@ -155,29 +131,15 @@ def process_methods(dataset, methods_subset):
                     exp["test_msssim"] = test_msssim
                     exp["test_lpips"] = test_lpips
                     
-                    exp["train-test_psnr"] = train_psnr - test_psnr
-                    exp["train-test_ssim"] = train_ssim - test_ssim
-                    exp["train-test_msssim"] = train_msssim - test_msssim
-                    exp["train-test_lpips"] = train_lpips - test_lpips
-                    
                     if big_name == "TiNeuVox":
-                        train_iter = len(train_run) - 1
-                        while train_iter >= 0:
-                            if len(train_run[train_iter].history(keys=["global_step"], pandas=False)) >= 1:
-                                break
-                            train_iter -= 1
-                        if train_iter < 0:
-                            print(["No trainer record!", local_path, test_psnr])
-                        else:
-                            train_run = train_run[train_iter]
-                            
-                            start_time = train_run.created_at
-                            end_time = train_run.heartbeatAt
-                            start_datetime = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S')
-                            end_datetime = datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S')
-                            total_time = end_datetime - start_datetime
-                            exp["train_time"] = total_time.total_seconds()
-                            exp["OOM"] = 0.
+                        train_run = train_run[-1]
+                        start_time = train_run.created_at
+                        end_time = train_run.heartbeatAt
+                        start_datetime = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S')
+                        end_datetime = datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S')
+                        total_time = end_datetime - start_datetime
+                        exp["train_time"] = total_time.total_seconds()
+                        exp["OOM"] = 0.
                     else:
                         train_iter = len(train_run) - 1
                         while train_iter >= 0:
@@ -277,7 +239,51 @@ else:
         pickle.dump(result_final, file)
 
 
-#assert False, result_final[datasets[0]].keys()
+# hand put in dnerf results for Deformable GS
+
+result_final["dnerf"]["DeformableGS"] = {}
+# Hell Warrior
+result_final["dnerf"]["DeformableGS"]["hellwarrior"] = {}
+result_final["dnerf"]["DeformableGS"]["hellwarrior"]["test_psnr"] = [41.54, 41.54, 41.54]
+result_final["dnerf"]["DeformableGS"]["hellwarrior"]["test_ssim"] = [0.9873, 0.9873, 0.9873]
+
+
+# Mutant
+result_final["dnerf"]["DeformableGS"]["mutant"] = {}
+result_final["dnerf"]["DeformableGS"]["mutant"]["test_psnr"] = [42.63, 42.63, 42.63]
+result_final["dnerf"]["DeformableGS"]["mutant"]["test_ssim"] = [0.9951, 0.9951, 0.9951]
+
+# Hook
+result_final["dnerf"]["DeformableGS"]["hook"] = {}
+result_final["dnerf"]["DeformableGS"]["hook"]["test_psnr"] = [37.42, 37.42, 37.42]
+result_final["dnerf"]["DeformableGS"]["hook"]["test_ssim"] = [0.9867, 0.9867, 0.9867]
+
+# Bouncing Balls
+result_final["dnerf"]["DeformableGS"]["bouncingballs"] = {}
+result_final["dnerf"]["DeformableGS"]["bouncingballs"]["test_psnr"] = [41.01, 41.01, 41.01]
+result_final["dnerf"]["DeformableGS"]["bouncingballs"]["test_ssim"] = [0.9953, 0.9953, 0.9953]
+
+# Lego
+result_final["dnerf"]["DeformableGS"]["lego"] = {}
+result_final["dnerf"]["DeformableGS"]["lego"]["test_psnr"] = [33.07, 33.07, 33.07]
+result_final["dnerf"]["DeformableGS"]["lego"]["test_ssim"] = [0.9794, 0.9794, 0.9794]
+
+# T-Rex
+result_final["dnerf"]["DeformableGS"]["trex"] = {}
+result_final["dnerf"]["DeformableGS"]["trex"]["test_psnr"] = [38.10, 38.10, 38.10]
+result_final["dnerf"]["DeformableGS"]["trex"]["test_ssim"] = [0.9933, 0.9933, 0.9933]
+
+# Stand Up
+result_final["dnerf"]["DeformableGS"]["standup"] = {}
+result_final["dnerf"]["DeformableGS"]["standup"]["test_psnr"] = [44.62, 44.62, 44.62]
+result_final["dnerf"]["DeformableGS"]["standup"]["test_ssim"] = [0.9960, 0.9960, 0.9960]
+
+# Jumping Jacks
+result_final["dnerf"]["DeformableGS"]["jumpingjacks"] = {}
+result_final["dnerf"]["DeformableGS"]["jumpingjacks"]["test_psnr"] = [37.72, 37.72, 37.72]
+result_final["dnerf"]["DeformableGS"]["jumpingjacks"]["test_ssim"] = [0.9897, 0.9897, 0.9897]
+
+methods += ["DeformableGS"]
 
 for dataset in datasets:
     #assert False, result_final[dataset].keys()
@@ -298,30 +304,208 @@ for dataset in datasets:
                     result_final[dataset][method]["all"][key] = []
                 result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][key] # if crash/OOM, a list of numbers instead of tuple
 
-'''
-for dataset in datasets:
-    dataset_dir = os.path.join(root_dir, dataset)
-    scenes=[os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
-    scene_dirs=[scene for scene in scenes if os.path.isdir(scene)]
-    for method in methods:
-        result_vanilla_final[dataset][method]["all"] = {}
-        for scene_dir in scene_dirs:
-            scene = scene_dir.split("/")[-1]
-            if scene not in result_vanilla_final[dataset][method]:
-                continue
-            for key in result_final[dataset][method][scene]:
-                if key not in result_vanilla_final[dataset][method]["all"]:
-                    result_vanilla_final[dataset][method]["all"][key] = []
-                result_vanilla_final[dataset][method]["all"][key] += result_vanilla_final[dataset][method][scene][key]
-'''
+result_final["hypernerf"]["EffGS"] = {}
+result_final["hypernerf"]["EffGS"]["all"] = {}
+result_final["hypernerf"]["EffGS"]["all"]["test_psnr"] = [23.5, 23.5, 23.5]
+result_final["hypernerf"]["EffGS"]["all"]["test_msssim"] = [0.798, 0.798, 0.798]
 
-method_colors = [color for color in cm.pink(np.linspace(0.6, 0.8, 1))] +\
-    [color for color in cm.Greens(np.linspace(0.4, 0.8, 2))] +\
-    [color for color in cm.Blues(np.linspace(0.6, 0.8, 1))] +\
-    [color for color in cm.Reds(np.linspace(0.6, 0.8, 1))] +\
-    [color for color in cm.Purples(np.linspace(0.6, 0.8, 1))] +\
-    [color for color in cm.Oranges(np.linspace(0.6, 0.8, 1))] +\
-    [color for color in cm.Grays(np.linspace(0.6, 0.8, 1))] 
+result_final["hypernerf"]["4DGS"] = {}
+result_final["hypernerf"]["4DGS"]["all"] = {}
+result_final["hypernerf"]["4DGS"]["all"]["test_psnr"] = [25.2, 25.2, 25.2]
+result_final["hypernerf"]["4DGS"]["all"]["test_msssim"] = [0.845, 0.845, 0.845]
+
+
+result_final["dnerf"]["EffGS"] = {}
+result_final["dnerf"]["EffGS"]["all"] = {}
+result_final["dnerf"]["EffGS"]["all"]["test_psnr"] = [32.07, 32.07, 32.07]
+result_final["dnerf"]["EffGS"]["all"]["test_msssim"] = [0.96, 0.96, 0.96]
+
+result_final["dnerf"]["RTGS"] = {}
+result_final["dnerf"]["RTGS"]["all"] = {}
+result_final["dnerf"]["RTGS"]["all"]["test_psnr"] = [34.09, 34.09, 34.09]
+result_final["dnerf"]["RTGS"]["all"]["test_ssim"] = [0.98, 0.98, 0.98]
+
+result_final["dnerf"]["4DGS"] = {}
+result_final["dnerf"]["4DGS"]["all"] = {}
+result_final["dnerf"]["4DGS"]["all"]["test_psnr"] = [33.30, 33.30, 33.30]
+result_final["dnerf"]["4DGS"]["all"]["test_ssim"] = [0.98, 0.98, 0.98]
+
+
+result_final["nerfds"]["DeformableGS"] = {}
+result_final["nerfds"]["DeformableGS"]["all"] = {}
+result_final["nerfds"]["DeformableGS"]["all"]["test_psnr"] = [24.11, 24.11, 24.11]
+result_final["nerfds"]["DeformableGS"]["all"]["test_ssim"] = [0.8525, 0.8525, 0.8525]
+result_final["nerfds"]["DeformableGS"]["all"]["test_lpips"] = [0.1769, 0.1769, 0.1769]
+
+def format_latex(mean, variance):
+    #return f"{mean:.2f}"
+    return f"{mean:.2f} $\pm$ {variance:.3f}"
+
+
+
+
+
+def extract_and_format_metrics(dict_data, keys):
+    metrics = {}
+    for key in keys:
+        print(key)
+        values = dict_data
+        for k in key.split('.'):
+            values = values[k]
+        mean = np.mean(values)
+        variance = np.var(values)
+        metrics[key] = format_latex(mean, variance)
+    return metrics
+
+keys=[
+    "nerfds.DeformableGS.all.test_psnr",
+    "nerfds.DeformableGS.all.test_ssim",
+    #"nerfds.MLP/vanilla.all.test_psnr",
+    #"nerfds.MLP/vanilla.all.test_ssim",
+    "dnerf.DeformableGS.all.test_psnr",
+    "dnerf.DeformableGS.all.test_ssim",
+    #"dnerf.MLP/vanilla.all.test_psnr",
+    #"dnerf.MLP/vanilla.all.test_ssim",
+    "dnerf.4DGS.all.test_psnr",
+    "dnerf.4DGS.all.test_ssim",
+    #"dnerf.HexPlane/vanilla.all.test_psnr",
+    #"dnerf.HexPlane/vanilla.all.test_ssim",
+    "dnerf.EffGS.all.test_psnr",
+    "dnerf.EffGS.all.test_msssim",
+    #"dnerf.Curve/vanilla.all.test_psnr",
+    #"dnerf.Curve/vanilla.all.test_ssim",
+    "dnerf.RTGS.all.test_psnr",
+    "dnerf.RTGS.all.test_ssim",
+    #"dnerf.FourDim/vanilla.all.test_psnr",
+    #"dnerf.FourDim/vanilla.all.test_ssim",
+    "hypernerf.4DGS.all.test_psnr",
+    "hypernerf.4DGS.all.test_msssim",
+    #"hypernerf.HexPlane/vanilla.all.test_psnr",
+    #"hypernerf.HexPlane/vanilla.all.test_msssim",
+    "hypernerf.EffGS.all.test_psnr",
+    "hypernerf.EffGS.all.test_msssim",
+    #"hypernerf.Curve/vanilla.all.test_psnr",
+    #"hypernerf.Curve/vanilla.all.test_ssim",
+]
+
+
+formatted_metrics = extract_and_format_metrics(result_final, keys)
+
+formatted_metrics["dnerf.EffGS.all.test_ssim"] = "-"
+formatted_metrics["dnerf.RTGS.all.test_msssim"] = "-"
+formatted_metrics["dnerf.DeformableGS.all.test_msssim"] = "-"
+formatted_metrics["dnerf.4DGS.all.test_msssim"] = "-"
+formatted_metrics["hypernerf.4DGS.all.test_ssim"] = "-"
+formatted_metrics["hypernerf.EffGS.all.test_ssim"] = "-"
+formatted_metrics["nerfds.DeformableGS.all.test_msssim"] = "-"
+formatted_metrics["dnerf.EffGS.all.test_lpips"] = "-"
+formatted_metrics["dnerf.RTGS.all.test_lpips"] = "-"
+formatted_metrics["dnerf.DeformableGS.all.test_lpips"] = "-"
+formatted_metrics["dnerf.4DGS.all.test_lpips"] = "-"
+formatted_metrics["hypernerf.EffGS.all.test_lpips"] = "-"
+formatted_metrics["hypernerf.4DGS.all.test_lpips"] = "-"
+formatted_metrics["nerfds.DeformableGS.all.test_lpips"] = "-"
+
+keys  = [
+    "nerfds.MLP/vanilla.all.test_psnr",
+    "nerfds.MLP/vanilla.all.test_ssim",
+    "nerfds.MLP/vanilla.all.test_msssim",
+    "nerfds.MLP/vanilla.all.test_lpips",
+    "dnerf.MLP/vanilla.all.test_psnr",
+    "dnerf.MLP/vanilla.all.test_ssim",
+    "dnerf.MLP/vanilla.all.test_msssim",
+    "dnerf.MLP/vanilla.all.test_lpips",
+    "dnerf.HexPlane/vanilla.all.test_psnr",
+    "dnerf.HexPlane/vanilla.all.test_ssim",
+    "dnerf.HexPlane/vanilla.all.test_msssim",
+    "dnerf.HexPlane/vanilla.all.test_lpips",
+    "dnerf.Curve/vanilla.all.test_psnr",
+    "dnerf.Curve/vanilla.all.test_ssim",
+    "dnerf.Curve/vanilla.all.test_msssim",
+    "dnerf.Curve/vanilla.all.test_lpips",
+    "dnerf.FourDim/vanilla.all.test_psnr",
+    "dnerf.FourDim/vanilla.all.test_ssim",
+    "dnerf.FourDim/vanilla.all.test_msssim",
+    "dnerf.FourDim/vanilla.all.test_lpips",
+    "hypernerf.HexPlane/vanilla.all.test_psnr",
+    "hypernerf.HexPlane/vanilla.all.test_ssim",
+    "hypernerf.HexPlane/vanilla.all.test_msssim",
+    "hypernerf.HexPlane/vanilla.all.test_lpips",
+    "hypernerf.Curve/vanilla.all.test_psnr",
+    "hypernerf.Curve/vanilla.all.test_ssim",
+    "hypernerf.Curve/vanilla.all.test_msssim",
+    "hypernerf.Curve/vanilla.all.test_lpips",
+]
+
+for key in keys:
+    dataset, method, _, metric = key.split(".")
+    metrics = result_final[dataset][method]["all"][metric]
+    mean = []
+    variance = []
+    for metric in metrics:
+        mean.append(metric[0])
+        variance.append(metric[1])
+    mean = sum(mean)/float(len(mean))
+    variance = sum(np.sqrt(variance))/float(len(variance))
+    formatted_metrics[key] = format_latex(mean, variance)
+
+#print(result_final["dnerf"]["Curve/vanilla"]["all"]["test_psnr"])
+
+#print(result_final["dnerf"]["Curve/vanilla"]["all"]["test_ssim"])
+#assert False
+
+
+# Prepare the LaTeX table content
+table1 = f"""
+\\begin{{table}}[]
+    \\centering
+    \\begin{{tabular}}{{l|ccc|ccc}}
+    \\toprule
+    & \\multicolumn{{3}}{{c}}{{Reported}} & \\multicolumn{{3}}{{c}}{{Benchmark}} \\\\
+          & SSIM & MS-SSIM & LPIPS-Alex & SSIM & MS-SSIM & LPIPS-Alex \\\\
+         \\hline
+        RTGS~\\cite{{yang2023gs4d}} & {formatted_metrics["dnerf.RTGS.all.test_ssim"]} & {formatted_metrics["dnerf.RTGS.all.test_msssim"]} & {formatted_metrics["dnerf.RTGS.all.test_lpips"]}  & {formatted_metrics["dnerf.FourDim/vanilla.all.test_ssim"]} & {formatted_metrics["dnerf.FourDim/vanilla.all.test_msssim"]}  & {formatted_metrics["dnerf.FourDim/vanilla.all.test_lpips"]} \\\\
+        DeformableGS~\\cite{{yang2023deformable3dgs}}  & {formatted_metrics["dnerf.DeformableGS.all.test_ssim"]} & {formatted_metrics["dnerf.DeformableGS.all.test_msssim"]}  & {formatted_metrics["dnerf.DeformableGS.all.test_lpips"]} & {formatted_metrics["dnerf.MLP/vanilla.all.test_ssim"]} & {formatted_metrics["dnerf.MLP/vanilla.all.test_msssim"]} & {formatted_metrics["dnerf.MLP/vanilla.all.test_lpips"]} \\\\
+        4DGS~\\cite{{wu20234dgaussians}}  & {formatted_metrics["dnerf.4DGS.all.test_ssim"]} & {formatted_metrics["dnerf.4DGS.all.test_msssim"]} & {formatted_metrics["dnerf.4DGS.all.test_lpips"]} & {formatted_metrics["dnerf.HexPlane/vanilla.all.test_ssim"]} & {formatted_metrics["dnerf.HexPlane/vanilla.all.test_msssim"]} & {formatted_metrics["dnerf.HexPlane/vanilla.all.test_lpips"]} \\\\
+        EffGS~\\cite{{katsumata2023efficient}} & {formatted_metrics["dnerf.EffGS.all.test_ssim"]} & {formatted_metrics["dnerf.EffGS.all.test_msssim"]} & {formatted_metrics["dnerf.EffGS.all.test_lpips"]}  & {formatted_metrics["dnerf.Curve/vanilla.all.test_ssim"]} & {formatted_metrics["dnerf.Curve/vanilla.all.test_msssim"]} & {formatted_metrics["dnerf.Curve/vanilla.all.test_lpips"]} \\\\
+    \\bottomrule
+    \\end{{tabular}}
+    \\caption{{Reported Number vs. Benchmark Number on D-NeRF dataset~\\cite{{pumarola2020d}}}}
+    \\label{{tab:veri_synthetic}}
+\\end{{table}}
+"""
+
+print(table1)
+
+table2 = f"""
+\\begin{{table}}[]
+    \\centering
+    \\begin{{tabular}}{{r|l|ccc|ccc}}
+    \\toprule
+    & & \\multicolumn{{3}}{{c}}{{Reported}} & \\multicolumn{{3}}{{c}}{{Benchmark}} \\\\
+        & & SSIM & MS-SSIM & LPIPS & SSIM & MS-SSIM & LPIPS \\\\
+         \\hline
+HyperNeRF & 4DGS~\\cite{{wu20234dgaussians}} & {formatted_metrics["hypernerf.4DGS.all.test_ssim"]} & {formatted_metrics["hypernerf.4DGS.all.test_msssim"]} & {formatted_metrics["hypernerf.4DGS.all.test_lpips"]} & {formatted_metrics["hypernerf.HexPlane/vanilla.all.test_ssim"]} & {formatted_metrics["hypernerf.HexPlane/vanilla.all.test_msssim"]} & {formatted_metrics["hypernerf.HexPlane/vanilla.all.test_lpips"]} \\\\
+HyperNeRF & EffGS~\\cite{{katsumata2023efficient}} & {formatted_metrics["hypernerf.EffGS.all.test_ssim"]} & {formatted_metrics["hypernerf.EffGS.all.test_msssim"]} & {formatted_metrics["hypernerf.EffGS.all.test_lpips"]} & {formatted_metrics["hypernerf.Curve/vanilla.all.test_ssim"]} & {formatted_metrics["hypernerf.Curve/vanilla.all.test_msssim"]} & {formatted_metrics["hypernerf.Curve/vanilla.all.test_lpips"]} \\\\
+NeRF-DS & DeformableGS~\\cite{{wu20234dgaussians}} & {formatted_metrics["nerfds.DeformableGS.all.test_ssim"]} & {formatted_metrics["nerfds.DeformableGS.all.test_msssim"]} & {formatted_metrics["nerfds.DeformableGS.all.test_lpips"]} & {formatted_metrics["nerfds.MLP/vanilla.all.test_ssim"]} & {formatted_metrics["nerfds.MLP/vanilla.all.test_msssim"]} & {formatted_metrics["nerfds.MLP/vanilla.all.test_lpips"]} \\\\
+    \\bottomrule
+    \\end{{tabular}}
+    \\caption{{Reported Number vs. Benchmark Number on real-world datasets HyperNeRF~\\cite{{park2021hypernerf}} and NeRF-DS~\\cite{{yan2023nerf}}}}
+    \\label{{tab:veri_realworld}}
+\\end{{table}}
+"""
+
+print(table2)
+assert False
+
+
+method_colors = [color for color in cm.pink(np.linspace(0.2, 0.8, 1))] +\
+    [color for color in cm.Greens(np.linspace(0.2, 0.8, 3))] +\
+    [color for color in cm.Blues(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Reds(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Purples(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Oranges(np.linspace(0.2, 0.8, 2))] +\
+    [color for color in cm.Grays(np.linspace(0.2, 0.8, 1))] 
 
 #method_colors = ['steelblue', "red", "yellow", "green", "orange", "purple", ""]
 assert len(method_colors) >= len(methods)
@@ -342,7 +526,7 @@ for color, method in zip(method_colors[:len(methods)], methods):
 
 
 for key in result_final[datasets[0]][methods[0]]["all"]:
-    #plt.rcParams['font.family'] = 'Arial'
+    plt.rcParams['font.family'] = 'Arial'
     plt.rcParams['font.size'] = 12
 
     # Calculate the width of the plot based on the number of datasets and methods
@@ -359,12 +543,10 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
     bar_colors = []
 
     for dataset in result_final:
-        if dataset not in datasets:
-            continue
         dataset_id = datasets.index(dataset)
         for method in result_final[dataset]:
-            #if (dataset == "dnerf") and (method == "TRBF/vanilla"):
-            #    continue
+            if (dataset == "dnerf") and (method == "TRBF/vanilla"):
+                continue
             method_id = methods.index(method)
             bar_positions.append(dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width)
             if (key not in result_final[dataset][method][sub_class]) or (len(result_final[dataset][method][sub_class][key]) == 0):
@@ -384,11 +566,8 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
     y_min = min(means)
     y_max = max(means)
     y_range = y_max - y_min
-    y_padding = abs(y_range) * 0.1  # Add 10% padding to the y-axis range
-    if y_min < 0:
-        ax.set_ylim(bottom=y_min - y_padding, top=y_max + y_padding)
-    else:
-        ax.set_ylim(bottom=max(y_min - y_padding, 0), top=y_max + y_padding)
+    y_padding = y_range * 0.1  # Add 10% padding to the y-axis range
+    ax.set_ylim(bottom=max(y_min - y_padding, 0.), top=y_max + y_padding)
 
     ax.bar(bar_positions, means, width=bar_width, color=bar_colors, edgecolor='white', linewidth=1)
     ax.errorbar(bar_positions, means, yerr=np.sqrt(variances), fmt='none', ecolor=error_color, capsize=5, elinewidth=1)
@@ -431,7 +610,7 @@ for dataset in datasets:
     common_scenes = [scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"]
 
     for key in result_final[datasets[0]][methods[0]]["all"]:
-        #plt.rcParams['font.family'] = 'Arial'
+        plt.rcParams['font.family'] = 'Arial'
         plt.rcParams['font.size'] = 12
 
         # Calculate the width of the plot based on the number of scenes and methods
@@ -485,11 +664,8 @@ for dataset in datasets:
         y_min = min(means)
         y_max = max(means)
         y_range = y_max - y_min
-        y_padding = abs(y_range) * 0.1  # Add 10% padding to the y-axis range
-        if y_min < 0:
-            ax.set_ylim(bottom=y_min - y_padding, top=y_max + y_padding)
-        else:
-            ax.set_ylim(bottom=max(y_min - y_padding, 0), top=y_max + y_padding)
+        y_padding = y_range * 0.1  # Add 10% padding to the y-axis range
+        ax.set_ylim(bottom=max(y_min - y_padding, 0.0), top=y_max + y_padding)
 
         ax.bar(bar_positions, means, width=bar_width, color=bar_colors, edgecolor='white', linewidth=1)
         ax.errorbar(bar_positions, means, yerr=np.sqrt(variances), fmt='none', ecolor=error_color, capsize=5, elinewidth=1)
