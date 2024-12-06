@@ -10,7 +10,7 @@ if __name__ == "__main__":
     parser.add_argument("--group", "-g", type=str, default="default", help="wandb group name")
     parser.add_argument("--name", "-n", type=str, help="Experiment name")
     parser.add_argument("--dataset", type=str, help="Path to the dataset")
-    parser.add_argument("--slurm_script", type=str, default="slurms/dnerf_custom.sh", help="Path to slurm script")
+    parser.add_argument("--slurm_script", type=str, default=None, help="Path to slurm script")
     parser.add_argument("--output_dir", type=str, help="Output directory")
 
     args = parser.parse_args()
@@ -28,16 +28,28 @@ if __name__ == "__main__":
     config["data"]["init_args"]["datadir"] = args.dataset
 
     # Save the new config file
-    new_config_name = os.path.join(os.path.dirname(args.config_file), f"{args.name}.yaml")
-    with open(new_config_name, "w") as f:
+    new_config_path = os.path.join(os.path.dirname(args.config_file), f"{args.name}.yaml")
+    with open(new_config_path, "w") as f:
         yaml.dump(config, f)
 
-    print(f"New config file saved at {new_config_name}")
+    print(f"New config file saved at {new_config_path}")
     print(f"Dataset path replaced with {args.dataset}")
     print(f"Experiment name: {args.name}")
 
     # Run the experiment
-    slurm_command = f"sbatch -J {args.name} {args.slurm_script} {new_config_name} {args.output_dir}"
-    print(f"Running the experiment with the following command: \n {slurm_command}")
-    os.system(slurm_command)
+    if args.slurm_script is not None:
+        slurm_command = f"sbatch -J {args.name} {args.slurm_script} {new_config_path} {args.output_dir}"
+        print(f"Running the experiment with the following command: \n {slurm_command}")
+        os.system(slurm_command)
+    else:
+        cmd = [
+            f'python main.py fit --config {new_config_path}',
+            f'python main.py test --config {new_config_path}  --ckpt_path  last',
+            f'python main.py test --config {new_config_path}  --ckpt_path  last --model.init_args.eval_mask true --data.init_args.load_mask true'
+        ]
+        for c in cmd:
+            print(c)
+            os.system(c)
+        print("Done")
+    
     

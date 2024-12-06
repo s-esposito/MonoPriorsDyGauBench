@@ -106,7 +106,7 @@ def _ssim(
 
     if mask is not None:
         # Interpolate the mask to match the size of ssim_map and cs_map
-        mask_resized = F.interpolate(mask, size=ssim_map.shape[-2:], mode='nearest')
+        mask_resized = F.interpolate(mask, size=ssim_map.shape[-2:], mode='bilinear')
 
         # Flatten the ssim_map, cs_map, and resized mask
         ssim_map_flat = torch.flatten(ssim_map, 2)
