@@ -71,9 +71,11 @@ this_repo
 │    │     │ 
 │    │     └───broom
 │    │     └───...
-│    │              
-│    └───dynamic_cube_dynamic_camera_textured_motion_range_0.0
-│    └───...
+│    │
+|    └───custom
+|          |
+│          └───dynamic_cube_dynamic_camera_textured_motion_range_0.0
+│          └───...
 └...       
 ...
 ```
@@ -137,22 +139,23 @@ paste API key and create first project following instruction
 ## Usage
 
 
-### On Our Instrutive Dataset
+### On Our Instructive Dataset
 
+We provide a python utility to run training and testing for the instructive dataset. The utility trains the model as well as runs evaluations for masked and non-masked metrics.
+The utility by default is going to run the code locally. However, this amount of experiments will likely require a cluster to finish in a reasonable time. For this case, the utility can instead run scripts on the slurm cluster. Check slurms/custom.sh as an example and specify ```--slurm_script``` parameter.
 For training and testing method ```${method}``` on the instructive dataset scene ```${scene}```,
 
 ```bash
-variant="dnerf/custom/${method}/${scene}"
 exp_group_name="vanilla"
 exp_name="${scene}_${method}"
 
 python runner.py \
-    --config_file configs/dnerf/custom/${method}/vanilla1.yaml \
+    --config_file configs/custom/${method}/vanilla1.yaml \
     --group ${exp_group_name}_${scene} \
     --name ${exp_name} \
-    --dataset data/${scene} \
-    --slurm_script slurms/dnerf_custom.sh \
-    --output_dir output/dnerf/${exp_group_name}/${scene}/${method}
+    --dataset data/custom/${scene} \
+    --slurm_script slurms/custom.sh \
+    --output_dir output/custom/${exp_group_name}/${scene}/${method}
 ```
 
 ### On All Other Datasets
