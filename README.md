@@ -84,7 +84,7 @@ this_repo
 This code has been developed with Anaconda (Python 3.7), CUDA 11.8.0 on Red Hat Enterprise Linux 9.2, one NVIDIA GeForce RTX 3090 GPU.  
 
 ```Shell
-conda create -p [YourEnv] python=3.7
+conda create -p [YourEnv] python=3.9
 conda activate [YourEnv]
 
 conda install -c anaconda libstdcxx-ng
@@ -93,7 +93,7 @@ conda install -c menpo opencv
 conda install -c conda-forge plyfile==0.8.1
 pip install tqdm imageio
 
-pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+pip install torch==2xx # find the torch version that works for your cuda device
 
 pip install torchmetrics
 
@@ -107,7 +107,7 @@ pip install kornia
 
 
 
-pip install lightning=2.2.1
+pip install lightning=2.2.1 # recommend to use this version for stability!
 pip install "jsonargparse[signatures]"
 
 pip install wandb
