@@ -180,3 +180,17 @@ python main.py test \
     --name "${base##*/}_$name" 
 ```
 
+### Citation
+
+If you find our repository useful, please consider giving it a star ⭐ and citing our paper:
+
+```
+@misc{liang2024monocular,
+  title        ={Monocular Dynamic Gaussian Splatting is Fast and Brittle but Smooth Motion Helps},
+  author       ={Yiqing Liang and Mikhail Okunev and Mikaela Angelina Uy and Runfeng Li and Leonidas Guibas and James Tompkin and Adam W. Harley},
+  year         ={2024},
+  eprint       ={2412.04457},
+  archivePrefix={arXiv},
+  primaryClass ={cs.CV}
+}
+```
