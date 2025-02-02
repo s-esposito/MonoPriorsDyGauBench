@@ -35,3 +35,4 @@ motion_iphone/*
 *.mp4
 *.png
 compress_datasets_log.txt
+*.txt
