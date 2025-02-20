@@ -121,8 +121,8 @@ pip install timm==0.4.5
 # install from local folders 
 pip install submodules/diff-gaussian-rasterization
 pip install submodules/depth-diff-gaussian-rasterization
-pip install submodules/gaussian-rasterization_ch3
-pip install submodules/gaussian-rasterization_ch9
+pip install submodules/gaussian_rasterization_ch3
+pip install submodules/gaussian_rasterization_ch9
 pip install submodules/simple-knn
 
 ```

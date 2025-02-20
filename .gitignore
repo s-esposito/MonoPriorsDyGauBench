@@ -36,3 +36,4 @@ motion_iphone/*
 *.png
 compress_datasets_log.txt
 *.txt
+submodules/diff-gaussian-rasterization-zerg
