@@ -6,7 +6,7 @@ import math
 import lpips
 import os
 from jsonargparse import Namespace
-from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation, build_rotation_4d, build_scaling_rotation_4d, get_linear_noise_func
+from src.utils.general_utils import inverse_sigmoid, get_expon_lr_func, strip_symmetric, build_scaling_rotation, update_quaternion, build_rotation, build_rotation_4d, build_scaling_rotation_4d, get_linear_noise_func, knn
 from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
 from src.models.modules.Init import create_from_pcd_func 
 from src.models.modules.Deform import create_motion_model
@@ -34,6 +34,9 @@ from diff_gaussian_rasterization_ch9 import GaussianRasterizationSettings as Gau
 from diff_gaussian_rasterization_ch9 import GaussianRasterizer as GaussianRasterizer_ch9
 #from diff_gaussian_rasterization_ch3 import GaussianRasterizationSettings as GaussianRasterizationSettings_ch3
 #from diff_gaussian_rasterization_ch3 import GaussianRasterizer as GaussianRasterizer_ch3
+
+
+GRADIENT_CLIP_VAL = 0.5
 
 # all modules.??? contain base classes and inherit, or functions
 # class: share the same input and output
@@ -109,6 +112,8 @@ class GS3d(MyModelBaseClass):
         rot_4d: Optional[bool]=False,
         verbose: Optional[bool]=False,
         eval_mask: Optional[bool]=False,
+        lambda_rigid: Optional[float]=0.0, # default not using rigid loss
+        new_batching: Optional[bool]=False,
         **kwargs
     ):
         super().__init__()
@@ -313,6 +318,9 @@ class GS3d(MyModelBaseClass):
                 assert not self.deform_feature, "Not supporting feature deformation for TRBF SH mode"
         
         self.eval_mask = eval_mask
+
+        self.lambda_rigid = lambda_rigid
+        self.new_batching = new_batching
     #@torch.inference_mode()
     #def compute_lpips(
     #    self, image: torch.Tensor, gt: torch.Tensor 
@@ -563,6 +571,13 @@ class GS3d(MyModelBaseClass):
 
     def get_covariance(self, scaling_modifier=1):
         return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
+
+    def get_current_covariance_and_mean_offset(self, scaling_modifier = 1, timestamp = 0.0):
+        return self.covariance_activation(self.get_scaling_xyzt, scaling_modifier, 
+                                                              self._rotation, 
+                                                              self._rotation_r,
+                                                              dt = timestamp - self.get_t)
+
 
 
 
@@ -1134,6 +1149,8 @@ class GS3d(MyModelBaseClass):
         ssim_list = []
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 = 0.
+        if (self.motion_mode == "FourDim") and (self.lambda_rigid > 0):
+            Lrigid = 0.
         
         flow_loss_list = None
         if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
@@ -1162,6 +1179,19 @@ class GS3d(MyModelBaseClass):
                     self.time_smoothness_weight,
                     self.l1_time_planes_weight,
                     self.plane_tv_weight)
+            if (self.motion_mode == "FourDim") and (self.lambda_rigid > 0):
+                k = 20
+                xyz_mean = self.get_xyz 
+                xyz_cur =  xyz_mean #  + delta_mean
+                idx, dist = knn(xyz_cur[None].contiguous().detach(), 
+                                xyz_cur[None].contiguous().detach(), 
+                                k)
+                _, velocity = self.get_current_covariance_and_mean_offset(1.0, self.get_t + 0.1)
+                weight = torch.exp(-100 * dist)
+                vel_dist = torch.norm(velocity[idx] - velocity[None, :, None], p=2, dim=-1)
+                Lrigid += (weight * vel_dist).sum() / k / xyz_cur.shape[0]
+                   
+                
             if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
                 if "fwd_flow" in batch:
                     fwd_flow = fwd_flows[idx] 
@@ -1193,6 +1223,9 @@ class GS3d(MyModelBaseClass):
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 /= float(batch_size)
             loss += tv1
+        if (self.motion_mode == "FourDim") and (self.lambda_rigid > 0): 
+            Lrigid /= float(batch_size)
+            loss += Lrigid
         if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             if "fwd_flow" in batch:
                 flow_loss /= float(batch_size)
@@ -1206,6 +1239,8 @@ class GS3d(MyModelBaseClass):
         self.log(f"{mode}/loss", loss, prog_bar=True)
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             self.log(f"{mode}/loss_tv", tv1)
+        if (self.motion_mode == "FourDim") and (self.lambda_rigid > 0):
+            self.log(f"{mode}/loss_rigid", Lrigid)
         if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             if "fwd_flow" in batch:
                 self.log(f"{mode}/loss_flow", flow_loss)
@@ -1261,44 +1296,88 @@ class GS3d(MyModelBaseClass):
         loss, ssim_list, flow_loss_list = self.compute_loss(
             render_pkg, batch, mode="train"
         )
+        # Check for NaN loss after opacity reset
+        if torch.isnan(loss):
+            print(f"NaN loss detected at iteration {iteration}, skipping parameter updates")
+            self.log("train/nan_loss_detected", 1.0)
+            #self.iteration += 1 # optimizer did not step forward
+            return None
+        if loss > 1e+5 or loss < -1e+5:
+            print(f"Too big loss detected at iteration {iteration}, skipping parameter updates")
+            self.log("train/big_loss_detected", 1.0)
+            #self.iteration += 1  # optimizer did not step forward
+            return None
         #print(loss)
         print(iteration, self.trainer.global_step, loss)
         #assert False, render_pkg["render"]
         self.manual_backward(loss)
 
         #print([[param_group['name'], optimizer.state.get(param_group["params"][0])] for param_group in optimizer.param_groups])
-        
+
+        if self.new_batching:
+            batch_point_grad = []
+            batch_visibility_filter = []
+            batch_radii = []
+            
+            batch_size = len(render_pkg["render"])
+            for bidx in range(batch_size):
+                batch_point_grad.append(torch.norm(render_pkg["viewspace_points"][bidx].grad[:,:2], dim=-1))
+                batch_radii.append(render_pkg["radii"][bidx])
+                batch_visibility_filter.append(render_pkg["visibility_filter"][bidx])
+
+            visibility_count = torch.stack(batch_visibility_filter,1).sum(1)
+            visibility_filter = visibility_count > 0
+            radii = torch.stack(batch_radii,1).max(1)[0]
+            
+            batch_viewspace_point_grad = torch.stack(batch_point_grad,1).sum(1)
+            batch_viewspace_point_grad[visibility_filter] = batch_viewspace_point_grad[visibility_filter] * batch_size / visibility_count[visibility_filter]
+            batch_viewspace_point_grad = batch_viewspace_point_grad.unsqueeze(1)
+            
+            
 
         with torch.no_grad():
-            # keep track of stats for adaptive policy
-            #radii = 
-            #visibility_filter = 
-            #viewspace_points = 
-            radii_list = []
-            for radii in render_pkg["radii"]:
-                radii_list.append(radii.unsqueeze(0))
-            #    radii_list.append(radii.unsqueeze(0))
-            #    visibility_filter_list.append(visibility_filter.unsqueeze(0))
-            #    viewspace_point_tensor_list.append(viewspace_point_tensor)
-            viewspace_point_tensor_list = render_pkg["viewspace_points"]
-            viewspace_point_tensor_grad = torch.zeros_like(viewspace_point_tensor_list[0])
-            for idx in range(0, len(viewspace_point_tensor_list)):
-                viewspace_point_tensor_grad = viewspace_point_tensor_grad + viewspace_point_tensor_list[idx].grad
-                  
-            #radii_list = 
-            radii = torch.cat(radii_list, dim=0).max(dim=0).values
-            visibility_filter = torch.max(torch.stack(render_pkg["visibility_filter"], dim=0), dim=0).values > 0.
-            #viewspace_points = render_pkg["viewspace_points"]
-            #assert False, [radii.shape, render_pkg["visibility_filter"][0].shape, visibility_filter.shape, viewspace_point_tensor_grad.shape]
+            if not self.new_batching:
+                # keep track of stats for adaptive policy
+                #radii = 
+                #visibility_filter = 
+                #viewspace_points = 
+                radii_list = []
+                for radii in render_pkg["radii"]:
+                    radii_list.append(radii.unsqueeze(0))
+                #    radii_list.append(radii.unsqueeze(0))
+                #    visibility_filter_list.append(visibility_filter.unsqueeze(0))
+                #    viewspace_point_tensor_list.append(viewspace_point_tensor)
+                viewspace_point_tensor_list = render_pkg["viewspace_points"]
+                viewspace_point_tensor_grad = torch.zeros_like(viewspace_point_tensor_list[0])
+                for idx in range(0, len(viewspace_point_tensor_list)):
+                    viewspace_point_tensor_grad = viewspace_point_tensor_grad + viewspace_point_tensor_list[idx].grad
+                    
+                # radii_list: a list of 1xN
+                # radii: N,
+                # visibility_filter: N, boolean
+                radii = torch.cat(radii_list, dim=0).max(dim=0).values
+                visibility_filter = torch.max(torch.stack(render_pkg["visibility_filter"], dim=0), dim=0).values > 0.
+                #viewspace_points = render_pkg["viewspace_points"]
+                #assert False, [radii.shape, render_pkg["visibility_filter"][0].shape, visibility_filter.shape, viewspace_point_tensor_grad.shape]
+                #assert False, [torch.cat(radii_list, dim=0).shape, self.max_radii2D.shape, torch.stack(render_pkg["visibility_filter"], dim=0).shape]
+            
             self.max_radii2D[visibility_filter] = torch.max(self.max_radii2D[visibility_filter],
-                                                            radii[visibility_filter])
+                                                                radii[visibility_filter])
             if iteration < self.densify_until_iter:
-                self.add_densification_stats(
-                    viewspace_point_tensor_grad, 
-                    visibility_filter)
+                #assert False, [viewspace_point_tensor_grad.shape, visibility_filter.shape]
+                #vpt_mask = torch.any(torch.isnan(viewspace_point_tensor_grad[:, :2]), dim=1)
+                #viewspace_point_tensor_grad[vpt_mask] = 0.
+                if self.new_batching:
+                    self.add_densification_stats(
+                        batch_viewspace_point_grad, 
+                        visibility_filter)
+                else:
+                    self.add_densification_stats(
+                        viewspace_point_tensor_grad, 
+                        visibility_filter)
 
                 # update selectedviews for guided sampling
-                for idx in range(0, len(viewspace_point_tensor_list)):
+                for idx in range(0, len(render_pkg["render"])):
                     value = ssim_list[idx]
                     key = batch["image_name"][idx]
                     self.depthdict[key] =  torch.amax(render_pkg["depth"][idx]).item()
@@ -1441,23 +1520,26 @@ class GS3d(MyModelBaseClass):
                             
 
                 if (iteration % self.opacity_reset_interval == 0) or (
-                        self.white_background and iteration == self.densify_from_iter
-                        and (self.motion_mode not in ["4DGS"])
-                        and (self.motion_mode not in ["EffGS"] or not self.deform_opacity)):
+                        self.white_background and iteration == self.densify_from_iter and (self.motion_mode not in ["4DGS"]) and (
+                            self.motion_mode not in ["EffGS"] 
+                            or 
+                            not self.deform_opacity
+                        )
+                    ):
                     #if self.iteration > self.warm_up + 1:
                     #if not self.deform_opacity:
-                        self.reset_opacity()
+                    self.reset_opacity()
 
                 
 
         #old_xyz = (self._xyz[:, 0]).detach().clone()
         # in practice, to prevent NaN loss
         #if self.motion_mode == "TRBF":
-        self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm") 
+        self.clip_gradients(optimizer, gradient_clip_val=GRADIENT_CLIP_VAL, gradient_clip_algorithm="norm") 
         
         
         if deform_optimizer is not None:
-            self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
+            self.clip_gradients(deform_optimizer, gradient_clip_val=GRADIENT_CLIP_VAL, gradient_clip_algorithm="norm")
             deform_optimizer.step()
         optimizer.step()
         #assert False, torch.any(old_xyz != self._xyz[:, 0])
@@ -1901,6 +1983,12 @@ class GS3d(MyModelBaseClass):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor_grad[update_filter, :2], dim=-1,
                                                              keepdim=True)
         self.denom[update_filter] += 1
+        print("\nCheckerNumberOne: ", 
+            torch.any(torch.isnan(viewspace_point_tensor_grad[update_filter, :2])), 
+            torch.sum(update_filter), update_filter.shape, 
+            torch.max(self.denom)
+        )
+        
     
     def addgaussians(self, baduvidx, depthmap, gt_image, 
         camera2world, projectinverse, camera_center,
@@ -2059,7 +2147,11 @@ class GS3d(MyModelBaseClass):
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         grads = self.xyz_gradient_accum / self.denom
+        print("\nCheckerNumberTwo", torch.max(self.denom), torch.any(torch.isnan(self.xyz_gradient_accum)), torch.all(self.denom==0))
         grads[grads.isnan()] = 0.0
+        with torch.no_grad():
+            norms = torch.norm(grads, dim=-1)
+            print("\nCheckerNumberTwo",torch.quantile(norms, 0.1), torch.quantile(norms, 0.3), torch.quantile(norms, 0.5), torch.quantile(norms, 0.7), torch.quantile(norms, 0.9))
 
         self.densify_and_clone(grads, max_grad, extent)
         self.densify_and_split(grads, max_grad, extent)

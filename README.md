@@ -125,6 +125,8 @@ pip install submodules/gaussian_rasterization_ch3
 pip install submodules/gaussian_rasterization_ch9
 pip install submodules/simple-knn
 
+pip install -e submodules/pointops2
+
 ```
 
 
