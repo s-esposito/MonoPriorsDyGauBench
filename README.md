@@ -1,4 +1,4 @@
-# Monocular Dynamic Gaussian Splatting is Fast and Brittle but Smooth Motion Helps
+# Monocular Dynamic Gaussian Splatting: Fast, Brittle, and Scene Complexity Rules
 
 This repository is the official PyTorch(Lightning) implementation of the paper:
 
