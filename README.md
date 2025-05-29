@@ -186,7 +186,7 @@ If you find our repository useful, please consider giving it a star ⭐ and citi
 
 ```
 @misc{liang2024monocular,
-  title        ={Monocular Dynamic Gaussian Splatting is Fast and Brittle but Smooth Motion Helps},
+  title        ={Monocular Dynamic Gaussian Splatting: Fast, Brittle, and Scene Complexity Rules},
   author       ={Yiqing Liang and Mikhail Okunev and Mikaela Angelina Uy and Runfeng Li and Leonidas Guibas and James Tompkin and Adam W. Harley},
   year         ={2024},
   eprint       ={2412.04457},
