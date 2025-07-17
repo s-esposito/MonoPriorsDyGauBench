@@ -505,6 +505,7 @@ if __name__ == "__main__":
 
             all_dataset.setup("")
             pcd = all_dataset.pcd.points  # Nx3
+            print(f"init pcd shape: {pcd.shape}")
 
             train_dataset = all_dataset.train_cameras
             test_dataset = all_dataset.test_cameras
