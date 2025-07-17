@@ -139,9 +139,9 @@ class MyLightningCLI(LightningCLI):
             setattr(
                 logger_config.init_args,
                 "name",
-                config.project + "_" + config.group + "_" + config.name + "_" + self.config.subcommand,
+                config.project + "_" + config.name + "_" + self.config.subcommand,
             )
-            setattr(logger_config.init_args, "project", "monodybench")
+            setattr(logger_config.init_args, "project", config.group)
             # setattr(logger_config.init_args, "group", config.group)
             # setattr(logger_config.init_args, "mode", "online")
             # setattr(logger_config.init_args, "log_model", "all")

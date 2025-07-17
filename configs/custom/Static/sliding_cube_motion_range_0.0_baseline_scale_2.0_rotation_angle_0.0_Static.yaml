@@ -12,7 +12,7 @@ data:
     ratio: 1.0
     seed: null
     white_background: true
-group: custom_dataset_sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0
+group: baseline
 logger: wandb
 model:
   class_path: src.models.GS3d
@@ -72,9 +72,9 @@ model:
     trbfslinit: -2.0
     use_AST: true
     use_static: false
-    warm_up: 3000
-name: sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0_MLP
-output: output/custom/custom_dataset/sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0/MLP
+    warm_up: 3000000
+name: sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0_Static
+output: output/custom/baseline/sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0/Static
 project: GaussianDiff_dnerf
 seed_everything: false
 trainer:
