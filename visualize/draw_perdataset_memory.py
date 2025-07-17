@@ -53,9 +53,7 @@ for dataset in datasets:
             for key in result_final[dataset][method][scene]:
                 if key not in result_final[dataset][method]["all"]:
                     result_final[dataset][method]["all"][key] = []
-                result_final[dataset][method]["all"][key] += result_final[dataset][
-                    method
-                ][scene][key]
+                result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][key]
 
 
 method_colors = (
@@ -98,9 +96,7 @@ for key in metric_name_mapping:
 
     gap_ratio = 0.1
     gap = plot_width * gap_ratio / (len(datasets) - 1) if len(datasets) > 1 else 0
-    bar_width = (plot_width - gap * (len(datasets) - 1)) / (
-        len(methods) * len(datasets)
-    )
+    bar_width = (plot_width - gap * (len(datasets) - 1)) / (len(methods) * len(datasets))
     bar_positions = []
     means = []
     # variances = []
@@ -110,9 +106,7 @@ for key in metric_name_mapping:
         if dataset not in result_final:
             continue
         for method_id, method in enumerate(methods):
-            bar_positions.append(
-                dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width
-            )
+            bar_positions.append(dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width)
             if (key not in result_final[dataset][method][sub_class]) or (
                 len(result_final[dataset][method][sub_class][key]) == 0
             ):
@@ -123,9 +117,9 @@ for key in metric_name_mapping:
                 # variances.append(0)
             else:
                 # assert False, result_final[dataset][method][sub_class][key]
-                mean = sum(
-                    [x for x in result_final[dataset][method][sub_class][key]]
-                ) / float(len(result_final[dataset][method][sub_class][key]))
+                mean = sum([x for x in result_final[dataset][method][sub_class][key]]) / float(
+                    len(result_final[dataset][method][sub_class][key])
+                )
                 # variance = sum([x[1] for x in result_final[dataset][method][sub_class][key]]) / float(len(result_final[dataset][method][sub_class][key]))
                 means.append(mean)
                 # variances.append(variance)
@@ -154,8 +148,7 @@ for key in metric_name_mapping:
     ax.spines["right"].set_visible(False)
 
     xticks_positions = [
-        dataset_id * (len(methods) * bar_width + gap)
-        + (len(methods) - 1) * bar_width / 2
+        dataset_id * (len(methods) * bar_width + gap) + (len(methods) - 1) * bar_width / 2
         for dataset_id in range(len(datasets))
     ]
     ax.set_xticks(xticks_positions)

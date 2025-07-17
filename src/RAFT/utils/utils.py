@@ -51,13 +51,9 @@ def forward_interpolate(flow):
     dx = dx[valid]
     dy = dy[valid]
 
-    flow_x = interpolate.griddata(
-        (x1, y1), dx, (x0, y0), method="nearest", fill_value=0
-    )
+    flow_x = interpolate.griddata((x1, y1), dx, (x0, y0), method="nearest", fill_value=0)
 
-    flow_y = interpolate.griddata(
-        (x1, y1), dy, (x0, y0), method="nearest", fill_value=0
-    )
+    flow_y = interpolate.griddata((x1, y1), dy, (x0, y0), method="nearest", fill_value=0)
 
     flow = np.stack([flow_x, flow_y], axis=0)
     return torch.from_numpy(flow).float()

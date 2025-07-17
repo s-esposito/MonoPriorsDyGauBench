@@ -128,27 +128,19 @@ def prepare_omega_data(omega_data, metric_key):
             for scene in traineval_data[dataset][method]:
                 if scene == "all" or scene not in omega_data[dataset]:
                     if scene != "all":
-                        print(
-                            f"Skipping {dataset} {method} {scene}: Not found in omega_data"
-                        )
+                        print(f"Skipping {dataset} {method} {scene}: Not found in omega_data")
                     continue
                 try:
                     omega = omega_data[dataset][scene]
                     metric_data = traineval_data[dataset][method][scene].get(metric_key)
                     if metric_data is None:
-                        print(
-                            f"Skipping {dataset} {method} {scene}: {metric_key} not found"
-                        )
+                        print(f"Skipping {dataset} {method} {scene}: {metric_key} not found")
                         continue
                     if not metric_data or len(metric_data) == 0:
-                        print(
-                            f"Skipping {dataset} {method} {scene}: {metric_key} data is empty"
-                        )
+                        print(f"Skipping {dataset} {method} {scene}: {metric_key} data is empty")
                         continue
                     if len(metric_data[0]) == 0:
-                        print(
-                            f"Skipping {dataset} {method} {scene}: {metric_key} data is empty list"
-                        )
+                        print(f"Skipping {dataset} {method} {scene}: {metric_key} data is empty list")
                         continue
                     metric_value = metric_data[0][0]  # Mean value
                     data.append((dataset, method, omega, metric_value))
@@ -168,9 +160,7 @@ def create_combined_plot(omega_data):
 
     # Create dummy points for legend
     for i, dataset in enumerate(datasets):
-        legend_ax.scatter(
-            [], [], color=colors[dataset], label=dataset_names[i], alpha=0.7, s=100
-        )
+        legend_ax.scatter([], [], color=colors[dataset], label=dataset_names[i], alpha=0.7, s=100)
 
     # Create the legend
     legend = legend_ax.legend(
@@ -215,9 +205,7 @@ def create_combined_plot(omega_data):
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
 
     # Adjust layout
-    plt.subplots_adjust(
-        top=0.90, bottom=0.1, left=0.1, right=0.9, hspace=0.2, wspace=0.2
-    )
+    plt.subplots_adjust(top=0.90, bottom=0.1, left=0.1, right=0.9, hspace=0.2, wspace=0.2)
 
     # Save the combined figure
     plt.savefig("omega_plots/combined_metrics.png", bbox_inches="tight", dpi=80)
@@ -235,6 +223,4 @@ if __name__ == "__main__":
     # Generate combined plot
     create_combined_plot(omega_data)
 
-    print(
-        "\nCombined ω plot has been generated and saved as 'omega_plots/combined_metrics.png'."
-    )
+    print("\nCombined ω plot has been generated and saved as 'omega_plots/combined_metrics.png'.")

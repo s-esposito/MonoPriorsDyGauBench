@@ -181,12 +181,8 @@ class GS3d(MyModelBaseClass):
             symm = strip_symmetric(actual_covariance)
             return symm
 
-        def build_covariance_from_scaling_rotation_4d(
-            scaling, scaling_modifier, rotation_l, rotation_r, dt=0.0
-        ):
-            L = build_scaling_rotation_4d(
-                scaling_modifier * scaling, rotation_l, rotation_r
-            )
+        def build_covariance_from_scaling_rotation_4d(scaling, scaling_modifier, rotation_l, rotation_r, dt=0.0):
+            L = build_scaling_rotation_4d(scaling_modifier * scaling, rotation_l, rotation_r)
             actual_covariance = L @ L.transpose(1, 2)
             cov_11 = actual_covariance[:, :3, :3]
             cov_12 = actual_covariance[:, 0:3, 3:4]
@@ -194,9 +190,7 @@ class GS3d(MyModelBaseClass):
             current_covariance = cov_11 - cov_12 @ cov_12.transpose(1, 2) / cov_t
             symm = strip_symmetric(current_covariance)
             if dt.shape[1] > 1:
-                mean_offset = (cov_12.squeeze(-1) / cov_t.squeeze(-1))[:, None, :] * dt[
-                    ..., None
-                ]
+                mean_offset = (cov_12.squeeze(-1) / cov_t.squeeze(-1))[:, None, :] * dt[..., None]
                 mean_offset = mean_offset[..., None]  # [num_pts, num_time, 3, 1]
             else:
                 mean_offset = cov_12.squeeze(-1) / cov_t.squeeze(-1) * dt
@@ -280,9 +274,7 @@ class GS3d(MyModelBaseClass):
             deform_scale=deform_scale,
             deform_opacity=deform_opacity,
             deform_feature=deform_feature,
-            sh_dim=(
-                ((self.max_sh_degree + 1) ** 2) * 3 if (self.rgbdecoder is None) else 9
-            ),
+            sh_dim=(((self.max_sh_degree + 1) ** 2) * 3 if (self.rgbdecoder is None) else 9),
             **kwargs,
         )
         self.motion_mode = motion_mode
@@ -303,9 +295,7 @@ class GS3d(MyModelBaseClass):
 
         # LPIPS evaluation
         self.lpips_mode = lpips_mode
-        self.lpips = lpips.LPIPS(
-            net=lpips_mode, spatial=eval_mask
-        )  # if spatial is True, keep dim
+        self.lpips = lpips.LPIPS(net=lpips_mode, spatial=eval_mask)  # if spatial is True, keep dim
 
         self.raystart = raystart
         self.ratioend = ratioend
@@ -339,21 +329,15 @@ class GS3d(MyModelBaseClass):
 
         self.use_AST = use_AST
         if self.use_AST:
-            self.smooth_term = get_linear_noise_func(
-                lr_init=0.1, lr_final=1e-15, lr_delay_mult=0.01, max_steps=20000
-            )
+            self.smooth_term = get_linear_noise_func(lr_init=0.1, lr_final=1e-15, lr_delay_mult=0.01, max_steps=20000)
 
         self.lambda_flow = lambda_flow
         if self.lambda_flow > 0.0:
-            assert (
-                self.motion_mode not in "FourDim"
-            ), "RTGS flow rendering not implemented for now"
+            assert self.motion_mode not in "FourDim", "RTGS flow rendering not implemented for now"
             self.flow_start = flow_start
 
         if not self.post_act:
-            assert self.motion_mode in [
-                "HexPlane"
-            ], "otherwise may cause issues in def deform(self)"
+            assert self.motion_mode in ["HexPlane"], "otherwise may cause issues in def deform(self)"
 
         # if deform_opacity:
         #    assert opacity_reset_interval > 100000, "Not supporting opacity reset for deforming opacity case"
@@ -364,9 +348,7 @@ class GS3d(MyModelBaseClass):
 
         if self.motion_mode in ["TRBF"]:
             if self.rgbdecoder is None:
-                assert (
-                    not self.deform_feature
-                ), "Not supporting feature deformation for TRBF SH mode"
+                assert not self.deform_feature, "Not supporting feature deformation for TRBF SH mode"
 
         self.eval_mask = eval_mask
 
@@ -387,12 +369,8 @@ class GS3d(MyModelBaseClass):
         self.white_background = white_background
         self.bg_color = torch.tensor(bg_color, dtype=torch.float32)
         if self.use_static:
-            assert (
-                self.trainer.datamodule.num_pts == 0
-            ), "Not supporting static for random initialization"
-            assert (
-                self.trainer.datamodule.num_pts_ratio > 0
-            ), "must have extra random point for dynamic point cloud"
+            assert self.trainer.datamodule.num_pts == 0, "Not supporting static for random initialization"
+            assert self.trainer.datamodule.num_pts_ratio > 0, "must have extra random point for dynamic point cloud"
             num_static = self.trainer.datamodule.num_static
 
         if self.motion_mode in ["TRBF"]:
@@ -450,20 +428,12 @@ class GS3d(MyModelBaseClass):
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
 
         if self.rgbdecoder is None:
-            self._features_dc = nn.Parameter(
-                features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True)
-            )
-            self._features_rest = nn.Parameter(
-                features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True)
-            )
+            self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
+            self._features_rest = nn.Parameter(features[:, :, 1:].transpose(1, 2).contiguous().requires_grad_(True))
         else:
             features9channel = torch.cat((fused_color, fused_color), dim=1)
-            self._features_dc = nn.Parameter(
-                features9channel.contiguous().requires_grad_(True)
-            )
-            fomega = torch.zeros(
-                (self._features_dc.shape[0], 3), dtype=torch.float, device="cuda"
-            )
+            self._features_dc = nn.Parameter(features9channel.contiguous().requires_grad_(True))
+            fomega = torch.zeros((self._features_dc.shape[0], 3), dtype=torch.float, device="cuda")
             self._features_rest = nn.Parameter(fomega.contiguous().requires_grad_(True))
 
         self._scaling = nn.Parameter(scales.requires_grad_(True))
@@ -485,11 +455,7 @@ class GS3d(MyModelBaseClass):
                 self._rotation_r = nn.Parameter(rots_r.requires_grad_(True))
         if self.motion_mode in ["TRBF"]:
             self._trbf_center = nn.Parameter(times.contiguous().requires_grad_(True))
-            self._trbf_scale = nn.Parameter(
-                torch.ones((self.get_xyz.shape[0], 1), device="cuda").requires_grad_(
-                    True
-                )
-            )
+            self._trbf_scale = nn.Parameter(torch.ones((self.get_xyz.shape[0], 1), device="cuda").requires_grad_(True))
             nn.init.constant_(self._trbf_scale, self.trbfslinit)
 
         self.maxz, self.minz = torch.amax(self._xyz[:, 2]), torch.amin(self._xyz[:, 2])
@@ -504,31 +470,19 @@ class GS3d(MyModelBaseClass):
         if self.motion_mode in ["EffGS"]:
             if self.deform_scale:
                 # zero initialization
-                scales_t = self.scaling_inverse_activation(
-                    torch.ones_like(self.get_scaling).cuda() * 1e-3
-                )
-                self._scaling_t = nn.Parameter(
-                    scales_t.contiguous().requires_grad_(True)
-                )
+                scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
+                self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
             if self.deform_opacity:
                 opacities_t = torch.zeros_like(self.get_opacity).cuda()
-                self._opacity_t = nn.Parameter(
-                    opacities_t.contiguous().requires_grad_(True)
-                )
+                self._opacity_t = nn.Parameter(opacities_t.contiguous().requires_grad_(True))
             if self.deform_feature:
                 features_t = torch.zeros_like(self.get_features).cuda()
-                self._features_t = nn.Parameter(
-                    features_t.contiguous().requires_grad_(True)
-                )
+                self._features_t = nn.Parameter(features_t.contiguous().requires_grad_(True))
 
         if self.motion_mode in ["TRBF"]:
             if self.deform_scale:
-                scales_t = self.scaling_inverse_activation(
-                    torch.ones_like(self.get_scaling).cuda() * 1e-3
-                )
-                self._scaling_t = nn.Parameter(
-                    scales_t.contiguous().requires_grad_(True)
-                )
+                scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
+                self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -604,9 +558,7 @@ class GS3d(MyModelBaseClass):
                     }
                 )
             if self.deform_feature:
-                l.append(
-                    {"params": [self._features_t], "lr": self.feature_lr, "name": "f_t"}
-                )
+                l.append({"params": [self._features_t], "lr": self.feature_lr, "name": "f_t"})
         if self.motion_mode in ["TRBF"]:
             if self.deform_scale:
                 l.append(
@@ -635,18 +587,16 @@ class GS3d(MyModelBaseClass):
             max_steps=self.position_lr_max_steps,
         )
         # the second one is a Dict!!!
-        self.deform_optimizer, self.deform_scheduler_args_dict = (
-            self.deform_model.train_setting(
-                spatial_lr_scale=self.spatial_lr_scale,
-                deform_lr_init=self.deform_lr_init,
-                deform_lr_final=self.deform_lr_final,
-                deform_lr_delay_mult=self.deform_lr_delay_mult,
-                deform_lr_max_steps=self.deform_lr_max_steps,
-                grid_lr_init=self.grid_lr_init,
-                grid_lr_final=self.grid_lr_final,
-                grid_lr_delay_mult=self.grid_lr_delay_mult,
-                grid_lr_max_steps=self.grid_lr_max_steps,
-            )
+        self.deform_optimizer, self.deform_scheduler_args_dict = self.deform_model.train_setting(
+            spatial_lr_scale=self.spatial_lr_scale,
+            deform_lr_init=self.deform_lr_init,
+            deform_lr_final=self.deform_lr_final,
+            deform_lr_delay_mult=self.deform_lr_delay_mult,
+            deform_lr_max_steps=self.deform_lr_max_steps,
+            grid_lr_init=self.grid_lr_init,
+            grid_lr_final=self.grid_lr_final,
+            grid_lr_delay_mult=self.grid_lr_delay_mult,
+            grid_lr_max_steps=self.grid_lr_max_steps,
         )
         if self.deform_optimizer is not None:
             return [self.optimizer, self.deform_optimizer]
@@ -671,9 +621,7 @@ class GS3d(MyModelBaseClass):
 
     @property
     def get_scaling_xyzt(self):
-        return self.scaling_activation(
-            torch.cat([self._scaling, self._scaling_t], dim=1)
-        )
+        return self.scaling_activation(torch.cat([self._scaling, self._scaling_t], dim=1))
 
     @property
     def get_rotation(self):
@@ -734,14 +682,10 @@ class GS3d(MyModelBaseClass):
 
     def get_marginal_t(self, timestamp, scaling_modifier=1):  # Standard
         sigma = self.get_cov_t(scaling_modifier)
-        return torch.exp(
-            -0.5 * (self.get_t - timestamp) ** 2 / sigma
-        )  # / torch.sqrt(2*torch.pi*sigma)
+        return torch.exp(-0.5 * (self.get_t - timestamp) ** 2 / sigma)  # / torch.sqrt(2*torch.pi*sigma)
 
     def get_covariance(self, scaling_modifier=1):
-        return self.covariance_activation(
-            self.get_scaling, scaling_modifier, self._rotation
-        )
+        return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
 
     def deform(self, time: float) -> Dict:
         if self.motion_mode == "FourDim":
@@ -806,14 +750,11 @@ class GS3d(MyModelBaseClass):
                     "cov3D_precomp": None,
                 }
         else:
-            d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform_model.forward(
-                result, time
-            )
+            d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform_model.forward(result, time)
             if self.motion_mode in ["MLP"]:
                 # assert d_feat == 0
                 result_ = {
-                    "means3D": self.get_xyz
-                    + d_xyz,  # ) if (2 == len(list(result["means3D"].shape))) else d_xyz,
+                    "means3D": self.get_xyz + d_xyz,  # ) if (2 == len(list(result["means3D"].shape))) else d_xyz,
                     "shs": self.get_features + d_feat,
                     "colors_precomp": None,
                     "opacity": self.get_opacity
@@ -829,21 +770,9 @@ class GS3d(MyModelBaseClass):
                     "means3D": d_xyz,
                     "shs": d_feat,
                     "colors_precomp": None,
-                    "opacity": (
-                        d_opacity
-                        if self.post_act
-                        else self.opacity_activation(d_opacity)
-                    ),
-                    "scales": (
-                        d_scaling
-                        if self.post_act
-                        else self.scaling_activation(d_scaling)
-                    ),
-                    "rotations": (
-                        d_rotation
-                        if self.post_act
-                        else self.rotation_activation(d_rotation)
-                    ),
+                    "opacity": (d_opacity if self.post_act else self.opacity_activation(d_opacity)),
+                    "scales": (d_scaling if self.post_act else self.scaling_activation(d_scaling)),
+                    "rotations": (d_rotation if self.post_act else self.rotation_activation(d_rotation)),
                     "cov3D_precomp": None,
                 }
             elif self.motion_mode in ["TRBF"]:
@@ -905,27 +834,17 @@ class GS3d(MyModelBaseClass):
                 "HexPlane",
             ], f"Not supporting static for {self.motion_mode} right now"
             # print([self.isstatic.shape, result_["means3D"].shape])
-            result_["means3D"] = (1.0 - self.isstatic) * result_[
-                "means3D"
-            ] + self.isstatic * self.get_xyz
+            result_["means3D"] = (1.0 - self.isstatic) * result_["means3D"] + self.isstatic * self.get_xyz
             if self.rgbdecoder is None:
-                result_["shs"] = (1.0 - self.isstatic)[..., None] * result_[
-                    "shs"
-                ] + self.isstatic[..., None] * self.get_features
+                result_["shs"] = (1.0 - self.isstatic)[..., None] * result_["shs"] + self.isstatic[
+                    ..., None
+                ] * self.get_features
             else:
-                result_["shs"] = (1.0 - self.isstatic) * result_[
-                    "shs"
-                ] + self.isstatic * self.get_features
+                result_["shs"] = (1.0 - self.isstatic) * result_["shs"] + self.isstatic * self.get_features
             # result_["colors_precomp"] = (1.-self.isstatic) * result_["colors_precomp"] + self.isstatic * self.get_features_dc
-            result_["opacity"] = (1.0 - self.isstatic) * result_[
-                "opacity"
-            ] + self.isstatic * self.get_opacity
-            result_["scales"] = (1.0 - self.isstatic) * result_[
-                "scales"
-            ] + self.isstatic * self.get_scaling
-            result_["rotations"] = (1.0 - self.isstatic) * result_[
-                "rotations"
-            ] + self.isstatic * self.get_rotation
+            result_["opacity"] = (1.0 - self.isstatic) * result_["opacity"] + self.isstatic * self.get_opacity
+            result_["scales"] = (1.0 - self.isstatic) * result_["scales"] + self.isstatic * self.get_scaling
+            result_["rotations"] = (1.0 - self.isstatic) * result_["rotations"] + self.isstatic * self.get_rotation
 
         # if rgbdecoder is not None
         # then need to switch colors_precomp and shs
@@ -1104,16 +1023,12 @@ class GS3d(MyModelBaseClass):
         scaling_modifier: Optional[float] = 1.0,
     ) -> Dict:
         if self.use_AST and (not render_mode):
-            ast_noise = self.trainer.datamodule.time_interval * self.smooth_term(
-                self.iteration
-            )
+            ast_noise = self.trainer.datamodule.time_interval * self.smooth_term(self.iteration)
         else:
             ast_noise = 0.0
 
         if self.motion_mode == "FourDim":
-            return self.forward_FourDim(
-                batch=batch, scaling_modifier=scaling_modifier, ast_noise=ast_noise
-            )
+            return self.forward_FourDim(batch=batch, scaling_modifier=scaling_modifier, ast_noise=ast_noise)
 
         # have to visit each batch one by one for rasterizer
         batch_size = batch["time"].shape[0]
@@ -1250,12 +1165,8 @@ class GS3d(MyModelBaseClass):
                         "depth": depth,
                     }
                 )
-            if (
-                render_flow
-            ):  # need to rename means2D and screenspace points to prevent gradient error
-                assert (
-                    time_offset > 0.0
-                ), "Must have a time offset for rendering the flow"
+            if render_flow:  # need to rename means2D and screenspace points to prevent gradient error
+                assert time_offset > 0.0, "Must have a time offset for rendering the flow"
                 screenspace_points_ = (
                     torch.zeros_like(
                         result["means3D"],
@@ -1283,18 +1194,18 @@ class GS3d(MyModelBaseClass):
                     + viewmatrix[3, :3]
                 )
                 t = t.detach()
-                flow_fwd[:, 0] = flow_fwd[:, 0] * focal_x / t[:, 2] + flow_fwd[
-                    :, 2
-                ] * -(focal_x * t[:, 0]) / (t[:, 2] * t[:, 2])
-                flow_fwd[:, 1] = flow_fwd[:, 1] * focal_y / t[:, 2] + flow_fwd[
-                    :, 2
-                ] * -(focal_y * t[:, 1]) / (t[:, 2] * t[:, 2])
-                flow_bwd[:, 0] = flow_bwd[:, 0] * focal_x / t[:, 2] + flow_bwd[
-                    :, 2
-                ] * -(focal_x * t[:, 0]) / (t[:, 2] * t[:, 2])
-                flow_bwd[:, 1] = flow_bwd[:, 1] * focal_y / t[:, 2] + flow_bwd[
-                    :, 2
-                ] * -(focal_y * t[:, 1]) / (t[:, 2] * t[:, 2])
+                flow_fwd[:, 0] = flow_fwd[:, 0] * focal_x / t[:, 2] + flow_fwd[:, 2] * -(focal_x * t[:, 0]) / (
+                    t[:, 2] * t[:, 2]
+                )
+                flow_fwd[:, 1] = flow_fwd[:, 1] * focal_y / t[:, 2] + flow_fwd[:, 2] * -(focal_y * t[:, 1]) / (
+                    t[:, 2] * t[:, 2]
+                )
+                flow_bwd[:, 0] = flow_bwd[:, 0] * focal_x / t[:, 2] + flow_bwd[:, 2] * -(focal_x * t[:, 0]) / (
+                    t[:, 2] * t[:, 2]
+                )
+                flow_bwd[:, 1] = flow_bwd[:, 1] * focal_y / t[:, 2] + flow_bwd[:, 2] * -(focal_y * t[:, 1]) / (
+                    t[:, 2] * t[:, 2]
+                )
 
                 # Rasterize visible Gaussians to image, obtain their radii (on screen).
 
@@ -1304,21 +1215,9 @@ class GS3d(MyModelBaseClass):
                     shs=None,
                     colors_precomp=flow_fwd,
                     opacities=result["opacity"].detach(),
-                    scales=(
-                        result["scales"].detach()
-                        if result["scales"] is not None
-                        else None
-                    ),
-                    rotations=(
-                        result["rotations"].detach()
-                        if result["rotations"] is not None
-                        else None
-                    ),
-                    cov3D_precomp=(
-                        result["cov3D_precomp"].detach()
-                        if result["cov3D_precomp"] is not None
-                        else None
-                    ),
+                    scales=(result["scales"].detach() if result["scales"] is not None else None),
+                    rotations=(result["rotations"].detach() if result["rotations"] is not None else None),
+                    cov3D_precomp=(result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None),
                 )
                 rendered_flow_bwd, _, _ = rasterizer_ch3(
                     means3D=result["means3D"].detach(),
@@ -1326,21 +1225,9 @@ class GS3d(MyModelBaseClass):
                     shs=None,
                     colors_precomp=flow_bwd,
                     opacities=result["opacity"].detach(),
-                    scales=(
-                        result["scales"].detach()
-                        if result["scales"] is not None
-                        else None
-                    ),
-                    rotations=(
-                        result["rotations"].detach()
-                        if result["rotations"] is not None
-                        else None
-                    ),
-                    cov3D_precomp=(
-                        result["cov3D_precomp"].detach()
-                        if result["cov3D_precomp"] is not None
-                        else None
-                    ),
+                    scales=(result["scales"].detach() if result["scales"] is not None else None),
+                    rotations=(result["rotations"].detach() if result["rotations"] is not None else None),
+                    cov3D_precomp=(result["cov3D_precomp"].detach() if result["cov3D_precomp"] is not None else None),
                 )
                 result.update(
                     {
@@ -1414,9 +1301,7 @@ class GS3d(MyModelBaseClass):
             tv1 = 0.0
 
         flow_loss_list = None
-        if eval_mode or (
-            (self.lambda_flow > 0.0) and (self.iteration > self.flow_start)
-        ):
+        if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             if "fwd_flow" in batch:
                 flow_loss = 0.0
                 flow_loss_list = []
@@ -1446,9 +1331,7 @@ class GS3d(MyModelBaseClass):
                     self.l1_time_planes_weight,
                     self.plane_tv_weight,
                 )
-            if eval_mode or (
-                (self.lambda_flow > 0.0) and (self.iteration > self.flow_start)
-            ):
+            if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
                 if "fwd_flow" in batch:
                     fwd_flow = fwd_flows[idx]
                     fwd_flow_mask = fwd_flow_masks[idx]
@@ -1485,9 +1368,7 @@ class GS3d(MyModelBaseClass):
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 /= float(batch_size)
             loss += tv1
-        if eval_mode or (
-            (self.lambda_flow > 0.0) and (self.iteration > self.flow_start)
-        ):
+        if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             if "fwd_flow" in batch:
                 flow_loss /= float(batch_size)
 
@@ -1500,9 +1381,7 @@ class GS3d(MyModelBaseClass):
         self.log(f"{mode}/loss", loss, prog_bar=True)
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             self.log(f"{mode}/loss_tv", tv1)
-        if eval_mode or (
-            (self.lambda_flow > 0.0) and (self.iteration > self.flow_start)
-        ):
+        if eval_mode or ((self.lambda_flow > 0.0) and (self.iteration > self.flow_start)):
             if "fwd_flow" in batch:
                 self.log(f"{mode}/loss_flow", flow_loss)
         # print([Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])])
@@ -1522,9 +1401,7 @@ class GS3d(MyModelBaseClass):
             optimizer = self.optimizers()
             deform_optimizer = None
 
-        iteration = (
-            self.iteration + 1
-        )  # has to start from 1 to prevent actions on step=0
+        iteration = self.iteration + 1  # has to start from 1 to prevent actions on step=0
 
         # Every 1000 its we increase the levels of SH up to a maximum degree
         if iteration % 1000 == 0:
@@ -1561,9 +1438,7 @@ class GS3d(MyModelBaseClass):
         if deform_optimizer is not None:
             deform_optimizer.zero_grad()
         # Loss
-        loss, ssim_list, flow_loss_list = self.compute_loss(
-            render_pkg, batch, mode="train"
-        )
+        loss, ssim_list, flow_loss_list = self.compute_loss(render_pkg, batch, mode="train")
         # print(loss)
         print(iteration, self.trainer.global_step, loss)
         # assert False, render_pkg["render"]
@@ -1583,31 +1458,20 @@ class GS3d(MyModelBaseClass):
             #    visibility_filter_list.append(visibility_filter.unsqueeze(0))
             #    viewspace_point_tensor_list.append(viewspace_point_tensor)
             viewspace_point_tensor_list = render_pkg["viewspace_points"]
-            viewspace_point_tensor_grad = torch.zeros_like(
-                viewspace_point_tensor_list[0]
-            )
+            viewspace_point_tensor_grad = torch.zeros_like(viewspace_point_tensor_list[0])
             for idx in range(0, len(viewspace_point_tensor_list)):
-                viewspace_point_tensor_grad = (
-                    viewspace_point_tensor_grad + viewspace_point_tensor_list[idx].grad
-                )
+                viewspace_point_tensor_grad = viewspace_point_tensor_grad + viewspace_point_tensor_list[idx].grad
 
             # radii_list =
             radii = torch.cat(radii_list, dim=0).max(dim=0).values
-            visibility_filter = (
-                torch.max(
-                    torch.stack(render_pkg["visibility_filter"], dim=0), dim=0
-                ).values
-                > 0.0
-            )
+            visibility_filter = torch.max(torch.stack(render_pkg["visibility_filter"], dim=0), dim=0).values > 0.0
             # viewspace_points = render_pkg["viewspace_points"]
             # assert False, [radii.shape, render_pkg["visibility_filter"][0].shape, visibility_filter.shape, viewspace_point_tensor_grad.shape]
             self.max_radii2D[visibility_filter] = torch.max(
                 self.max_radii2D[visibility_filter], radii[visibility_filter]
             )
             if iteration < self.densify_until_iter:
-                self.add_densification_stats(
-                    viewspace_point_tensor_grad, visibility_filter
-                )
+                self.add_densification_stats(viewspace_point_tensor_grad, visibility_filter)
 
                 # update selectedviews for guided sampling
                 for idx in range(0, len(viewspace_point_tensor_list)):
@@ -1631,13 +1495,8 @@ class GS3d(MyModelBaseClass):
                         self.selectedviews[key] = value
                         heapq.heappush(self.max_heap, (-value, key))
 
-                if (
-                    iteration > self.densify_from_iter
-                    and iteration % self.densification_interval == 0
-                ):
-                    size_threshold = (
-                        20 if iteration > self.opacity_reset_interval else None
-                    )
+                if iteration > self.densify_from_iter and iteration % self.densification_interval == 0:
+                    size_threshold = 20 if iteration > self.opacity_reset_interval else None
                     self.densify_and_prune(
                         self.densify_grad_threshold,
                         0.005,
@@ -1645,9 +1504,7 @@ class GS3d(MyModelBaseClass):
                         size_threshold,
                     )
 
-                if (self.iteration > self.emsstartfromiterations) and (
-                    self.iteration - self.lasterems > 100
-                ):
+                if (self.iteration > self.emsstartfromiterations) and (self.iteration - self.lasterems > 100):
                     for idx in range(0, len(viewspace_point_tensor_list)):
                         if self.emscnt >= self.selectedlength:
                             continue  # means if have already performed enough times of addgaussian, skip anyways
@@ -1693,12 +1550,7 @@ class GS3d(MyModelBaseClass):
                             dummypatch = torch.ones_like(patches)
                             patchessum = patches.sum(dim=(2, 3))
                             patchesmusk = patchessum > kh * kh * 0.85
-                            patchesmusk = (
-                                patchesmusk.unsqueeze(2)
-                                .unsqueeze(3)
-                                .repeat(1, 1, kh, kh)
-                                .float()
-                            )
+                            patchesmusk = patchesmusk.unsqueeze(2).unsqueeze(3).repeat(1, 1, kh, kh).float()
                             patches = dummypatch * patchesmusk
 
                             depth = render_pkg["depth"][idx]
@@ -1728,21 +1580,13 @@ class GS3d(MyModelBaseClass):
                             # rewrite above line to determinstic quantile
                             mediandepthpatch = torch.quantile(depthpaches, 0.5, dim=(2))
 
-                            depthpaches = dummydepthpatches * (
-                                mediandepthpatch.unsqueeze(2).unsqueeze(3)
-                            )
+                            depthpaches = dummydepthpatches * (mediandepthpatch.unsqueeze(2).unsqueeze(3))
                             unfold_depth_shape = dummydepthpatches.size()
-                            output_depth_h = (
-                                unfold_depth_shape[0] * unfold_depth_shape[2]
-                            )
-                            output_depth_w = (
-                                unfold_depth_shape[1] * unfold_depth_shape[3]
-                            )
+                            output_depth_h = unfold_depth_shape[0] * unfold_depth_shape[2]
+                            output_depth_w = unfold_depth_shape[1] * unfold_depth_shape[3]
 
                             patches_depth_orig = depthpaches.view(unfold_depth_shape)
-                            patches_depth_orig = patches_depth_orig.permute(
-                                0, 2, 1, 3
-                            ).contiguous()
+                            patches_depth_orig = patches_depth_orig.permute(0, 2, 1, 3).contiguous()
                             patches_depth = patches_depth_orig.view(
                                 output_depth_h, output_depth_w
                             ).float()  # 1 for error, 0 for no error
@@ -1765,22 +1609,16 @@ class GS3d(MyModelBaseClass):
                             output_h = unfold_shape[0] * unfold_shape[2]
                             output_w = unfold_shape[1] * unfold_shape[3]
                             patches_orig = patches_orig.permute(0, 2, 1, 3).contiguous()
-                            centerpatches_orig = centerpatches_orig.permute(
-                                0, 2, 1, 3
-                            ).contiguous()
+                            centerpatches_orig = centerpatches_orig.permute(0, 2, 1, 3).contiguous()
                             centermask = centerpatches_orig.view(
                                 output_h, output_w
                             ).float()  # H * W  mask, # 1 for error, 0 for no error
-                            centermask = centermask[
-                                : image.shape[1], : image.shape[2]
-                            ]  # reverse back
+                            centermask = centermask[: image.shape[1], : image.shape[2]]  # reverse back
 
                             errormask = patches_orig.view(
                                 output_h, output_w
                             ).float()  # H * W  mask, # 1 for error, 0 for no error
-                            errormask = errormask[
-                                : image.shape[1], : image.shape[2]
-                            ]  # reverse back
+                            errormask = errormask[: image.shape[1], : image.shape[2]]  # reverse back
 
                             H, W = centermask.shape
 
@@ -1808,12 +1646,8 @@ class GS3d(MyModelBaseClass):
 
                             depth = torch.where(depth > mediandepth, depth, mediandepth)
 
-                            camera2world = batch["world_view_transform"][
-                                idx
-                            ].T.inverse()
-                            projectinverse = batch["full_proj_transform"][
-                                idx
-                            ].T.inverse()
+                            camera2world = batch["world_view_transform"][idx].T.inverse()
+                            projectinverse = batch["full_proj_transform"][idx].T.inverse()
                             self.addgaussians(
                                 badindices,
                                 depth,
@@ -1839,14 +1673,10 @@ class GS3d(MyModelBaseClass):
         # old_xyz = (self._xyz[:, 0]).detach().clone()
         # in practice, to prevent NaN loss
         # if self.motion_mode == "TRBF":
-        self.clip_gradients(
-            optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm"
-        )
+        self.clip_gradients(optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
 
         if deform_optimizer is not None:
-            self.clip_gradients(
-                deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm"
-            )
+            self.clip_gradients(deform_optimizer, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
             deform_optimizer.step()
         optimizer.step()
         # assert False, torch.any(old_xyz != self._xyz[:, 0])
@@ -1861,9 +1691,7 @@ class GS3d(MyModelBaseClass):
         if deform_optimizer is not None:
             for param_group in deform_optimizer.param_groups:
                 if param_group["name"] in self.deform_scheduler_args_dict:
-                    lr = self.deform_scheduler_args_dict[param_group["name"]](
-                        self.iteration
-                    )
+                    lr = self.deform_scheduler_args_dict[param_group["name"]](self.iteration)
                     param_group["lr"] = lr
 
         self.iteration += 1
@@ -1903,33 +1731,17 @@ class GS3d(MyModelBaseClass):
             gt = torch.clamp(batch["original_image"][0][:3], 0.0, 1.0)
 
             depth = render_pkg["depth"][0]
-            depth = imutils.np2png_d(
-                [depth[0, ...].cpu().numpy()], None, colormap="jet"
-            )
+            depth = imutils.np2png_d([depth[0, ...].cpu().numpy()], None, colormap="jet")
             depth = torch.from_numpy(depth).permute(2, 0, 1) / 255.0
 
             try:
-                rendered_flow_fwd = (
-                    render_pkg["render_flow_fwd"][0][:2, ...]
-                    .permute(1, 2, 0)
-                    .cpu()
-                    .numpy()
-                )
-                rendered_flow_bwd = (
-                    render_pkg["render_flow_bwd"][0][:2, ...]
-                    .permute(1, 2, 0)
-                    .cpu()
-                    .numpy()
-                )
+                rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+                rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
 
                 rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
-                rendered_flow_fwd = (
-                    torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.0
-                )
+                rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.0
                 rendered_flow_bwd = flow_to_image(rendered_flow_bwd)
-                rendered_flow_bwd = (
-                    torch.from_numpy(rendered_flow_bwd).permute(2, 0, 1) / 255.0
-                )
+                rendered_flow_bwd = torch.from_numpy(rendered_flow_bwd).permute(2, 0, 1) / 255.0
             except:
                 rendered_flow_fwd = torch.zeros_like(depth)
                 rendered_flow_bwd = torch.zeros_like(depth)
@@ -1940,9 +1752,7 @@ class GS3d(MyModelBaseClass):
             if (split == "train") and (self.num_batches_train < 5):
                 # print(self.iteration)
                 # assert False, self.iteration
-                if (self.iteration > 0) and (
-                    self.iteration % self.log_image_interval
-                ) == 0:
+                if (self.iteration > 0) and (self.iteration % self.log_image_interval) == 0:
                     self.logger.log_image(
                         f"val_images_{split}/{image_name}",
                         [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd],
@@ -1950,9 +1760,7 @@ class GS3d(MyModelBaseClass):
                     # visualize fwd flow and bwd flow
                     # self.logger.log_image(f"val_flow_fwd_{split}/{image_name}", [rendered_flow_fwd], step=self.iteration)
             elif (split == "test") and (self.num_batches_test < 5):
-                if (self.iteration > 0) and (
-                    self.iteration % self.log_image_interval
-                ) == 0:
+                if (self.iteration > 0) and (self.iteration % self.log_image_interval) == 0:
                     self.logger.log_image(
                         f"val_images_{split}/{image_name}",
                         [gt, image, depth, rendered_flow_fwd, rendered_flow_bwd],
@@ -2007,9 +1815,7 @@ class GS3d(MyModelBaseClass):
 
     def on_test_epoch_start(self):
         if self.eval_mask:
-            assert (
-                self.trainer.datamodule.load_mask
-            ), "Cannot evaluation masked results if mask is not loaded!"
+            assert self.trainer.datamodule.load_mask, "Cannot evaluation masked results if mask is not loaded!"
         self.test_image_name = []
         self.test_times = []
         self.test_render_time = []
@@ -2091,21 +1897,13 @@ class GS3d(MyModelBaseClass):
         depth = torch.from_numpy(depth).permute(2, 0, 1)
 
         try:
-            rendered_flow_fwd = (
-                render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
-            )
-            rendered_flow_bwd = (
-                render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
-            )
+            rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
+            rendered_flow_bwd = render_pkg["render_flow_bwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
 
             rendered_flow_fwd = flow_to_image(rendered_flow_fwd)
-            rendered_flow_fwd = (
-                torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.0
-            )
+            rendered_flow_fwd = torch.from_numpy(rendered_flow_fwd).permute(2, 0, 1) / 255.0
             rendered_flow_bwd = flow_to_image(rendered_flow_bwd)
-            rendered_flow_bwd = (
-                torch.from_numpy(rendered_flow_bwd).permute(2, 0, 1) / 255.0
-            )
+            rendered_flow_bwd = torch.from_numpy(rendered_flow_bwd).permute(2, 0, 1) / 255.0
         except:
             rendered_flow_fwd = torch.zeros_like(depth)
             rendered_flow_bwd = torch.zeros_like(depth)
@@ -2163,28 +1961,20 @@ class GS3d(MyModelBaseClass):
                 mask=1.0 - mask[None, None].repeat(1, 3, 1, 1),
             ).item()
 
-            _lpips = self.lpips(
-                image[None] * 2.0 - 1.0, gt[None] * 2.0 - 1.0
-            )  # , mask=mask[None, None]).item()
+            _lpips = self.lpips(image[None] * 2.0 - 1.0, gt[None] * 2.0 - 1.0)  # , mask=mask[None, None]).item()
             _lpips = _lpips[mask[None, None] == 0].mean()
 
             # _lpips = self.lpips(image[None]*2.-1., gt[None]*2. - 1.).item()
 
         else:
-            torchvision.utils.save_image(
-                image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx)
-            )
-            torchvision.utils.save_image(
-                gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx)
-            )
+            torchvision.utils.save_image(image[None], os.path.join(self.log_dir_test, "%05d.png" % batch_idx))
+            torchvision.utils.save_image(gt[None], os.path.join(self.log_dir_gt, "%05d.png" % batch_idx))
             error_map = torch.norm(torch.abs(image - gt), dim=0)
             torchvision.utils.save_image(
                 error_map[None],
                 os.path.join(self.log_dir_error, "%05d.png" % batch_idx),
             )
-            torchvision.utils.save_image(
-                depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx)
-            )
+            torchvision.utils.save_image(depth[None], os.path.join(self.log_dir_depth, "%05d.png" % batch_idx))
             torchvision.utils.save_image(
                 rendered_flow_fwd[None],
                 os.path.join(self.log_dir_flow, "%05d_fwd.png" % batch_idx),
@@ -2197,9 +1987,7 @@ class GS3d(MyModelBaseClass):
             _, _, flow_loss_list = self.compute_loss(render_pkg, batch, mode="test")
             _psnr = psnr(image[None], gt[None]).mean()
             _ssim = ssim(image, gt)
-            _msssim = ms_ssim(
-                image[None], gt[None], data_range=1, size_average=False
-            ).item()
+            _msssim = ms_ssim(image[None], gt[None], data_range=1, size_average=False).item()
             _lpips = self.lpips(image[None] * 2.0 - 1.0, gt[None] * 2.0 - 1.0).item()
 
         self.test_psnr_total.append(_psnr)
@@ -2334,86 +2122,52 @@ class GS3d(MyModelBaseClass):
 
         # num_gs = checkpoint["extra_state_dict"]["max_radii2D"].shape[0]
         # have to reload all parameters because shape won't match
-        self._xyz = nn.Parameter(
-            torch.zeros(checkpoint["state_dict"]["_xyz"].shape).requires_grad_(True)
-        )
+        self._xyz = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_xyz"].shape).requires_grad_(True))
         self._features_dc = nn.Parameter(
-            torch.zeros(checkpoint["state_dict"]["_features_dc"].shape).requires_grad_(
-                True
-            )
+            torch.zeros(checkpoint["state_dict"]["_features_dc"].shape).requires_grad_(True)
         )
         self._features_rest = nn.Parameter(
-            torch.zeros(
-                checkpoint["state_dict"]["_features_rest"].shape
-            ).requires_grad_(True)
+            torch.zeros(checkpoint["state_dict"]["_features_rest"].shape).requires_grad_(True)
         )
-        self._scaling = nn.Parameter(
-            torch.zeros(checkpoint["state_dict"]["_scaling"].shape).requires_grad_(True)
-        )
-        self._rotation = nn.Parameter(
-            torch.zeros(checkpoint["state_dict"]["_rotation"].shape).requires_grad_(
-                True
-            )
-        )
-        self._opacity = nn.Parameter(
-            torch.zeros(checkpoint["state_dict"]["_opacity"].shape).requires_grad_(True)
-        )
+        self._scaling = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_scaling"].shape).requires_grad_(True))
+        self._rotation = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_rotation"].shape).requires_grad_(True))
+        self._opacity = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_opacity"].shape).requires_grad_(True))
         if self.motion_mode == "FourDim":
-            self._t = nn.Parameter(
-                torch.zeros(checkpoint["state_dict"]["_t"].shape).requires_grad_(True)
-            )
+            self._t = nn.Parameter(torch.zeros(checkpoint["state_dict"]["_t"].shape).requires_grad_(True))
             self._scaling_t = nn.Parameter(
-                torch.zeros(
-                    checkpoint["state_dict"]["_scaling_t"].shape
-                ).requires_grad_(True)
+                torch.zeros(checkpoint["state_dict"]["_scaling_t"].shape).requires_grad_(True)
             )
             if self.rot_4d:
                 self._rotation_r = nn.Parameter(
-                    torch.zeros(
-                        checkpoint["state_dict"]["_rotation_r"].shape
-                    ).requires_grad_(True)
+                    torch.zeros(checkpoint["state_dict"]["_rotation_r"].shape).requires_grad_(True)
                 )
         if self.motion_mode == "TRBF":
             self._trbf_center = nn.Parameter(
-                torch.zeros(
-                    checkpoint["state_dict"]["_trbf_center"].shape
-                ).requires_grad_(True)
+                torch.zeros(checkpoint["state_dict"]["_trbf_center"].shape).requires_grad_(True)
             )
             self._trbf_scale = nn.Parameter(
-                torch.zeros(
-                    checkpoint["state_dict"]["_trbf_scale"].shape
-                ).requires_grad_(True)
+                torch.zeros(checkpoint["state_dict"]["_trbf_scale"].shape).requires_grad_(True)
             )
             if self.deform_scale:
                 self._scaling_t = nn.Parameter(
-                    torch.zeros(
-                        checkpoint["state_dict"]["_scaling_t"].shape
-                    ).requires_grad_(True)
+                    torch.zeros(checkpoint["state_dict"]["_scaling_t"].shape).requires_grad_(True)
                 )
         if self.motion_mode == "EffGS":
             if self.deform_scale:
                 self._scaling_t = nn.Parameter(
-                    torch.zeros(
-                        checkpoint["state_dict"]["_scaling_t"].shape
-                    ).requires_grad_(True)
+                    torch.zeros(checkpoint["state_dict"]["_scaling_t"].shape).requires_grad_(True)
                 )
             if self.deform_opacity:
                 self._opacity_t = nn.Parameter(
-                    torch.zeros(
-                        checkpoint["state_dict"]["_opacity_t"].shape
-                    ).requires_grad_(True)
+                    torch.zeros(checkpoint["state_dict"]["_opacity_t"].shape).requires_grad_(True)
                 )
             if self.deform_feature:
                 self._features_t = nn.Parameter(
-                    torch.zeros(
-                        checkpoint["state_dict"]["_features_t"].shape
-                    ).requires_grad_(True)
+                    torch.zeros(checkpoint["state_dict"]["_features_t"].shape).requires_grad_(True)
                 )
         # load extra parameters
         self.max_radii2D = checkpoint["extra_state_dict"]["max_radii2D"].to("cuda")
-        self.xyz_gradient_accum = checkpoint["extra_state_dict"][
-            "xyz_gradient_accum"
-        ].to("cuda")
+        self.xyz_gradient_accum = checkpoint["extra_state_dict"]["xyz_gradient_accum"].to("cuda")
         self.denom = checkpoint["extra_state_dict"]["denom"].to("cuda")
         self.active_sh_degree = checkpoint["extra_state_dict"]["active_sh_degree"]
         self.active_sh_degree_t = checkpoint["extra_state_dict"]["active_sh_degree_t"]
@@ -2497,15 +2251,11 @@ class GS3d(MyModelBaseClass):
             ndcu = ndcu.unsqueeze(1)
             ndcv = ndcv.unsqueeze(1)
 
-            ndccamera = torch.cat(
-                (ndcv, ndcu, torch.ones_like(ndcu) * (1.0), torch.ones_like(ndcu)), 1
-            )  # N,4 ...
+            ndccamera = torch.cat((ndcv, ndcu, torch.ones_like(ndcu) * (1.0), torch.ones_like(ndcu)), 1)  # N,4 ...
 
             localpointuv = ndccamera @ projectinverse.T
 
-            diretioninlocal = (
-                localpointuv / localpointuv[:, 3:]
-            )  # ray direction in camera space
+            diretioninlocal = localpointuv / localpointuv[:, 3:]  # ray direction in camera space
 
             rate = targetPz / diretioninlocal[:, 2:3]  #
 
@@ -2513,9 +2263,7 @@ class GS3d(MyModelBaseClass):
 
             localpoint[:, -1] = 1
 
-            worldpointH = (
-                localpoint @ camera2world.T
-            )  # myproduct4x4batch(localpoint, camera2wold) #
+            worldpointH = localpoint @ camera2world.T  # myproduct4x4batch(localpoint, camera2wold) #
             worldpoint = worldpointH / worldpointH[:, 3:]  #
 
             xyz = worldpoint[:, :3]
@@ -2523,9 +2271,7 @@ class GS3d(MyModelBaseClass):
             distancetocameracenter = torch.norm(distancetocameracenter, dim=1)
 
             xmask = torch.logical_and(xyz[:, 0] > minx, xyz[:, 0] < maxx)
-            selectedmask = torch.logical_or(
-                xmask, torch.logical_not(xmask)
-            )  # torch.logical_and(xmask, ymask)
+            selectedmask = torch.logical_or(xmask, torch.logical_not(xmask))  # torch.logical_and(xmask, ymask)
             new_xyz.append(xyz[selectedmask])
 
             new_features_dc.append(featuredc[selectedmask])
@@ -2534,13 +2280,9 @@ class GS3d(MyModelBaseClass):
 
             if self.motion_mode == "TRBF":
                 new_trbf_center.append(torch.rand((selectnumpoints, 1)).cuda())
-                new_trbf_scale.append(
-                    self.trbfslinit * torch.ones((selectnumpoints, 1), device="cuda")
-                )
+                new_trbf_scale.append(self.trbfslinit * torch.ones((selectnumpoints, 1), device="cuda"))
             if self.rgbdecoder is not None:
-                new_features_rest.append(
-                    torch.zeros((selectnumpoints, 3), device="cuda")
-                )
+                new_features_rest.append(torch.zeros((selectnumpoints, 3), device="cuda"))
             else:
                 new_features_rest.append(
                     torch.zeros(
@@ -2554,16 +2296,12 @@ class GS3d(MyModelBaseClass):
             new_xyz = torch.cat(
                 [
                     new_xyz[:, None, :],
-                    torch.zeros(
-                        (new_xyz.shape[0], self._xyz.shape[1] - 1, 3), device="cuda"
-                    ),
+                    torch.zeros((new_xyz.shape[0], self._xyz.shape[1] - 1, 3), device="cuda"),
                 ],
                 dim=1,
             )
 
-            new_rotation = torch.zeros(
-                (new_xyz.shape[0], self._rotation.shape[1], 4), device="cuda"
-            )
+            new_rotation = torch.zeros((new_xyz.shape[0], self._rotation.shape[1], 4), device="cuda")
             new_rotation[:, 0, 0] = 1
         else:
             new_rotation = torch.zeros((new_xyz.shape[0], 4), device="cuda")
@@ -2579,9 +2317,7 @@ class GS3d(MyModelBaseClass):
         scales = torch.clamp(scales, -10, 1.0)
         new_scaling = scales
 
-        new_opacity = inverse_sigmoid(
-            0.1 * torch.ones((new_xyz.shape[0], 1), device="cuda")
-        )
+        new_opacity = inverse_sigmoid(0.1 * torch.ones((new_xyz.shape[0], 1), device="cuda"))
         if self.motion_mode == "TRBF":
             new_trbf_center = torch.cat(new_trbf_center, dim=0)
             new_trbf_scale = torch.cat(new_trbf_scale, dim=0)
@@ -2607,9 +2343,7 @@ class GS3d(MyModelBaseClass):
             if self.deform_opacity:
                 new_opacity_t = torch.zeros_like(new_opacity).cuda()
             if self.deform_feature:
-                new_features_t = torch.zeros_like(
-                    torch.cat([new_features_dc, new_features_rest], dim=1)
-                ).cuda()
+                new_features_t = torch.zeros_like(torch.cat([new_features_dc, new_features_rest], dim=1)).cuda()
         if self.motion_mode == "TRBF":
             if self.deform_scale:
                 new_scaling_t = torch.zeros_like(new_scaling).cuda()
@@ -2648,22 +2382,17 @@ class GS3d(MyModelBaseClass):
         if max_screen_size:
             big_points_vs = self.max_radii2D > max_screen_size
             big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
-            prune_mask = torch.logical_or(
-                torch.logical_or(prune_mask, big_points_vs), big_points_ws
-            )
+            prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
         self.prune_points(prune_mask)
 
         torch.cuda.empty_cache()
 
     def densify_and_clone(self, grads, grad_threshold, scene_extent):
         # Extract points that satisfy the gradient condition
-        selected_pts_mask = torch.where(
-            torch.norm(grads, dim=-1) >= grad_threshold, True, False
-        )
+        selected_pts_mask = torch.where(torch.norm(grads, dim=-1) >= grad_threshold, True, False)
         selected_pts_mask = torch.logical_and(
             selected_pts_mask,
-            torch.max(self.get_scaling, dim=1).values
-            <= self.percent_dense * scene_extent,
+            torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent,
         )
 
         new_xyz = self._xyz[selected_pts_mask]
@@ -2702,9 +2431,7 @@ class GS3d(MyModelBaseClass):
             if self.deform_opacity:
                 new_opacity_t = torch.zeros_like(new_opacities).cuda()
             if self.deform_feature:
-                new_features_t = torch.zeros_like(
-                    torch.cat([new_features_dc, new_features_rest], dim=1)
-                ).cuda()
+                new_features_t = torch.zeros_like(torch.cat([new_features_dc, new_features_rest], dim=1)).cuda()
         if self.motion_mode == "TRBF":
             if self.deform_scale:
                 new_scaling_t = torch.zeros_like(new_scaling).cuda()
@@ -2735,8 +2462,7 @@ class GS3d(MyModelBaseClass):
         selected_pts_mask = torch.where(padded_grad >= grad_threshold, True, False)
         selected_pts_mask = torch.logical_and(
             selected_pts_mask,
-            torch.max(self.get_scaling, dim=1).values
-            > self.percent_dense * scene_extent,
+            torch.max(self.get_scaling, dim=1).values > self.percent_dense * scene_extent,
         )
 
         if self.motion_mode == "FourDim":
@@ -2747,9 +2473,9 @@ class GS3d(MyModelBaseClass):
                 means = torch.zeros((stds.size(0), 3), device="cuda")
                 samples = torch.normal(mean=means, std=stds)
                 rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
-                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(
-                    -1
-                ) + self.get_xyz[selected_pts_mask].repeat(N, 1)
+                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(
+                    N, 1
+                )
 
                 stds_t = self.get_scaling_t[selected_pts_mask].repeat(N, 1)
                 means_t = torch.zeros((stds_t.size(0), 1), device="cuda")
@@ -2767,9 +2493,9 @@ class GS3d(MyModelBaseClass):
                     self._rotation[selected_pts_mask],
                     self._rotation_r[selected_pts_mask],
                 ).repeat(N, 1, 1)
-                new_xyzt = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(
-                    -1
-                ) + self.get_xyzt[selected_pts_mask].repeat(N, 1)
+                new_xyzt = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyzt[selected_pts_mask].repeat(
+                    N, 1
+                )
                 new_xyz = new_xyzt[..., 0:3]
                 new_t = new_xyzt[..., 3:4]
                 new_scaling_t = self.scaling_inverse_activation(
@@ -2786,35 +2512,21 @@ class GS3d(MyModelBaseClass):
                 means = torch.zeros((stds.size(0), 3), device="cuda")
                 samples = torch.normal(mean=means, std=stds)
                 rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
-                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(
-                    -1
-                ) + self.get_xyz[selected_pts_mask].repeat(N, 1)
+                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(
+                    N, 1
+                )
                 new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
             else:
-                stds = self.get_scaling[selected_pts_mask].repeat(
-                    N * self.get_xyz.shape[1], 1
-                )
+                stds = self.get_scaling[selected_pts_mask].repeat(N * self.get_xyz.shape[1], 1)
                 means = torch.zeros((stds.size(0), 3), device="cuda")
                 samples = torch.normal(mean=means, std=stds)
-                rots = (
-                    build_rotation(self._rotation[selected_pts_mask])
-                    .repeat(N, 1, 1, 1)
-                    .reshape(-1, 3, 3)
-                )
-                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1).unsqueeze(
-                    1
-                ).reshape(-1, self.get_xyz.shape[1], 3) + self.get_xyz[
-                    selected_pts_mask
-                ].repeat(
-                    N, 1, 1
-                )
-                new_xyz[:, 1:, :] = self.get_xyz[selected_pts_mask].repeat(N, 1, 1)[
-                    :, 1:, :
-                ]
+                rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1, 1).reshape(-1, 3, 3)
+                new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1).unsqueeze(1).reshape(
+                    -1, self.get_xyz.shape[1], 3
+                ) + self.get_xyz[selected_pts_mask].repeat(N, 1, 1)
+                new_xyz[:, 1:, :] = self.get_xyz[selected_pts_mask].repeat(N, 1, 1)[:, 1:, :]
                 new_rotation = self._rotation[selected_pts_mask].repeat(N, 1, 1)
-        new_scaling = self.scaling_inverse_activation(
-            self.get_scaling[selected_pts_mask].repeat(N, 1) / (0.8 * N)
-        )
+        new_scaling = self.scaling_inverse_activation(self.get_scaling[selected_pts_mask].repeat(N, 1) / (0.8 * N))
 
         if self.rgbdecoder is None:
             new_features_dc = self._features_dc[selected_pts_mask].repeat(N, 1, 1)
@@ -2845,9 +2557,7 @@ class GS3d(MyModelBaseClass):
             if self.deform_opacity:
                 new_opacity_t = torch.zeros_like(new_opacity).cuda()
             if self.deform_feature:
-                new_features_t = torch.zeros_like(
-                    torch.cat([new_features_dc, new_features_rest], dim=1)
-                ).cuda()
+                new_features_t = torch.zeros_like(torch.cat([new_features_dc, new_features_rest], dim=1)).cuda()
 
         if self.motion_mode == "TRBF":
             if self.deform_scale:
@@ -2933,16 +2643,12 @@ class GS3d(MyModelBaseClass):
                 stored_state["exp_avg_sq"] = stored_state["exp_avg_sq"][mask]
 
                 del self.optimizer.state[group["params"][0]]
-                group["params"][0] = nn.Parameter(
-                    (group["params"][0][mask].requires_grad_(True))
-                )
+                group["params"][0] = nn.Parameter((group["params"][0][mask].requires_grad_(True)))
                 self.optimizer.state[group["params"][0]] = stored_state
 
                 optimizable_tensors[group["name"]] = group["params"][0]
             else:
-                group["params"][0] = nn.Parameter(
-                    group["params"][0][mask].requires_grad_(True)
-                )
+                group["params"][0] = nn.Parameter(group["params"][0][mask].requires_grad_(True))
                 optimizable_tensors[group["name"]] = group["params"][0]
         return optimizable_tensors
 
@@ -3053,18 +2759,14 @@ class GS3d(MyModelBaseClass):
 
                 del self.optimizer.state[group["params"][0]]
                 group["params"][0] = nn.Parameter(
-                    torch.cat(
-                        (group["params"][0], extension_tensor), dim=0
-                    ).requires_grad_(True)
+                    torch.cat((group["params"][0], extension_tensor), dim=0).requires_grad_(True)
                 )
                 self.optimizer.state[group["params"][0]] = stored_state
 
                 optimizable_tensors[group["name"]] = group["params"][0]
             else:
                 group["params"][0] = nn.Parameter(
-                    torch.cat(
-                        (group["params"][0], extension_tensor), dim=0
-                    ).requires_grad_(True)
+                    torch.cat((group["params"][0], extension_tensor), dim=0).requires_grad_(True)
                 )
                 optimizable_tensors[group["name"]] = group["params"][0]
             # print(group["name"], self.optimizer.state.get(group['params'][0], None))
@@ -3072,17 +2774,13 @@ class GS3d(MyModelBaseClass):
         return optimizable_tensors
 
     def reset_opacity(self):
-        opacities_new = inverse_sigmoid(
-            torch.min(self.get_opacity, torch.ones_like(self.get_opacity) * 0.01)
-        )
+        opacities_new = inverse_sigmoid(torch.min(self.get_opacity, torch.ones_like(self.get_opacity) * 0.01))
         optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
         self._opacity = optimizable_tensors["opacity"]
         if self.motion_mode == "EffGS":
             if self.deform_opacity and (self.iteration > self.warm_up + 1):
                 opacity_t_new = torch.zeros_like(self.get_opacity).cuda()
-                optimizable_tensors = self.replace_tensor_to_optimizer(
-                    opacity_t_new, "opacity_t"
-                )
+                optimizable_tensors = self.replace_tensor_to_optimizer(opacity_t_new, "opacity_t")
                 self._opacity_t = optimizable_tensors["opacity_t"]
 
     def replace_tensor_to_optimizer(self, tensor, name):

@@ -67,9 +67,7 @@ class TRBFModel(nn.Module):
         means3D = torch.sum(inp["means3D"][:, : self.Np + 1, :] * basis, dim=1)  # Nx3
         # means3D = means3D[:, 0, :] +  measn3D[:, 1, :] * tforpoly + pc._motion[:, 3:6] * tforpoly * tforpoly + pc._motion[:, 6:9] * tforpoly *tforpoly * tforpoly
         basis_rot = create_sequence(tforpoly, self.Nq)
-        rotations = torch.sum(
-            inp["rotations"][:, : self.Nq + 1, :] * basis_rot, dim=1
-        )  # Nx4
+        rotations = torch.sum(inp["rotations"][:, : self.Nq + 1, :] * basis_rot, dim=1)  # Nx4
 
         if self.deform_scale:
             # to prevent negative value, adopt linear approx to prevent instability
@@ -105,9 +103,7 @@ class TRBFModel(nn.Module):
                     dim=1,
                 )
         else:
-            assert (
-                not self.deform_feature
-            ), "SH feature is not supported for TRBF non-deform"
+            assert not self.deform_feature, "SH feature is not supported for TRBF non-deform"
             dfeat = 0.0
         return means3D, rotations, scales, opacities, dfeat
 

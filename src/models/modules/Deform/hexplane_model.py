@@ -20,9 +20,7 @@ def compute_plane_smoothness(t):
     batch_size, c, h, w = t.shape
     # Convolve with a second derivative filter, in the time dimension which is dimension 2
     first_difference = t[..., 1:, :] - t[..., : h - 1, :]  # [batch, c, h-1, w]
-    second_difference = (
-        first_difference[..., 1:, :] - first_difference[..., : h - 2, :]
-    )  # [batch, c, h-2, w]
+    second_difference = first_difference[..., 1:, :] - first_difference[..., : h - 2, :]  # [batch, c, h-2, w]
     # Take the L2 norm of the result
     return torch.square(second_difference).mean()
 
@@ -40,9 +38,7 @@ def normalize_aabb(pts, aabb):
     return (pts - aabb[0]) * (2.0 / (aabb[1] - aabb[0])) - 1.0
 
 
-def grid_sample_wrapper(
-    grid: torch.Tensor, coords: torch.Tensor, align_corners: bool = True
-) -> torch.Tensor:
+def grid_sample_wrapper(grid: torch.Tensor, coords: torch.Tensor, align_corners: bool = True) -> torch.Tensor:
     grid_dim = coords.shape[-1]
 
     if grid.dim() == grid_dim + 1:
@@ -55,13 +51,10 @@ def grid_sample_wrapper(
         grid_sampler = F.grid_sample
     else:
         raise NotImplementedError(
-            f"Grid-sample was called with {grid_dim}D data but is only "
-            f"implemented for 2 and 3D data."
+            f"Grid-sample was called with {grid_dim}D data but is only " f"implemented for 2 and 3D data."
         )
 
-    coords = coords.view(
-        [coords.shape[0]] + [1] * (grid_dim - 1) + list(coords.shape[1:])
-    )
+    coords = coords.view([coords.shape[0]] + [1] * (grid_dim - 1) + list(coords.shape[1:]))
     B, feature_dim = grid.shape[:2]
     n = coords.shape[-2]
     interp = grid_sampler(
@@ -84,17 +77,13 @@ def init_grid_param(
     a: float = 0.1,
     b: float = 0.5,
 ):
-    assert in_dim == len(
-        reso
-    ), "Resolution must have same number of elements as input-dimension"
+    assert in_dim == len(reso), "Resolution must have same number of elements as input-dimension"
     has_time_planes = in_dim == 4
     assert grid_nd <= in_dim
     coo_combs = list(itertools.combinations(range(in_dim), grid_nd))
     grid_coefs = nn.ParameterList()
     for ci, coo_comb in enumerate(coo_combs):
-        new_grid_coef = nn.Parameter(
-            torch.empty([1, out_dim] + [reso[cc] for cc in coo_comb[::-1]])
-        )
+        new_grid_coef = nn.Parameter(torch.empty([1, out_dim] + [reso[cc] for cc in coo_comb[::-1]]))
         if has_time_planes and 3 in coo_comb:  # Initialize time planes to 1
             nn.init.ones_(new_grid_coef)
         else:
@@ -121,9 +110,7 @@ def interpolate_ms_features(
         for ci, coo_comb in enumerate(coo_combs):
             # interpolate in plane
             feature_dim = grid[ci].shape[1]  # shape of grid[ci]: 1, out_dim, *reso
-            interp_out_plane = grid_sample_wrapper(grid[ci], pts[..., coo_comb]).view(
-                -1, feature_dim
-            )
+            interp_out_plane = grid_sample_wrapper(grid[ci], pts[..., coo_comb]).view(-1, feature_dim)
             # compute product over planes
             interp_space = interp_space * interp_out_plane
 
@@ -173,9 +160,7 @@ class DenseGrid(nn.Module):
         """
         shape = xyz.shape[:-1]
         xyz = xyz.reshape(1, 1, 1, -1, 3)
-        ind_norm = ((xyz - self.xyz_min) / (self.xyz_max - self.xyz_min)).flip(
-            (-1,)
-        ) * 2 - 1
+        ind_norm = ((xyz - self.xyz_min) / (self.xyz_max - self.xyz_min)).flip((-1,)) * 2 - 1
         out = F.grid_sample(self.grid, ind_norm, mode="bilinear", align_corners=True)
         out = out.reshape(self.channels, -1).T.reshape(*shape, self.channels)
         # if self.channels == 1:
@@ -227,9 +212,7 @@ class HexPlaneField(nn.Module):
             # initialize coordinate grid
             config = self.grid_config[0].copy()
             # Resolution fix: multi-res only on spatial planes
-            config["resolution"] = [r * res for r in config["resolution"][:3]] + config[
-                "resolution"
-            ][3:]
+            config["resolution"] = [r * res for r in config["resolution"][:3]] + config["resolution"][3:]
             gp = init_grid_param(
                 grid_nd=config["grid_dimensions"],
                 in_dim=config["input_coordinate_dim"],
@@ -331,9 +314,7 @@ class Deformation(nn.Module):
         if self.args_empty_voxel:
             self.empty_voxel = DenseGrid(channels=1, world_size=[64, 64, 64])
         if self.args_static_mlp:
-            self.static_mlp = nn.Sequential(
-                nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 1)
-            )
+            self.static_mlp = nn.Sequential(nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 1))
 
         self.ratio = 0
         self.sh_dim = sh_dim
@@ -365,18 +346,10 @@ class Deformation(nn.Module):
             self.feature_out.append(nn.ReLU())
             self.feature_out.append(nn.Linear(self.W, self.W))
         self.feature_out = nn.Sequential(*self.feature_out)
-        self.pos_deform = nn.Sequential(
-            nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 3)
-        )
-        self.scales_deform = nn.Sequential(
-            nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 3)
-        )
-        self.rotations_deform = nn.Sequential(
-            nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 4)
-        )
-        self.opacity_deform = nn.Sequential(
-            nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 1)
-        )
+        self.pos_deform = nn.Sequential(nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 3))
+        self.scales_deform = nn.Sequential(nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 3))
+        self.rotations_deform = nn.Sequential(nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 4))
+        self.opacity_deform = nn.Sequential(nn.ReLU(), nn.Linear(self.W, self.W), nn.ReLU(), nn.Linear(self.W, 1))
         self.shs_deform = nn.Sequential(
             nn.ReLU(),
             nn.Linear(self.W, self.W),
@@ -384,9 +357,7 @@ class Deformation(nn.Module):
             nn.Linear(self.W, self.sh_dim),
         )
 
-    def query_time(
-        self, rays_pts_emb, scales_emb, rotations_emb, time_feature, time_emb
-    ):
+    def query_time(self, rays_pts_emb, scales_emb, rotations_emb, time_feature, time_emb):
 
         if self.no_grid:
             h = torch.cat([rays_pts_emb[:, :3], time_emb[:, :1]], -1)
@@ -444,9 +415,7 @@ class Deformation(nn.Module):
         time_feature,
         time_emb,
     ):
-        hidden = self.query_time(
-            rays_pts_emb, scales_emb, rotations_emb, time_feature, time_emb
-        )
+        hidden = self.query_time(rays_pts_emb, scales_emb, rotations_emb, time_feature, time_emb)
         if self.args_static_mlp:
             mask = self.static_mlp(hidden)
         elif self.args_empty_voxel:
@@ -553,19 +522,13 @@ class deform_network(nn.Module):
             input_ch_time=timenet_output,
             **kwargs,
         )
-        self.register_buffer(
-            "time_poc", torch.FloatTensor([(2**i) for i in range(timebase_pe)])
-        )
-        self.register_buffer(
-            "pos_poc", torch.FloatTensor([(2**i) for i in range(posbase_pe)])
-        )
+        self.register_buffer("time_poc", torch.FloatTensor([(2**i) for i in range(timebase_pe)]))
+        self.register_buffer("pos_poc", torch.FloatTensor([(2**i) for i in range(posbase_pe)]))
         self.register_buffer(
             "rotation_scaling_poc",
             torch.FloatTensor([(2**i) for i in range(scale_rotation_pe)]),
         )
-        self.register_buffer(
-            "opacity_poc", torch.FloatTensor([(2**i) for i in range(opacity_pe)])
-        )
+        self.register_buffer("opacity_poc", torch.FloatTensor([(2**i) for i in range(opacity_pe)]))
         self.apply(initialize_weights)
         # print(self)
 
@@ -577,9 +540,7 @@ class deform_network(nn.Module):
         # self.rotation_scaling_poc =  self.rotation_scaling_poc.cuda()
         # self.opacity_poc = self.opacity_poc.cuda()
 
-    def forward(
-        self, point, scales=None, rotations=None, opacity=None, shs=None, times_sel=None
-    ):
+    def forward(self, point, scales=None, rotations=None, opacity=None, shs=None, times_sel=None):
         return self.forward_dynamic(point, scales, rotations, opacity, shs, times_sel)
 
     @property
@@ -595,9 +556,7 @@ class deform_network(nn.Module):
         points = self.deformation_net(points)
         return points
 
-    def forward_dynamic(
-        self, point, scales=None, rotations=None, opacity=None, shs=None, times_sel=None
-    ):
+    def forward_dynamic(self, point, scales=None, rotations=None, opacity=None, shs=None, times_sel=None):
         # times_emb = poc_fre(times_sel, self.time_poc)
         point_emb = poc_fre(point, self.pos_poc)
         scales_emb = poc_fre(scales, self.rotation_scaling_poc)
@@ -610,9 +569,7 @@ class deform_network(nn.Module):
         return means3D, scales, rotations, opacity, shs
 
     def get_mlp_parameters(self):
-        return self.deformation_net.get_mlp_parameters() + list(
-            self.timenet.parameters()
-        )
+        return self.deformation_net.get_mlp_parameters() + list(self.timenet.parameters())
 
     def get_grid_parameters(self):
         return self.deformation_net.get_grid_parameters()
@@ -667,27 +624,18 @@ class HexPlaneModel(nn.Module):
         # assert False, "Under construction for deform mode..."
 
     def forward(self, inp: Dict, time: float):
-        time = (
-            torch.tensor([time])
-            .to(inp["means3D"].device)
-            .view(1, 1)
-            .repeat(inp["means3D"].shape[0], 1)
-        )
-        means3D_final, scales_final, rotations_final, opacity_final, shs_final = (
-            self._deformation(
-                inp["means3D"],
-                inp["scales"],
-                inp["rotations"],
-                inp["opacity"],
-                inp["shs"],
-                time,
-            )
+        time = torch.tensor([time]).to(inp["means3D"].device).view(1, 1).repeat(inp["means3D"].shape[0], 1)
+        means3D_final, scales_final, rotations_final, opacity_final, shs_final = self._deformation(
+            inp["means3D"],
+            inp["scales"],
+            inp["rotations"],
+            inp["opacity"],
+            inp["shs"],
+            time,
         )
         return means3D_final, rotations_final, scales_final, opacity_final, shs_final
 
-    def compute_regulation(
-        self, time_smoothness_weight, l1_time_planes_weight, plane_tv_weight
-    ):
+    def compute_regulation(self, time_smoothness_weight, l1_time_planes_weight, plane_tv_weight):
         return (
             plane_tv_weight * self._plane_regulation()
             + time_smoothness_weight * self._time_regulation()

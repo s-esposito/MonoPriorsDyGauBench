@@ -13,9 +13,7 @@ import struct
 def read_pfm(filename):
     with Path(filename).open("rb") as pfm_file:
 
-        line1, line2, line3 = (
-            pfm_file.readline().decode("latin-1").strip() for _ in range(3)
-        )
+        line1, line2, line3 = (pfm_file.readline().decode("latin-1").strip() for _ in range(3))
         assert line1 in ("PF", "Pf")
         channels = 3 if "PF" in line1 else 1
         width, height = (int(s) for s in line2.split())
@@ -45,9 +43,7 @@ def np2png(arr, fname, norm_input=True):
         arr = np.concatenate(arr, 1)
 
     # plt.imsave( fname, np.uint8(norm_input * arr * 255 + (not norm_input) * arr) )
-    Image.fromarray(np.uint8(norm_input * arr * 255 + (not norm_input) * arr)).save(
-        fname
-    )
+    Image.fromarray(np.uint8(norm_input * arr * 255 + (not norm_input) * arr)).save(fname)
 
 
 def torch2png(arr, fname, norm_input=True):
@@ -85,8 +81,6 @@ def np2png_d(arr, fname=None, vmin=-1, vmax=-1, colormap="jet"):
 
 def torch2png_d(arr, fname, vmin=-1, vmax=-1, colormap="jet"):
     if type(arr) == list:
-        return np2png_d(
-            [a.detach().cpu().numpy() for a in arr], fname, vmin, vmax, colormap
-        )
+        return np2png_d([a.detach().cpu().numpy() for a in arr], fname, vmin, vmax, colormap)
     else:
         return np2png_d(arr.detach().cpu().numpy(), fname, vmin, vmax, colormap)

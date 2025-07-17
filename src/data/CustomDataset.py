@@ -31,18 +31,10 @@ def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True
     cam_infos = []
     color_files = os.listdir(osp.join(path, "color" + ("_nvs" if nvs else "")))
     frames = len(color_files)
-    extrinsics = np.load(
-        osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_extrinsics.npy")
-    )
-    intrinsics = np.load(
-        osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_intrinsics.npy")
-    )
-    forward_flow_dir = osp.join(
-        path, "estimated_forward_flow" + ("_nvs" if nvs else "")
-    )
-    backward_flow_dir = osp.join(
-        path, "estimated_backward_flow" + ("_nvs" if nvs else "")
-    )
+    extrinsics = np.load(osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_extrinsics.npy"))
+    intrinsics = np.load(osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_intrinsics.npy"))
+    forward_flow_dir = osp.join(path, "estimated_forward_flow" + ("_nvs" if nvs else ""))
+    backward_flow_dir = osp.join(path, "estimated_backward_flow" + ("_nvs" if nvs else ""))
 
     # Focal: 519.49
     fovx = focal2fov(intrinsics[0, 0], intrinsics[0, 2] * 2)
@@ -67,9 +59,7 @@ def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True
         # Resize the image to the desired resolution using opencv
         w, h = image.shape[:2]
         image = image.swapaxes(0, 1)
-        image = cv2.resize(
-            image, (w // downsample, h // downsample), interpolation=cv2.INTER_LINEAR
-        )
+        image = cv2.resize(image, (w // downsample, h // downsample), interpolation=cv2.INTER_LINEAR)
 
         FovY = fovy
         FovX = fovx
@@ -245,9 +235,7 @@ class CustomDataModule(MyDataModuleBaseClass):
 
         times = [cam_info.time for cam_info in self.train_cam_infos]
         times = np.unique(times)
-        assert (np.min(times) >= 0.0) and (
-            np.max(times) <= 1.0
-        ), "Time should be in [0, 1]"
+        assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]"
         self.time_interval = 1.0 / float(len(times))
 
         self.pcd = BasicPointCloud(

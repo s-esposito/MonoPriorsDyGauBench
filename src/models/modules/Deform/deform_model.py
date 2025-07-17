@@ -99,11 +99,7 @@ class DeformNetwork(nn.Module):
             self.linear = nn.ModuleList(
                 [nn.Linear(xyz_input_ch + self.time_out, W)]
                 + [
-                    (
-                        nn.Linear(W, W)
-                        if i not in self.skips
-                        else nn.Linear(W + xyz_input_ch + self.time_out, W)
-                    )
+                    (nn.Linear(W, W) if i not in self.skips else nn.Linear(W + xyz_input_ch + self.time_out, W))
                     for i in range(D - 1)
                 ]
             )
@@ -111,14 +107,7 @@ class DeformNetwork(nn.Module):
         else:
             self.linear = nn.ModuleList(
                 [nn.Linear(self.input_ch, W)]
-                + [
-                    (
-                        nn.Linear(W, W)
-                        if i not in self.skips
-                        else nn.Linear(W + self.input_ch, W)
-                    )
-                    for i in range(D - 1)
-                ]
+                + [(nn.Linear(W, W) if i not in self.skips else nn.Linear(W + self.input_ch, W)) for i in range(D - 1)]
             )
 
         self.is_blender = is_blender
@@ -209,13 +198,9 @@ class DeformModel(nn.Module):
     def forward(self, inp: Dict, time: float):
         N = inp["means3D"].shape[0]
         time_emb = torch.Tensor([time]).unsqueeze(0).expand(N, -1).cuda()
-        d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform(
-            inp["means3D"].detach(), time_emb
-        )
+        d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform(inp["means3D"].detach(), time_emb)
         if (len(inp["shs"].shape) == 3) and (not isinstance(d_feat, float)):
-            d_feat = d_feat.view(
-                inp["shs"].shape[0], inp["shs"].shape[1], inp["shs"].shape[2]
-            )
+            d_feat = d_feat.view(inp["shs"].shape[0], inp["shs"].shape[1], inp["shs"].shape[2])
         return d_xyz, d_rotation, d_scaling, d_opacity, d_feat
         """
         return {

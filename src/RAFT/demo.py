@@ -56,9 +56,7 @@ def demo(args):
     model.eval()
 
     with torch.no_grad():
-        images = glob.glob(os.path.join(args.path, "*.png")) + glob.glob(
-            os.path.join(args.path, "*.jpg")
-        )
+        images = glob.glob(os.path.join(args.path, "*.png")) + glob.glob(os.path.join(args.path, "*.jpg"))
 
         images = load_image_list(images)
         for i in range(images.shape[0] - 1):

@@ -64,23 +64,15 @@ def process_methods(dataset, methods_subset):
     for scene_dir in tqdm(scene_dirs):
         scene = scene_dir.split("/")[-1]
         scene_runs = [run for run in runs if run.group == scene]
-        tineuvox_scene_runs = [
-            run for run in tineuvox_runs_ if run.name.startswith(scene)
-        ]
+        tineuvox_scene_runs = [run for run in tineuvox_runs_ if run.name.startswith(scene)]
         for method_id, method in tqdm(enumerate(methods_subset)):
             big_name, small_name = method.split("/")
             if big_name == "TiNeuVox":
                 method_runs = [
-                    run
-                    for run in tineuvox_scene_runs
-                    if (run.name).startswith("/".join([scene, small_name]))
+                    run for run in tineuvox_scene_runs if (run.name).startswith("/".join([scene, small_name]))
                 ]
             elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF"]:
-                method_runs = [
-                    run
-                    for run in scene_runs
-                    if (run.name).startswith("_".join([big_name, small_name]))
-                ]
+                method_runs = [run for run in scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
             else:
                 assert False, f"Unknown method {big_name}!"
             # tineuvox_method_runs = [run for run in tineuvox_scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
@@ -100,25 +92,15 @@ def process_methods(dataset, methods_subset):
 
                 if big_name == "TiNeuVox":
 
-                    train_run = [
-                        run
-                        for run in method_runs
-                        if run.name == "/".join([scene, small_name + run_id])
-                    ]
+                    train_run = [run for run in method_runs if run.name == "/".join([scene, small_name + run_id])]
                     # assert False, ["/".join([scene, small_name+run_id]), len(train_run)]
-                    local_path = os.path.join(
-                        tineuvox_root_dir, dataset, scene, small_name + run_id
-                    )
+                    local_path = os.path.join(tineuvox_root_dir, dataset, scene, small_name + run_id)
                 elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF"]:
                     train_run = [
-                        run
-                        for run in method_runs
-                        if run.name == "_".join([big_name, small_name + run_id, "fit"])
+                        run for run in method_runs if run.name == "_".join([big_name, small_name + run_id, "fit"])
                     ]
                     test_run = [
-                        run
-                        for run in method_runs
-                        if run.name == "_".join([big_name, small_name + run_id, "test"])
+                        run for run in method_runs if run.name == "_".join([big_name, small_name + run_id, "test"])
                     ]
                     local_path = os.path.join(scene_dir, big_name, small_name + run_id)
                 else:
@@ -178,9 +160,7 @@ def process_methods(dataset, methods_subset):
                         train_run = train_run[-1]
                         start_time = train_run.created_at
                         end_time = train_run.heartbeatAt
-                        start_datetime = datetime.strptime(
-                            start_time, "%Y-%m-%dT%H:%M:%S"
-                        )
+                        start_datetime = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S")
                         end_datetime = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%S")
                         total_time = end_datetime - start_datetime
                         exp["train_time"] = total_time.total_seconds()
@@ -188,14 +168,7 @@ def process_methods(dataset, methods_subset):
                     else:
                         train_iter = len(train_run) - 1
                         while train_iter >= 0:
-                            if (
-                                len(
-                                    train_run[train_iter].history(
-                                        keys=["trainer/global_step"], pandas=False
-                                    )
-                                )
-                                >= 1
-                            ):
+                            if len(train_run[train_iter].history(keys=["trainer/global_step"], pandas=False)) >= 1:
                                 break
                             train_iter -= 1
                         if train_iter < 0:
@@ -203,19 +176,13 @@ def process_methods(dataset, methods_subset):
                         else:
                             train_run = train_run[train_iter]
                             train_step = int(
-                                train_run.history(
-                                    keys=["trainer/global_step"], pandas=False
-                                )[-1]["trainer/global_step"]
+                                train_run.history(keys=["trainer/global_step"], pandas=False)[-1]["trainer/global_step"]
                             )
                             if big_name == "TiNeuVox" or train_step == 29999:
                                 start_time = train_run.created_at
                                 end_time = train_run.heartbeatAt
-                                start_datetime = datetime.strptime(
-                                    start_time, "%Y-%m-%dT%H:%M:%S"
-                                )
-                                end_datetime = datetime.strptime(
-                                    end_time, "%Y-%m-%dT%H:%M:%S"
-                                )
+                                start_datetime = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S")
+                                end_datetime = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%S")
                                 total_time = end_datetime - start_datetime
                                 exp["train_time"] = total_time.total_seconds()
                                 exp["OOM"] = 0.0
@@ -243,9 +210,7 @@ def process_methods(dataset, methods_subset):
                             result_subset[method][scene][key].append(sum(scene_result))
                         else:
                             mean = sum(scene_result) / float(len(scene_result))
-                            variance = sum(
-                                (x - mean) ** 2 for x in scene_result
-                            ) / float(len(scene_result))
+                            variance = sum((x - mean) ** 2 for x in scene_result) / float(len(scene_result))
                             result_subset[method][scene][key].append((mean, variance))
             else:
                 print("Empty Exps! ", dataset, scene, method)
@@ -288,9 +253,7 @@ else:
             method_subsets = [methods[i::num_processes] for i in range(num_processes)]
 
             with multiprocessing.Pool(processes=num_processes) as pool:
-                results = pool.starmap(
-                    process_methods, [(dataset, subset) for subset in method_subsets]
-                )
+                results = pool.starmap(process_methods, [(dataset, subset) for subset in method_subsets])
 
             for method_subset_result in results:
                 for method, method_result in method_subset_result.items():
@@ -389,9 +352,7 @@ for dataset in datasets:
             for key in result_final[dataset][method][scene]:
                 if key not in result_final[dataset][method]["all"]:
                     result_final[dataset][method]["all"][key] = []
-                result_final[dataset][method]["all"][key] += result_final[dataset][
-                    method
-                ][scene][
+                result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][
                     key
                 ]  # if crash/OOM, a list of numbers instead of tuple
 
@@ -628,9 +589,7 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
 
     gap_ratio = 0.1  # Adjust the gap ratio as needed
     gap = plot_width * gap_ratio / (len(datasets) - 1) if len(datasets) > 1 else 0
-    bar_width = (plot_width - gap * (len(datasets) - 1)) / (
-        len(datasets) * len(methods)
-    )
+    bar_width = (plot_width - gap * (len(datasets) - 1)) / (len(datasets) * len(methods))
     bar_positions = []
     means = []
     variances = []
@@ -642,9 +601,7 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
             if (dataset == "dnerf") and (method == "TRBF/vanilla"):
                 continue
             method_id = methods.index(method)
-            bar_positions.append(
-                dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width
-            )
+            bar_positions.append(dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width)
             if (key not in result_final[dataset][method][sub_class]) or (
                 len(result_final[dataset][method][sub_class][key]) == 0
             ):
@@ -654,12 +611,12 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
                 means.append(sum(result_final[dataset][method][sub_class][key]))
                 variances.append(0)
             else:
-                mean = sum(
-                    [x[0] for x in result_final[dataset][method][sub_class][key]]
-                ) / float(len(result_final[dataset][method][sub_class][key]))
-                variance = sum(
-                    [x[1] for x in result_final[dataset][method][sub_class][key]]
-                ) / float(len(result_final[dataset][method][sub_class][key]))
+                mean = sum([x[0] for x in result_final[dataset][method][sub_class][key]]) / float(
+                    len(result_final[dataset][method][sub_class][key])
+                )
+                variance = sum([x[1] for x in result_final[dataset][method][sub_class][key]]) / float(
+                    len(result_final[dataset][method][sub_class][key])
+                )
                 means.append(mean)
                 variances.append(variance)
             bar_colors.append(method_colors[method_id])
@@ -696,8 +653,7 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
     # Update xticks_positions based on the bar width and gap, starting from the first bar position
     # xticks_positions = [bar_positions[dataset_id * len(methods)] + len(methods) * bar_width / 2 for dataset_id in range(len(datasets))]
     xticks_positions = [
-        dataset_id * (len(methods) * bar_width + gap)
-        + (len(methods) - 1) * bar_width / 2
+        dataset_id * (len(methods) * bar_width + gap) + (len(methods) - 1) * bar_width / 2
         for dataset_id in range(len(datasets))
     ]
 
@@ -732,9 +688,7 @@ for dataset in datasets:
     dataset_dir = os.path.join(root_dir, dataset)
     scenes = [os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
     scene_dirs = [scene for scene in scenes if os.path.isdir(scene)]
-    common_scenes = [
-        scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"
-    ]
+    common_scenes = [scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"]
 
     for key in result_final[datasets[0]][methods[0]]["all"]:
         plt.rcParams["font.family"] = "Arial"
@@ -744,9 +698,7 @@ for dataset in datasets:
         plot_width_multiplier = 0.4  # Adjust this multiplier to control the plot width
         plot_width = len(common_scenes) * (len(methods) * plot_width_multiplier + 1)
         # plot_width = len(common_scenes) * (len(methods) + 2)  # Adjust the multiplier as needed
-        fig, ax = plt.subplots(
-            figsize=(plot_width, 6)
-        )  # Adjust the figure size as needed
+        fig, ax = plt.subplots(figsize=(plot_width, 6))  # Adjust the figure size as needed
 
         # lim = lims[key]
         # if lim[0] is not None:
@@ -755,16 +707,10 @@ for dataset in datasets:
         #    ax.set_ylim(top=lim[1])
 
         # bar_width = 0.8
-        bar_width = (plot_width - gap * (len(common_scenes) - 1)) / (
-            len(common_scenes) * len(methods)
-        )
+        bar_width = (plot_width - gap * (len(common_scenes) - 1)) / (len(common_scenes) * len(methods))
 
         gap_ratio = 0.1  # Adjust the gap ratio as needed
-        gap = (
-            plot_width * gap_ratio / (len(common_scenes) - 1)
-            if len(common_scenes) > 1
-            else 0
-        )
+        gap = plot_width * gap_ratio / (len(common_scenes) - 1) if len(common_scenes) > 1 else 0
 
         bar_positions = []
         means = []
@@ -777,17 +723,11 @@ for dataset in datasets:
 
                 method_id = methods.index(method)
                 # bar_positions.append(scene_id * len(methods) + method_id + gap * (scene_id + 1.))
-                bar_positions.append(
-                    scene_id * (len(methods) * bar_width + gap) + method_id * bar_width
-                )
+                bar_positions.append(scene_id * (len(methods) * bar_width + gap) + method_id * bar_width)
 
-                if (method not in result_final[dataset]) or (
-                    scene not in result_final[dataset][method]
-                ):
+                if (method not in result_final[dataset]) or (scene not in result_final[dataset][method]):
                     means.append(0)
-                    variances.append(
-                        0
-                    )  # Skip the scene if it's not present in the method's results
+                    variances.append(0)  # Skip the scene if it's not present in the method's results
                 elif (key not in result_final[dataset][method][scene]) or (
                     len(result_final[dataset][method][scene][key]) == 0
                 ):
@@ -797,12 +737,12 @@ for dataset in datasets:
                     means.append(sum(result_final[dataset][method][scene][key]))
                     variances.append(0)
                 else:
-                    mean = sum(
-                        [x[0] for x in result_final[dataset][method][scene][key]]
-                    ) / float(len(result_final[dataset][method][scene][key]))
-                    variance = sum(
-                        [x[1] for x in result_final[dataset][method][scene][key]]
-                    ) / float(len(result_final[dataset][method][scene][key]))
+                    mean = sum([x[0] for x in result_final[dataset][method][scene][key]]) / float(
+                        len(result_final[dataset][method][scene][key])
+                    )
+                    variance = sum([x[1] for x in result_final[dataset][method][scene][key]]) / float(
+                        len(result_final[dataset][method][scene][key])
+                    )
                     means.append(mean)
                     variances.append(variance)
 

@@ -101,9 +101,7 @@ for dataset in tqdm(dataset_mapper):
             max_psnr = -1
             for split in splits:
                 if method.startswith("TiNeuVox"):
-                    log_path = os.path.join(
-                        tineuvox_root_dir, dataset, scene, "vanilla" + split
-                    )
+                    log_path = os.path.join(tineuvox_root_dir, dataset, scene, "vanilla" + split)
                 else:
                     log_path = os.path.join(root_dir, dataset, scene, method + split)
                 with open(os.path.join(log_path, "test.txt"), "r") as f:
@@ -116,9 +114,7 @@ for dataset in tqdm(dataset_mapper):
                     video_reader_path = os.path.join(log_path, "test.mp4")
             video_readers[method] = imageio.get_reader(video_reader_path, "mp4", fps=10)
             if "GT" not in video_readers:
-                video_readers["GT"] = imageio.get_reader(
-                    video_reader_path, "mp4", fps=10
-                )
+                video_readers["GT"] = imageio.get_reader(video_reader_path, "mp4", fps=10)
         first_video = next(iter(video_readers.values()))
         frame_width, frame_height = (
             first_video.get_next_data().shape[1],
@@ -140,9 +136,7 @@ for dataset in tqdm(dataset_mapper):
         writer = imageio.get_writer(video_path, fps=fps[scene])
         cur_index = 0
         while True:
-            stitched_frame = np.zeros(
-                (stitched_height, stitched_width, 3), dtype=np.uint8
-            )
+            stitched_frame = np.zeros((stitched_height, stitched_width, 3), dtype=np.uint8)
 
             for position, video_key in positions.items():
                 col, row = position
@@ -169,17 +163,13 @@ for dataset in tqdm(dataset_mapper):
                     method_name = method_mapper.get(video_key, "")
                     if video_key == "GT":
                         method_name = "GT"
-                    text_size, _ = cv2.getTextSize(
-                        method_name, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
-                    )
+                    text_size, _ = cv2.getTextSize(method_name, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
                     text_width, text_height = text_size
                     bg_left = 5
                     bg_top = 5
                     bg_right = bg_left + text_width + 10
                     bg_bottom = bg_top + text_height + 10
-                    frame = cv2.rectangle(
-                        frame, (bg_left, bg_top), (bg_right, bg_bottom), (0, 0, 0), -1
-                    )
+                    frame = cv2.rectangle(frame, (bg_left, bg_top), (bg_right, bg_bottom), (0, 0, 0), -1)
                     frame = cv2.putText(
                         frame,
                         method_name,
@@ -207,9 +197,7 @@ for dataset in tqdm(dataset_mapper):
                 writer.append_data(stitched_frame)
 
             # Break the loop if any video has ended
-            if not all(
-                video.get_length() > cur_index for video in video_readers.values()
-            ):
+            if not all(video.get_length() > cur_index for video in video_readers.values()):
                 break
 
             # Break the loop if max video length is reached

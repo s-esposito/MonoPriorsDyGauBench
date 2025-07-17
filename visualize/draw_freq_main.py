@@ -110,25 +110,19 @@ for idx, (method, final_name) in enumerate(zip(methods, final_names)):
             if method in method_data[dataset][scene]:
                 y_positions[dataset].append(method_data[dataset][scene][method])
             else:
-                y_positions[dataset].append(
-                    np.nan
-                )  # Handle cases where train_time is missing
+                y_positions[dataset].append(np.nan)  # Handle cases where train_time is missing
 
     for i, dataset in enumerate(sorted_df.columns):
         y = y_positions[dataset]
         x = sorted_df[dataset].dropna()
-        y = np.array(
-            [y[idx] for idx in x.index]
-        )  # Align y values with x values and convert to numpy array
+        y = np.array([y[idx] for idx in x.index])  # Align y values with x values and convert to numpy array
         x = x.values  # Convert x to numpy array
 
         all_x.extend(x)
         all_y.extend(y)
 
         # Add label for legend using dataset_name_mapping
-        ax.scatter(
-            x, y, color=colors[dataset], label=dataset_name_mapping[dataset], s=200
-        )
+        ax.scatter(x, y, color=colors[dataset], label=dataset_name_mapping[dataset], s=200)
 
         # Plot the mean with a "*" mark
         mean_value = sorted_means[dataset]

@@ -30,9 +30,7 @@ class FlowAugmentor:
         self.v_flip_prob = 0.1
 
         # photometric augmentation params
-        self.photo_aug = ColorJitter(
-            brightness=0.4, contrast=0.4, saturation=0.4, hue=0.5 / 3.14
-        )
+        self.photo_aug = ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.5 / 3.14)
         self.asymmetric_color_aug_prob = 0.2
         self.eraser_aug_prob = 0.5
 
@@ -47,9 +45,7 @@ class FlowAugmentor:
         # symmetric
         else:
             image_stack = np.concatenate([img1, img2], axis=0)
-            image_stack = np.array(
-                self.photo_aug(Image.fromarray(image_stack)), dtype=np.uint8
-            )
+            image_stack = np.array(self.photo_aug(Image.fromarray(image_stack)), dtype=np.uint8)
             img1, img2 = np.split(image_stack, 2, axis=0)
 
         return img1, img2
@@ -72,9 +68,7 @@ class FlowAugmentor:
     def spatial_transform(self, img1, img2, flow):
         # randomly sample scale
         ht, wd = img1.shape[:2]
-        min_scale = np.maximum(
-            (self.crop_size[0] + 8) / float(ht), (self.crop_size[1] + 8) / float(wd)
-        )
+        min_scale = np.maximum((self.crop_size[0] + 8) / float(ht), (self.crop_size[1] + 8) / float(wd))
 
         scale = 2 ** np.random.uniform(self.min_scale, self.max_scale)
         scale_x = scale
@@ -88,15 +82,9 @@ class FlowAugmentor:
 
         if np.random.rand() < self.spatial_aug_prob:
             # rescale the images
-            img1 = cv2.resize(
-                img1, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR
-            )
-            img2 = cv2.resize(
-                img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR
-            )
-            flow = cv2.resize(
-                flow, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR
-            )
+            img1 = cv2.resize(img1, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
+            img2 = cv2.resize(img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
+            flow = cv2.resize(flow, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             flow = flow * [scale_x, scale_y]
 
         if self.do_flip:
@@ -147,17 +135,13 @@ class SparseFlowAugmentor:
         self.v_flip_prob = 0.1
 
         # photometric augmentation params
-        self.photo_aug = ColorJitter(
-            brightness=0.3, contrast=0.3, saturation=0.3, hue=0.3 / 3.14
-        )
+        self.photo_aug = ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.3 / 3.14)
         self.asymmetric_color_aug_prob = 0.2
         self.eraser_aug_prob = 0.5
 
     def color_transform(self, img1, img2):
         image_stack = np.concatenate([img1, img2], axis=0)
-        image_stack = np.array(
-            self.photo_aug(Image.fromarray(image_stack)), dtype=np.uint8
-        )
+        image_stack = np.array(self.photo_aug(Image.fromarray(image_stack)), dtype=np.uint8)
         img1, img2 = np.split(image_stack, 2, axis=0)
         return img1, img2
 
@@ -212,9 +196,7 @@ class SparseFlowAugmentor:
         # randomly sample scale
 
         ht, wd = img1.shape[:2]
-        min_scale = np.maximum(
-            (self.crop_size[0] + 1) / float(ht), (self.crop_size[1] + 1) / float(wd)
-        )
+        min_scale = np.maximum((self.crop_size[0] + 1) / float(ht), (self.crop_size[1] + 1) / float(wd))
 
         scale = 2 ** np.random.uniform(self.min_scale, self.max_scale)
         scale_x = np.clip(scale, min_scale, None)
@@ -222,15 +204,9 @@ class SparseFlowAugmentor:
 
         if np.random.rand() < self.spatial_aug_prob:
             # rescale the images
-            img1 = cv2.resize(
-                img1, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR
-            )
-            img2 = cv2.resize(
-                img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR
-            )
-            flow, valid = self.resize_sparse_flow_map(
-                flow, valid, fx=scale_x, fy=scale_y
-            )
+            img1 = cv2.resize(img1, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
+            img2 = cv2.resize(img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
+            flow, valid = self.resize_sparse_flow_map(flow, valid, fx=scale_x, fy=scale_y)
 
         if self.do_flip:
             if np.random.rand() < 0.5:  # h-flip

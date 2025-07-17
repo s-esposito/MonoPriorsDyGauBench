@@ -63,9 +63,7 @@ class MyLightningCLI(LightningCLI):
         # self.config exists, but is empty!
         # anyways need to read config based on subcommand
         config = getattr(self.config, self.config.subcommand)
-        assert (
-            config.name is not None
-        ), "Experiment must have a name for saving and logging!"
+        assert config.name is not None, "Experiment must have a name for saving and logging!"
         assert config.output is not None, "Experiment must have a base output path!"
 
         """
@@ -86,9 +84,7 @@ class MyLightningCLI(LightningCLI):
         elif config.model.init_args.motion_mode in ["EffGS", "FourDim", "TRBF"]:
             pass
         else:
-            assert (
-                False
-            ), f"Unknown motion mode without handling of trainer steps: {config.model.init_args.motion_mode}"
+            assert False, f"Unknown motion mode without handling of trainer steps: {config.model.init_args.motion_mode}"
 
         """
         # find checkpoint if ckpt_path is set to "last" instead of exact path
@@ -117,12 +113,8 @@ class MyLightningCLI(LightningCLI):
         """
 
         if config.ckpt_path == "last":
-            checkpoint_name = sorted(
-                os.listdir(os.path.join(output_path, "checkpoints"))
-            )
-            checkpoint_name = [
-                name for name in checkpoint_name if name.startswith("last-v")
-            ]
+            checkpoint_name = sorted(os.listdir(os.path.join(output_path, "checkpoints")))
+            checkpoint_name = [name for name in checkpoint_name if name.startswith("last-v")]
             if len(checkpoint_name) > 0:
                 name = checkpoint_name[-1]
             else:
@@ -147,23 +139,18 @@ class MyLightningCLI(LightningCLI):
             setattr(
                 logger_config.init_args,
                 "name",
-                config.name + "_" + self.config.subcommand,
+                config.project + "_" + config.group + "_" + config.name + "_" + self.config.subcommand,
             )
-            setattr(logger_config.init_args, "project", config.project)
-            setattr(logger_config.init_args, "group", config.group)
-            setattr(logger_config.init_args, "mode", "online")
+            setattr(logger_config.init_args, "project", "monodybench")
+            # setattr(logger_config.init_args, "group", config.group)
+            # setattr(logger_config.init_args, "mode", "online")
             # setattr(logger_config.init_args, "log_model", "all")
             if config.trainer.callbacks is None:
                 config.trainer.callbacks = []
             assert isinstance(config.trainer.callbacks, list)
             config.trainer.callbacks += [lazy_instance(WandbWatcher)]
 
-        elif (
-            config.logger == "none"
-            or config.logger == "None"
-            or config.logger == "false"
-            or config.logger == "False"
-        ):
+        elif config.logger == "none" or config.logger == "None" or config.logger == "false" or config.logger == "False":
             logger_config = False
         else:
             assert False, "Undefined logger!"
@@ -215,20 +202,14 @@ class MyLightningCLI(LightningCLI):
                     save_last=cb.save_last,
                     every_n_train_steps=None,
                 )
-        self.trainer.callbacks = [
-            cb for cb in self.trainer.callbacks if not isinstance(cb, ModelCheckpoint)
-        ]
+        self.trainer.callbacks = [cb for cb in self.trainer.callbacks if not isinstance(cb, ModelCheckpoint)]
         self.trainer.callbacks += [new_cb]
 
         # Check if we are running test; if yes, do not let overwrite config happens
         if self.inference_mode:
             # Remove SaveConfigCallback if running test
             self.trainer.testing = True
-            self.trainer.callbacks = [
-                cb
-                for cb in self.trainer.callbacks
-                if not isinstance(cb, SaveConfigCallback)
-            ]
+            self.trainer.callbacks = [cb for cb in self.trainer.callbacks if not isinstance(cb, SaveConfigCallback)]
 
         # for cb in self.trainer.callbacks:
         #    print(cb)

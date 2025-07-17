@@ -7,14 +7,10 @@ if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_file", type=str, help="Path to config file")
-    parser.add_argument(
-        "--group", "-g", type=str, default="default", help="wandb group name"
-    )
+    parser.add_argument("--group", "-g", type=str, default="default", help="wandb group name")
     parser.add_argument("--name", "-n", type=str, help="Experiment name")
     parser.add_argument("--dataset", type=str, help="Path to the dataset")
-    parser.add_argument(
-        "--slurm_script", type=str, default=None, help="Path to slurm script"
-    )
+    parser.add_argument("--slurm_script", type=str, default=None, help="Path to slurm script")
     parser.add_argument("--output_dir", type=str, help="Output directory")
 
     args = parser.parse_args()
@@ -32,9 +28,7 @@ if __name__ == "__main__":
     config["data"]["init_args"]["datadir"] = args.dataset
 
     # Save the new config file
-    new_config_path = os.path.join(
-        os.path.dirname(args.config_file), f"{args.name}.yaml"
-    )
+    new_config_path = os.path.join(os.path.dirname(args.config_file), f"{args.name}.yaml")
     with open(new_config_path, "w") as f:
         yaml.dump(config, f)
 

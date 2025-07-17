@@ -30,9 +30,7 @@ def readCamerasFromTransforms(
     load_flow=False,
 ):
     if load_flow:
-        return readCamerasFromTransforms_flow(
-            path, transformsfile, white_background, extension=".png", downsample=1
-        )
+        return readCamerasFromTransforms_flow(path, transformsfile, white_background, extension=".png", downsample=1)
     cam_infos = []
 
     with open(os.path.join(path, transformsfile)) as json_file:
@@ -58,13 +56,9 @@ def readCamerasFromTransforms(
 
             depth_path = os.path.dirname(cam_name) + "_midasdepth"
             # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
-            if os.path.exists(
-                os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1])
-            ):
+            if os.path.exists(os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1])):
                 depth = cv2.imread(
-                    os.path.join(
-                        depth_path, image_name + "." + cam_name.split(".")[-1]
-                    ),
+                    os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1]),
                     -1,
                 ) / (2**16 - 1)
                 depth = depth.astype(float)
@@ -77,9 +71,7 @@ def readCamerasFromTransforms(
             bg = np.array([1, 1, 1]) if white_background else np.array([0, 0, 0])
 
             norm_data = im_data / 255.0
-            arr = norm_data[:, :, :3] * norm_data[:, :, 3:4] + bg * (
-                1 - norm_data[:, :, 3:4]
-            )
+            arr = norm_data[:, :, :3] * norm_data[:, :, 3:4] + bg * (1 - norm_data[:, :, 3:4])
             image = Image.fromarray(np.array(arr * 255.0, dtype=np.byte), "RGB")
 
             # fovy = focal2fov(fov2focal(fovx, image.size[0]), image.size[1])
@@ -170,13 +162,9 @@ def readCamerasFromTransforms_flow(
             depth_path = os.path.dirname(cam_name) + "_midasdepth"
             # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
             # print(cam_name, image_name, depth_path, os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]))
-            if os.path.exists(
-                os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1])
-            ):
+            if os.path.exists(os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1])):
                 depth = cv2.imread(
-                    os.path.join(
-                        depth_path, image_name + "." + cam_name.split(".")[-1]
-                    ),
+                    os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1]),
                     -1,
                 ) / (2**16 - 1)
                 depth = depth.astype(float)
@@ -189,9 +177,7 @@ def readCamerasFromTransforms_flow(
             bg = np.array([1, 1, 1]) if white_background else np.array([0, 0, 0])
 
             norm_data = im_data / 255.0
-            arr = norm_data[:, :, :3] * norm_data[:, :, 3:4] + bg * (
-                1 - norm_data[:, :, 3:4]
-            )
+            arr = norm_data[:, :, :3] * norm_data[:, :, 3:4] + bg * (1 - norm_data[:, :, 3:4])
             image = Image.fromarray(np.array(arr * 255.0, dtype=np.byte), "RGB")
 
             # fovy = focal2fov(fov2focal(fovx, image.size[0]), image.size[1])
@@ -440,9 +426,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         times = [cam_info.time for cam_info in self.train_cam_infos]
         times = np.unique(times)
         # record time interval for potential AST
-        assert (np.min(times) >= 0.0) and (
-            np.max(times) <= 1.0
-        ), "Time should be in [0, 1]"
+        assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]"
         self.time_interval = 1.0 / float(len(times))
 
         # assert False, "change self.pcd based on Nerfies debugged code"
@@ -466,17 +450,11 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         #                   #maxtime=max_time
         #                   )
 
-        self.train_cameras = FourDGSdataset(
-            self.train_cam_infos, split="train", load_flow=self.load_flow
-        )
-        self.test_cameras = FourDGSdataset(
-            self.test_cam_infos, split="test", load_flow=self.load_flow
-        )
+        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train", load_flow=self.load_flow)
+        self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test", load_flow=self.load_flow)
         # assert False, "change to 5 train, 5 test; and save image_name somewhere for both DneRF and Nerfies"
         is_val_train = [idx % len(self.train_cameras) for idx in range(5, 30, 5)]
-        is_val_test = [
-            idx % len(self.test_cameras) for idx in range(0, len(self.test_cameras), 1)
-        ]
+        is_val_test = [idx % len(self.test_cameras) for idx in range(0, len(self.test_cameras), 1)]
 
         val_1 = torch.utils.data.Subset(self.train_cameras, is_val_train)
         val_2 = torch.utils.data.Subset(self.test_cameras, is_val_test)

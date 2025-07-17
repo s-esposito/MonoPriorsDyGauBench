@@ -36,9 +36,7 @@ def psnr_mask(img1, img2, mask):
     masked_img2 = img2 * (mask_expanded == 0)
 
     # Calculate MSE only in the masked regions
-    mse = ((masked_img1 - masked_img2) ** 2).sum(dim=(1, 2, 3)) / (
-        mask_expanded == 0
-    ).sum(dim=(1, 2, 3))
+    mse = ((masked_img1 - masked_img2) ** 2).sum(dim=(1, 2, 3)) / (mask_expanded == 0).sum(dim=(1, 2, 3))
 
     # Calculate PSNR
     psnr_value = 20 * torch.log10(1.0 / torch.sqrt(mse))

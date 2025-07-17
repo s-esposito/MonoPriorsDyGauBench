@@ -55,9 +55,7 @@ for dataset in datasets:
             for key in result_final[dataset][method][scene]:
                 if key not in result_final[dataset][method]["all"]:
                     result_final[dataset][method]["all"][key] = []
-                result_final[dataset][method]["all"][key] += result_final[dataset][
-                    method
-                ][scene][key]
+                result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][key]
 
 method_colors = (
     [color for color in cm.pink(np.linspace(0.6, 0.8, 1))]
@@ -113,12 +111,12 @@ for dataset in datasets:
                 means.append(sum(result_final[dataset][method][sub_class][key]))
                 variances.append(0)
             else:
-                mean = sum(
-                    [x[0] for x in result_final[dataset][method][sub_class][key]]
-                ) / float(len(result_final[dataset][method][sub_class][key]))
-                variance = sum(
-                    [x[1] for x in result_final[dataset][method][sub_class][key]]
-                ) / float(len(result_final[dataset][method][sub_class][key]))
+                mean = sum([x[0] for x in result_final[dataset][method][sub_class][key]]) / float(
+                    len(result_final[dataset][method][sub_class][key])
+                )
+                variance = sum([x[1] for x in result_final[dataset][method][sub_class][key]]) / float(
+                    len(result_final[dataset][method][sub_class][key])
+                )
                 means.append(mean)
                 variances.append(variance)
             bar_colors.append(method_colors[method_id])
@@ -150,13 +148,8 @@ for dataset in datasets:
         ax.set_title(metric_name_mapping[key], fontsize=size)
 
     # Add legend
-    handles = [
-        mpatches.Patch(color=method_colors[i], label=methods_to_show[i])
-        for i in range(len(methods))
-    ]
-    fig.legend(
-        handles=handles, loc="upper center", fontsize=size, ncol=len(methods_to_show)
-    )
+    handles = [mpatches.Patch(color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))]
+    fig.legend(handles=handles, loc="upper center", fontsize=size, ncol=len(methods_to_show))
 
     plt.tight_layout()
     plt.subplots_adjust(top=0.75)

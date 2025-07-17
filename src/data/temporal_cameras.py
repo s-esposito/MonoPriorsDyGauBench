@@ -77,20 +77,14 @@ class TemporalCamera(nn.Module):
         self.trans = trans
         self.scale = scale
 
-        self.world_view_transform = torch.tensor(
-            getWorld2View2(R, T, trans, scale)
-        ).transpose(
-            0, 1
-        )  # .cuda()
+        self.world_view_transform = torch.tensor(getWorld2View2(R, T, trans, scale)).transpose(0, 1)  # .cuda()
         self.projection_matrix = getProjectionMatrix(
             znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy
         ).transpose(
             0, 1
         )  # .cuda()
         self.full_proj_transform = (
-            self.world_view_transform.unsqueeze(0).bmm(
-                self.projection_matrix.unsqueeze(0)
-            )
+            self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))
         ).squeeze(0)
         self.camera_center = self.world_view_transform.inverse()[3, :3]
 
@@ -112,9 +106,7 @@ class TemporalCamera(nn.Module):
         ndcx = ndcx.unsqueeze(-1)
         ndcy = ndcy.unsqueeze(-1)  # * (-1.0)
 
-        ndccamera = torch.cat(
-            (ndcx, ndcy, torch.ones_like(ndcy) * (1.0), torch.ones_like(ndcy)), 2
-        )  # N,4
+        ndccamera = torch.cat((ndcx, ndcy, torch.ones_like(ndcy) * (1.0), torch.ones_like(ndcy)), 2)  # N,4
 
         projected = ndccamera @ projectinverse.T
         diretioninlocal = projected / projected[:, :, 3:]  # v
@@ -180,12 +172,8 @@ class TemporalCamera_Flow(nn.Module):
         super(TemporalCamera_Flow, self).__init__()
 
         if fwd_flow is None or fwd_flow.dim() == 0:
-            fwd_flow = torch.from_numpy(
-                np.zeros((image.shape[1], image.shape[2], 2)).astype(float)
-            )
-            fwd_flow_mask = 1.0 - torch.from_numpy(
-                np.ones((image.shape[1], image.shape[2])).astype(float)
-            )  # all false
+            fwd_flow = torch.from_numpy(np.zeros((image.shape[1], image.shape[2], 2)).astype(float))
+            fwd_flow_mask = 1.0 - torch.from_numpy(np.ones((image.shape[1], image.shape[2])).astype(float))  # all false
             time_post = -1.0  # negative time denotes no post
             R_post = np.zeros_like(R)
             T_post = np.zeros_like(T)
@@ -193,12 +181,8 @@ class TemporalCamera_Flow(nn.Module):
             FoVy_post = np.zeros_like(FoVy)
 
         if bwd_flow is None or bwd_flow.dim() == 0:
-            bwd_flow = torch.from_numpy(
-                np.zeros((image.shape[1], image.shape[2], 2)).astype(float)
-            )
-            bwd_flow_mask = 1.0 - torch.from_numpy(
-                np.ones((image.shape[1], image.shape[2])).astype(float)
-            )  # all false
+            bwd_flow = torch.from_numpy(np.zeros((image.shape[1], image.shape[2], 2)).astype(float))
+            bwd_flow_mask = 1.0 - torch.from_numpy(np.ones((image.shape[1], image.shape[2])).astype(float))  # all false
             time_prev = -1.0  # negative time denotes no prev
             R_prev = np.zeros_like(R)
             T_prev = np.zeros_like(T)
@@ -257,28 +241,20 @@ class TemporalCamera_Flow(nn.Module):
         self.trans = trans
         self.scale = scale
 
-        self.world_view_transform = torch.tensor(
-            getWorld2View2(R, T, trans, scale)
-        ).transpose(
-            0, 1
-        )  # .cuda()
+        self.world_view_transform = torch.tensor(getWorld2View2(R, T, trans, scale)).transpose(0, 1)  # .cuda()
         self.projection_matrix = getProjectionMatrix(
             znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy
         ).transpose(
             0, 1
         )  # .cuda()
         self.full_proj_transform = (
-            self.world_view_transform.unsqueeze(0).bmm(
-                self.projection_matrix.unsqueeze(0)
-            )
+            self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))
         ).squeeze(0)
         self.camera_center = self.world_view_transform.inverse()[3, :3]
 
         # also compute above fore previous and post
         if self.time_prev >= 0.0:
-            self.world_view_transform_prev = torch.tensor(
-                getWorld2View2(R_prev, T_prev, trans, scale)
-            ).transpose(
+            self.world_view_transform_prev = torch.tensor(getWorld2View2(R_prev, T_prev, trans, scale)).transpose(
                 0, 1
             )  # .cuda()
             self.projection_matrix_prev = getProjectionMatrix(
@@ -290,9 +266,7 @@ class TemporalCamera_Flow(nn.Module):
                 0, 1
             )  # .cuda()
             self.full_proj_transform_prev = (
-                self.world_view_transform_prev.unsqueeze(0).bmm(
-                    self.projection_matrix_prev.unsqueeze(0)
-                )
+                self.world_view_transform_prev.unsqueeze(0).bmm(self.projection_matrix_prev.unsqueeze(0))
             ).squeeze(0)
             self.camera_center_prev = self.world_view_transform_prev.inverse()[3, :3]
         else:
@@ -302,9 +276,7 @@ class TemporalCamera_Flow(nn.Module):
             self.camera_center_prev = self.camera_center.detach()
 
         if self.time_post >= 0.0:
-            self.world_view_transform_post = torch.tensor(
-                getWorld2View2(R_post, T_post, trans, scale)
-            ).transpose(0, 1)
+            self.world_view_transform_post = torch.tensor(getWorld2View2(R_post, T_post, trans, scale)).transpose(0, 1)
             self.projection_matrix_post = getProjectionMatrix(
                 znear=self.znear,
                 zfar=self.zfar,
@@ -312,9 +284,7 @@ class TemporalCamera_Flow(nn.Module):
                 fovY=self.FoVy_post,
             ).transpose(0, 1)
             self.full_proj_transform_post = (
-                self.world_view_transform_post.unsqueeze(0).bmm(
-                    self.projection_matrix_post.unsqueeze(0)
-                )
+                self.world_view_transform_post.unsqueeze(0).bmm(self.projection_matrix_post.unsqueeze(0))
             ).squeeze(0)
             self.camera_center_post = self.world_view_transform_post.inverse()[3, :3]
         else:
@@ -341,9 +311,7 @@ class TemporalCamera_Flow(nn.Module):
         ndcx = ndcx.unsqueeze(-1)
         ndcy = ndcy.unsqueeze(-1)  # * (-1.0)
 
-        ndccamera = torch.cat(
-            (ndcx, ndcy, torch.ones_like(ndcy) * (1.0), torch.ones_like(ndcy)), 2
-        )  # N,4
+        ndccamera = torch.cat((ndcx, ndcy, torch.ones_like(ndcy) * (1.0), torch.ones_like(ndcy)), 2)  # N,4
 
         projected = ndccamera @ projectinverse.T
         diretioninlocal = projected / projected[:, :, 3:]  # v

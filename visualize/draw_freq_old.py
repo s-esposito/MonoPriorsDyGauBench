@@ -114,16 +114,12 @@ for method, final_name in zip(methods, final_names):
             if method in method_data[dataset][scene]:
                 y_positions[dataset].append(method_data[dataset][scene][method])
             else:
-                y_positions[dataset].append(
-                    np.nan
-                )  # Handle cases where train_time is missing
+                y_positions[dataset].append(np.nan)  # Handle cases where train_time is missing
 
     for i, dataset in enumerate(sorted_df.columns):
         y = y_positions[dataset]
         x = sorted_df[dataset].dropna()
-        y = np.array(
-            [y[idx] for idx in x.index]
-        )  # Align y values with x values and convert to numpy array
+        y = np.array([y[idx] for idx in x.index])  # Align y values with x values and convert to numpy array
         x = x.values  # Convert x to numpy array
 
         all_x.extend(x)

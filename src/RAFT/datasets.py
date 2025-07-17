@@ -99,9 +99,7 @@ class FlowDataset(data.Dataset):
 
 
 class MpiSintel(FlowDataset):
-    def __init__(
-        self, aug_params=None, split="training", root="datasets/Sintel", dstype="clean"
-    ):
+    def __init__(self, aug_params=None, split="training", root="datasets/Sintel", dstype="clean"):
         super(MpiSintel, self).__init__(aug_params)
         flow_root = osp.join(root, split, "flow")
         image_root = osp.join(root, split, dstype)
@@ -120,9 +118,7 @@ class MpiSintel(FlowDataset):
 
 
 class FlyingChairs(FlowDataset):
-    def __init__(
-        self, aug_params=None, split="train", root="datasets/FlyingChairs_release/data"
-    ):
+    def __init__(self, aug_params=None, split="train", root="datasets/FlyingChairs_release/data"):
         super(FlyingChairs, self).__init__(aug_params)
 
         images = sorted(glob(osp.join(root, "*.ppm")))
@@ -132,17 +128,13 @@ class FlyingChairs(FlowDataset):
         split_list = np.loadtxt("chairs_split.txt", dtype=np.int32)
         for i in range(len(flows)):
             xid = split_list[i]
-            if (split == "training" and xid == 1) or (
-                split == "validation" and xid == 2
-            ):
+            if (split == "training" and xid == 1) or (split == "validation" and xid == 2):
                 self.flow_list += [flows[i]]
                 self.image_list += [[images[2 * i], images[2 * i + 1]]]
 
 
 class FlyingThings3D(FlowDataset):
-    def __init__(
-        self, aug_params=None, root="datasets/FlyingThings3D", dstype="frames_cleanpass"
-    ):
+    def __init__(self, aug_params=None, root="datasets/FlyingThings3D", dstype="frames_cleanpass"):
         super(FlyingThings3D, self).__init__(aug_params)
 
         for cam in ["left"]:
@@ -190,12 +182,8 @@ class HD1K(FlowDataset):
 
         seq_ix = 0
         while 1:
-            flows = sorted(
-                glob(os.path.join(root, "hd1k_flow_gt", "flow_occ/%06d_*.png" % seq_ix))
-            )
-            images = sorted(
-                glob(os.path.join(root, "hd1k_input", "image_2/%06d_*.png" % seq_ix))
-            )
+            flows = sorted(glob(os.path.join(root, "hd1k_flow_gt", "flow_occ/%06d_*.png" % seq_ix)))
+            images = sorted(glob(os.path.join(root, "hd1k_input", "image_2/%06d_*.png" % seq_ix)))
 
             if len(flows) == 0:
                 break
@@ -258,13 +246,7 @@ def fetch_dataloader(args, TRAIN_DS="C+T+K+S+H"):
                     "do_flip": True,
                 }
             )
-            train_dataset = (
-                100 * sintel_clean
-                + 100 * sintel_final
-                + 200 * kitti
-                + 5 * hd1k
-                + things
-            )
+            train_dataset = 100 * sintel_clean + 100 * sintel_final + 200 * kitti + 5 * hd1k + things
 
         elif TRAIN_DS == "C+T+K/S":
             train_dataset = 100 * sintel_clean + 100 * sintel_final + things

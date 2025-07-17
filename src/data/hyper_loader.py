@@ -85,9 +85,7 @@ class Load_hyper_data(Dataset):
         self.split = split
         if eval:
             if len(self.val_id) == 0:
-                self.i_train = np.array(
-                    [i for i in np.arange(len(self.all_img)) if (i % 4 == 0)]
-                )
+                self.i_train = np.array([i for i in np.arange(len(self.all_img)) if (i % 4 == 0)])
                 self.i_test = self.i_train + 2
                 self.i_test = self.i_test[:-1,]
             else:
@@ -125,10 +123,7 @@ class Load_hyper_data(Dataset):
 
         self.load_mask = load_mask
         if self.load_mask:
-            self.all_masks = [
-                f"{datadir}/resized_mask/{int(1/ratio)}x/{i}.png.png"
-                for i in self.all_img
-            ]
+            self.all_masks = [f"{datadir}/resized_mask/{int(1/ratio)}x/{i}.png.png" for i in self.all_img]
 
         self.all_img = [f"{datadir}/rgb/{int(1/ratio)}x/{i}.png" for i in self.all_img]
         self.h, self.w = self.all_cam_params[0].image_shape
@@ -141,10 +136,7 @@ class Load_hyper_data(Dataset):
         if self.load_flow:
 
             # Create dictionaries to store the mapping of (prefix, image_id) to index
-            all_dict = {
-                extract_prefix_and_id(self.all_img[idx]): idx
-                for idx in range(len(self.all_img))
-            }
+            all_dict = {extract_prefix_and_id(self.all_img[idx]): idx for idx in range(len(self.all_img))}
 
             # Initialize the lists
             self.i_train_prev = [None] * len(self.i_train)
@@ -214,9 +206,7 @@ class Load_hyper_data(Dataset):
                     self.i_train_post[index],
                 )
             elif self.split == "test":
-                return self.load_raw_flow(
-                    self.i_test[index], self.i_test_prev[index], self.i_test_post[index]
-                )
+                return self.load_raw_flow(self.i_test[index], self.i_test_prev[index], self.i_test_post[index])
             elif self.split == "video":
                 assert False, "Not Implemented Yet"
                 return self.load_video_flow(self.i_video[index])
@@ -412,9 +402,7 @@ class Load_hyper_data(Dataset):
                 FovX_prev = focal2fov(camera_prev.focal_length, w)
 
             image_name_prev = self.all_img[idx_prev].split("/")[-1]
-            bwd_flow_path = os.path.join(
-                flow_path, f"{os.path.splitext(image_name_prev)[0]}_bwd.npz"
-            )
+            bwd_flow_path = os.path.join(flow_path, f"{os.path.splitext(image_name_prev)[0]}_bwd.npz")
             bwd_data = np.load(bwd_flow_path)
             bwd_flow = torch.from_numpy(bwd_data["flow"])
             bwd_flow_mask = torch.from_numpy(bwd_data["mask"])
@@ -439,9 +427,7 @@ class Load_hyper_data(Dataset):
                 FovY_post = focal2fov(camera_post.focal_length, h)
                 FovX_post = focal2fov(camera_post.focal_length, w)
 
-            fwd_flow_path = os.path.join(
-                flow_path, f"{os.path.splitext(image_name)[0]}_fwd.npz"
-            )
+            fwd_flow_path = os.path.join(flow_path, f"{os.path.splitext(image_name)[0]}_fwd.npz")
             fwd_data = np.load(fwd_flow_path)
             fwd_flow = torch.from_numpy(fwd_data["flow"])
             fwd_flow_mask = torch.from_numpy(fwd_data["mask"])

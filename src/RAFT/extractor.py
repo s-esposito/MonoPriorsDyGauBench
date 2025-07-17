@@ -7,9 +7,7 @@ class ResidualBlock(nn.Module):
     def __init__(self, in_planes, planes, norm_fn="group", stride=1):
         super(ResidualBlock, self).__init__()
 
-        self.conv1 = nn.Conv2d(
-            in_planes, planes, kernel_size=3, padding=1, stride=stride
-        )
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
         self.relu = nn.ReLU(inplace=True)
 
@@ -43,9 +41,7 @@ class ResidualBlock(nn.Module):
             self.downsample = None
 
         else:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3
-            )
+            self.downsample = nn.Sequential(nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
 
     def forward(self, x):
         y = x
@@ -63,9 +59,7 @@ class BottleneckBlock(nn.Module):
         super(BottleneckBlock, self).__init__()
 
         self.conv1 = nn.Conv2d(in_planes, planes // 4, kernel_size=1, padding=0)
-        self.conv2 = nn.Conv2d(
-            planes // 4, planes // 4, kernel_size=3, padding=1, stride=stride
-        )
+        self.conv2 = nn.Conv2d(planes // 4, planes // 4, kernel_size=3, padding=1, stride=stride)
         self.conv3 = nn.Conv2d(planes // 4, planes, kernel_size=1, padding=0)
         self.relu = nn.ReLU(inplace=True)
 
@@ -103,9 +97,7 @@ class BottleneckBlock(nn.Module):
             self.downsample = None
 
         else:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4
-            )
+            self.downsample = nn.Sequential(nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4)
 
     def forward(self, x):
         y = x

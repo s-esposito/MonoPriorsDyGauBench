@@ -98,9 +98,7 @@ legend_ax.axis("off")
 # Create dummy points for legend
 for i, dataset in enumerate(dataset_names):
     legend_ax.scatter([], [], color=list(colors.values())[i], label=dataset, s=100)
-legend_ax.scatter(
-    [], [], color="black", marker="*", s=200, label="Mean", edgecolor="black"
-)
+legend_ax.scatter([], [], color="black", marker="*", s=200, label="Mean", edgecolor="black")
 legend_ax.plot([], [], color="black", linestyle="-", linewidth=2, label="Linear Fit")
 
 # Create the legend

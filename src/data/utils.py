@@ -158,10 +158,7 @@ class Camera:
         )
 
     def to_json(self):
-        return {
-            k: (v.tolist() if hasattr(v, "tolist") else v)
-            for k, v in self.get_parameters().items()
-        }
+        return {k: (v.tolist() if hasattr(v, "tolist") else v) for k, v in self.get_parameters().items()}
 
     def get_parameters(self):
         return {
@@ -229,9 +226,7 @@ class Camera:
     def pixel_to_local_rays(self, pixels: np.ndarray):
         """Returns the local ray directions for the provided pixels."""
         y = (pixels[..., 1] - self.principal_point_y) / self.scale_factor_y
-        x = (
-            pixels[..., 0] - self.principal_point_x - y * self.skew
-        ) / self.scale_factor_x
+        x = (pixels[..., 0] - self.principal_point_x - y * self.skew) / self.scale_factor_x
 
         if self.has_radial_distortion or self.has_tangential_distortion:
             x, y = _radial_and_tangential_undistort(
@@ -259,10 +254,7 @@ class Camera:
         if pixels.shape[-1] != 2:
             raise ValueError("The last dimension of pixels must be 2.")
         if pixels.dtype != self.dtype:
-            raise ValueError(
-                f"pixels dtype ({pixels.dtype!r}) must match camera "
-                f"dtype ({self.dtype!r})"
-            )
+            raise ValueError(f"pixels dtype ({pixels.dtype!r}) must match camera " f"dtype ({self.dtype!r})")
 
         batch_shape = pixels.shape[:-1]
         pixels = np.reshape(pixels, (-1, 2))
@@ -279,10 +271,7 @@ class Camera:
     def pixels_to_points(self, pixels: np.ndarray, depth: np.ndarray):
         rays_through_pixels = self.pixels_to_rays(pixels)
         cosa = np.matmul(rays_through_pixels, self.optical_axis)
-        points = (
-            rays_through_pixels * depth[..., np.newaxis] / cosa[..., np.newaxis]
-            + self.position
-        )
+        points = rays_through_pixels * depth[..., np.newaxis] / cosa[..., np.newaxis] + self.position
         return points
 
     def points_to_local_points(self, points: np.ndarray):
@@ -303,8 +292,7 @@ class Camera:
 
         # Apply radial distortion.
         distortion = 1.0 + r2 * (
-            self.radial_distortion[0]
-            + r2 * (self.radial_distortion[1] + self.radial_distortion[2] * r2)
+            self.radial_distortion[0] + r2 * (self.radial_distortion[1] + self.radial_distortion[2] * r2)
         )
 
         # Apply tangential distortion.
@@ -408,9 +396,7 @@ class Camera:
         look_at_camera.orientation = camera_rotation
         return look_at_camera
 
-    def crop_image_domain(
-        self, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0
-    ):
+    def crop_image_domain(self, left: int = 0, right: int = 0, top: int = 0, bottom: int = 0):
         """Returns a copy of the camera with adjusted image bounds.
 
         Args:
@@ -437,12 +423,8 @@ class Camera:
             raise ValueError("Crop would result in non-positive image dimensions.")
 
         new_camera = self.copy()
-        new_camera.image_size = np.array(
-            [int(new_resolution[0]), int(new_resolution[1])]
-        )
-        new_camera.principal_point = np.array(
-            [new_principal_point[0], new_principal_point[1]]
-        )
+        new_camera.image_size = np.array([int(new_resolution[0]), int(new_resolution[1])])
+        new_camera.principal_point = np.array([new_principal_point[0], new_principal_point[1]])
         return new_camera
 
     def copy(self):

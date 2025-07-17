@@ -57,9 +57,7 @@ def write_pfm(path, image, scale=1):
 
         if len(image.shape) == 3 and image.shape[2] == 3:  # color image
             color = True
-        elif (
-            len(image.shape) == 2 or len(image.shape) == 3 and image.shape[2] == 1
-        ):  # greyscale
+        elif len(image.shape) == 2 or len(image.shape) == 3 and image.shape[2] == 1:  # greyscale
             color = False
         else:
             raise Exception("Image must have H x W x 3, H x W x 1 or H x W dimensions.")
@@ -99,13 +97,9 @@ def write_depth(path, depth, bits=1, absolute_depth=False):
             out = np.zeros(depth.shape, dtype=depth.dtype)
 
     if bits == 1:
-        cv2.imwrite(
-            path + ".png", out.astype("uint8"), [cv2.IMWRITE_PNG_COMPRESSION, 0]
-        )
+        cv2.imwrite(path + ".png", out.astype("uint8"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
     elif bits == 2:
-        cv2.imwrite(
-            path + ".png", out.astype("uint16"), [cv2.IMWRITE_PNG_COMPRESSION, 0]
-        )
+        cv2.imwrite(path + ".png", out.astype("uint16"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
     return
 
@@ -194,9 +188,7 @@ def write_pfm(path, image, scale=1):
 
         if len(image.shape) == 3 and image.shape[2] == 3:  # color image
             color = True
-        elif (
-            len(image.shape) == 2 or len(image.shape) == 3 and image.shape[2] == 1
-        ):  # greyscale
+        elif len(image.shape) == 2 or len(image.shape) == 3 and image.shape[2] == 1:  # greyscale
             color = False
         else:
             raise Exception("Image must have H x W x 3, H x W x 1 or H x W dimensions.")
@@ -255,9 +247,7 @@ def resize_image(img):
 
     img_resized = cv2.resize(img, (width, height), interpolation=cv2.INTER_AREA)
 
-    img_resized = (
-        torch.from_numpy(np.transpose(img_resized, (2, 0, 1))).contiguous().float()
-    )
+    img_resized = torch.from_numpy(np.transpose(img_resized, (2, 0, 1))).contiguous().float()
     img_resized = img_resized.unsqueeze(0)
 
     return img_resized
@@ -276,9 +266,7 @@ def resize_depth(depth, width, height):
     """
     depth = torch.squeeze(depth[0, :, :, :]).to("cpu")
 
-    depth_resized = cv2.resize(
-        depth.numpy(), (width, height), interpolation=cv2.INTER_CUBIC
-    )
+    depth_resized = cv2.resize(depth.numpy(), (width, height), interpolation=cv2.INTER_CUBIC)
 
     return depth_resized
 
@@ -371,9 +359,7 @@ def run(input_path, output_path, model_path, model_type="dpt_hybrid", optimize=T
         net_w = net_h = 384
 
         model = MidasNet_large(model_path, non_negative=True)
-        normalization = NormalizeImage(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        )
+        normalization = NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     else:
         assert (
             False
@@ -455,9 +441,7 @@ def run(input_path, output_path, model_path, model_type="dpt_hybrid", optimize=T
             if model_type == "dpt_hybrid_nyu":
                 prediction *= 1000.0
 
-        filename = os.path.join(
-            output_path, os.path.splitext(os.path.basename(img_name))[0]
-        )
+        filename = os.path.join(output_path, os.path.splitext(os.path.basename(img_name))[0])
         write_depth(filename, prediction, bits=2, absolute_depth=args.absolute_depth)
 
     print("finished")
@@ -466,9 +450,7 @@ def run(input_path, output_path, model_path, model_type="dpt_hybrid", optimize=T
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "-i", "--input_path", required=True, help="folder with input images"
-    )
+    parser.add_argument("-i", "--input_path", required=True, help="folder with input images")
 
     parser.add_argument(
         "-o",

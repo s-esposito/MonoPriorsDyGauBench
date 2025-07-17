@@ -110,9 +110,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         times = np.unique(times)
 
         # record time interval for potential AST
-        assert (np.min(times) >= 0.0) and (
-            np.max(times) <= 1.0
-        ), "Time should be in [0, 1]"
+        assert (np.min(times) >= 0.0) and (np.max(times) <= 1.0), "Time should be in [0, 1]"
         self.time_interval = 1.0 / float(len(times))
 
         if self.num_pts:
@@ -120,10 +118,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             mean_xyz = np.mean(xyz, axis=0)
             min_rand_xyz = mean_xyz - np.array([0.5, 0.5, 0.5])
             max_rand_xyz = mean_xyz + np.array([0.5, 2.0, 0.5])
-            xyz = (
-                np.random.random((num_pts, 3)) * (max_rand_xyz - min_rand_xyz)
-                + min_rand_xyz
-            )
+            xyz = np.random.random((num_pts, 3)) * (max_rand_xyz - min_rand_xyz) + min_rand_xyz
 
             shs = np.random.random((num_pts, 3)) / 255.0
 
@@ -136,8 +131,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             xyz = np.concatenate(
                 [
                     xyz,
-                    np.random.random((num_pts, 3)) * (max_rand_xyz - min_rand_xyz)
-                    + min_rand_xyz,
+                    np.random.random((num_pts, 3)) * (max_rand_xyz - min_rand_xyz) + min_rand_xyz,
                 ],
                 axis=0,
             )

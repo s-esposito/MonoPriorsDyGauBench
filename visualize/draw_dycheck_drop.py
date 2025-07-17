@@ -3,9 +3,7 @@ from collections import defaultdict
 
 
 def create_markdown_table(data, title):
-    table = (
-        f"| Method | PSNR↑ | SSIM↑ | LPIPS↓ |\n|--------|-------|-------|--------|\n"
-    )
+    table = f"| Method | PSNR↑ | SSIM↑ | LPIPS↓ |\n|--------|-------|-------|--------|\n"
     for row in data:
         table += f"| {row[0]} | {row[1]} | {row[2]} | {row[3]} |\n"
     table += f"\n{title}\n\n"
@@ -56,30 +54,18 @@ for dataset in datasets:
                 continue
 
             for scene in result_final[sub_dataset][method]:
-                if (
-                    scene == "all"
-                    or len(result_final[sub_dataset][method][scene]["test_psnr"]) == 0
-                ):
+                if scene == "all" or len(result_final[sub_dataset][method][scene]["test_psnr"]) == 0:
                     continue
 
-                psnr = sum(
-                    [
-                        x[0]
-                        for x in result_final[sub_dataset][method][scene]["test_psnr"]
-                    ]
-                ) / len(result_final[sub_dataset][method][scene]["test_psnr"])
-                ssim = sum(
-                    [
-                        x[0]
-                        for x in result_final[sub_dataset][method][scene]["test_ssim"]
-                    ]
-                ) / len(result_final[sub_dataset][method][scene]["test_ssim"])
-                lpips = sum(
-                    [
-                        x[0]
-                        for x in result_final[sub_dataset][method][scene]["test_lpips"]
-                    ]
-                ) / len(result_final[sub_dataset][method][scene]["test_lpips"])
+                psnr = sum([x[0] for x in result_final[sub_dataset][method][scene]["test_psnr"]]) / len(
+                    result_final[sub_dataset][method][scene]["test_psnr"]
+                )
+                ssim = sum([x[0] for x in result_final[sub_dataset][method][scene]["test_ssim"]]) / len(
+                    result_final[sub_dataset][method][scene]["test_ssim"]
+                )
+                lpips = sum([x[0] for x in result_final[sub_dataset][method][scene]["test_lpips"]]) / len(
+                    result_final[sub_dataset][method][scene]["test_lpips"]
+                )
 
                 scene_metrics["psnr"].append(psnr)
                 scene_metrics["ssim"].append(ssim)

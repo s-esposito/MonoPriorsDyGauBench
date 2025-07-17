@@ -97,23 +97,16 @@ def generate_latex_table(data, method_mapping, metric_mapping):
         "train_time": "down",
     }
 
-    latex_code = (
-        "\\begin{table}[h!]\n\\renewcommand{\\arraystretch}{1.05}\n\\centering\n"
-    )
+    latex_code = "\\begin{table}[h!]\n\\renewcommand{\\arraystretch}{1.05}\n\\centering\n"
     latex_code += f"\\caption{{\\textbf{{Summary of Quantitative Results.}} Table shows a summarized quantitative evaluation of all methods averaged across {dataset_name}.}}\n"
     latex_code += f"\\label{{tab:all_methods_{labelname}_metrics}}\n"
     latex_code += "\\begin{tabular}{l|" + "c" * len(metrics) + "}\n"
     latex_code += "\\toprule"
     latex_code += (
-        "\nMethod\\textbackslash Metric & "
-        + " & ".join(metric_mapping[m] for m in metrics)
-        + " \\\\\n\\hline\n"
+        "\nMethod\\textbackslash Metric & " + " & ".join(metric_mapping[m] for m in metrics) + " \\\\\n\\hline\n"
     )
 
-    mean_values = {
-        method: {metric: np.mean(data[method][metric]) for metric in metrics}
-        for method in methods
-    }
+    mean_values = {method: {metric: np.mean(data[method][metric]) for metric in metrics} for method in methods}
 
     for metric in metrics:
         values = [(method, mean_values[method][metric]) for method in methods]
@@ -158,7 +151,5 @@ def generate_latex_table(data, method_mapping, metric_mapping):
 
 
 # Generate and print LaTeX code
-latex_code = generate_latex_table(
-    formatted_metrics, method_name_mapping, metric_name_mapping
-)
+latex_code = generate_latex_table(formatted_metrics, method_name_mapping, metric_name_mapping)
 print(latex_code)

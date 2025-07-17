@@ -75,9 +75,7 @@ class CorrLayer(torch.autograd.Function):
     def backward(ctx, grad_corr):
         fmap1, fmap2, coords = ctx.saved_tensors
         grad_corr = grad_corr.contiguous()
-        fmap1_grad, fmap2_grad, coords_grad = correlation_cudaz.backward(
-            fmap1, fmap2, coords, grad_corr, ctx.r
-        )
+        fmap1_grad, fmap2_grad, coords_grad = correlation_cudaz.backward(fmap1, fmap2, coords, grad_corr, ctx.r)
         return fmap1_grad, fmap2_grad, coords_grad, None
 
 

@@ -20,9 +20,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-def visualize_lines_to_lookat(
-    points, viewdirs, lookat_point, lookat_train, lookat_test, output_path, N_train, pcd
-):
+def visualize_lines_to_lookat(points, viewdirs, lookat_point, lookat_train, lookat_test, output_path, N_train, pcd):
     endpoints = viewdirs + points  # look at negative direction of z-axis
     fig = plt.figure(figsize=(8, 6))
     num_points = points.shape[0]
@@ -103,9 +101,7 @@ def visualize_lines_to_lookat(
             alpha=0.3,
         )
     # Plot the test lookat point
-    ax.scatter(
-        lookat_test[0], lookat_test[1], lookat_test[2], c="blue", marker="x", alpha=0.5
-    )
+    ax.scatter(lookat_test[0], lookat_test[1], lookat_test[2], c="blue", marker="x", alpha=0.5)
     # Connect each point to the lookat point with a line
     for point in points[N_train:]:
         ax.plot(
@@ -127,15 +123,9 @@ def visualize_lines_to_lookat(
     # Adjust the aspect ratio
     # ax.set_box_aspect((np.ptp(xs), np.ptp(ys), np.ptp(zs)))
     # Calculate the range for each axis considering all points
-    all_xs = np.concatenate(
-        [xs, xe, [lookat_point[0]], [lookat_train[0]], [lookat_test[0]], pcd_xs]
-    )
-    all_ys = np.concatenate(
-        [ys, ye, [lookat_point[1]], [lookat_train[1]], [lookat_test[1]], pcd_ys]
-    )
-    all_zs = np.concatenate(
-        [zs, ze, [lookat_point[2]], [lookat_train[2]], [lookat_test[2]], pcd_zs]
-    )
+    all_xs = np.concatenate([xs, xe, [lookat_point[0]], [lookat_train[0]], [lookat_test[0]], pcd_xs])
+    all_ys = np.concatenate([ys, ye, [lookat_point[1]], [lookat_train[1]], [lookat_test[1]], pcd_ys])
+    all_zs = np.concatenate([zs, ze, [lookat_point[2]], [lookat_train[2]], [lookat_test[2]], pcd_zs])
 
     max_range = np.array(
         [
@@ -165,9 +155,7 @@ def ray_triangulate(startpoints, endpoints, weights=None):
         weights = np.ones(len(startpoints))  # Default equal weights if not provided
 
     if len(startpoints) != len(endpoints) or len(startpoints) != len(weights):
-        raise ValueError(
-            "The number of startpoints, endpoints, and weights must be the same."
-        )
+        raise ValueError("The number of startpoints, endpoints, and weights must be the same.")
 
     num_rays = len(startpoints)
 
@@ -195,9 +183,7 @@ def ray_triangulate(startpoints, endpoints, weights=None):
 
         # Fill the corresponding rows in A and b
         A[3 * i : 3 * (i + 1), :] = weight * cross_matrix
-        b[3 * i : 3 * (i + 1), :] = weight * np.dot(
-            cross_matrix, startpoint.reshape(3, 1)
-        )
+        b[3 * i : 3 * (i + 1), :] = weight * np.dot(cross_matrix, startpoint.reshape(3, 1))
 
     # Solve the least squares problem
     lookat_point, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
@@ -240,27 +226,16 @@ def ray_triangulate_old(startpoints, endpoints, weights, name="ray_triangulate")
     endpoints = torch.as_tensor(endpoints)
     weights = torch.as_tensor(weights)
 
-    if (
-        startpoints.dim() < 2
-        or startpoints.shape[-1] != 3
-        or startpoints.shape[-2] <= 1
-    ):
+    if startpoints.dim() < 2 or startpoints.shape[-1] != 3 or startpoints.shape[-2] <= 1:
         raise ValueError("startpoints must have shape [A1, ..., An, V, 3] with V > 1")
     if endpoints.dim() < 2 or endpoints.shape[-1] != 3 or endpoints.shape[-2] <= 1:
         raise ValueError("endpoints must have shape [A1, ..., An, V, 3] with V > 1")
-    if (
-        startpoints.shape[:-2] != endpoints.shape[:-2]
-        or endpoints.shape[:-2] != weights.shape[:-1]
-    ):
-        raise ValueError(
-            "batch dimensions of startpoints, endpoints, and weights must match"
-        )
+    if startpoints.shape[:-2] != endpoints.shape[:-2] or endpoints.shape[:-2] != weights.shape[:-1]:
+        raise ValueError("batch dimensions of startpoints, endpoints, and weights must match")
     if torch.any(weights <= 0):
         raise ValueError("weights must have all positive entries")
     if torch.sum(weights > 0, dim=-1).min() < 2:
-        raise ValueError(
-            "weights must have at least two non-zero entries for each point"
-        )
+        raise ValueError("weights must have at least two non-zero entries for each point")
 
     left_hand_side_list = []
     right_hand_side_list = []
@@ -281,15 +256,11 @@ def ray_triangulate_old(startpoints, endpoints, weights, name="ray_triangulate")
         )  # value: ..., 3, 3
         # assert False, [cross_product_matrix.shape, cross_product_matrix_shape]
         # cross_product_matrix = cross_product_matrix.reshape(cross_product_matrix_shape)
-        cross_product_matrix = cross_product_matrix.reshape(
-            tuple(cross_product_matrix_shape.tolist())
-        )  # ..., 3, 3
+        cross_product_matrix = cross_product_matrix.reshape(tuple(cross_product_matrix_shape.tolist()))  # ..., 3, 3
         weights_single_ray = weights_single_ray.unsqueeze(-1).unsqueeze(-1)  # ..., 1, 1
         left_hand_side = weights_single_ray * cross_product_matrix  # ..., 3, 3
         left_hand_side_list.append(left_hand_side)
-        dot_product = torch.matmul(
-            cross_product_matrix, startpoints_single_ray.unsqueeze(-1)
-        )  # ..., 3, 1
+        dot_product = torch.matmul(cross_product_matrix, startpoints_single_ray.unsqueeze(-1))  # ..., 3, 1
         right_hand_side = weights_single_ray * dot_product  # ..., 3, 1
         right_hand_side_list.append(right_hand_side)
     left_hand_side_multi_rays = torch.cat(left_hand_side_list, dim=-2)
@@ -298,9 +269,7 @@ def ray_triangulate_old(startpoints, endpoints, weights, name="ray_triangulate")
     # assert False, [left_hand_side_multi_rays.shape, right_hand_side_multi_rays.shape]
     # assert False, [torch.any(torch.isnan(left_hand_side_multi_rays)), torch.any(torch.isnan(right_hand_side_multi_rays))]
 
-    points = torch.linalg.lstsq(
-        right_hand_side_multi_rays, left_hand_side_multi_rays
-    ).solution
+    points = torch.linalg.lstsq(right_hand_side_multi_rays, left_hand_side_multi_rays).solution
     # points = torch.mean(points, dim=0)
 
     points = points.squeeze(-2)
@@ -353,17 +322,13 @@ def run(pcd, train_dataset, test_dataset, ratio, fps, negative_zaxis=True):
 
     ############### step 2: get camera's orientations and positions  ####################
     # world2view matrixs
-    w2c_train = np.stack(
-        [item["world_view_transform"].T for item in train_dataset], axis=0
-    )
+    w2c_train = np.stack([item["world_view_transform"].T for item in train_dataset], axis=0)
     c2w_train = np.stack(
         [torch.linalg.inv(item["world_view_transform"].T) for item in train_dataset],
         axis=0,
     )
 
-    w2c_test = np.stack(
-        [item["world_view_transform"].T for item in test_dataset], axis=0
-    )
+    w2c_test = np.stack([item["world_view_transform"].T for item in test_dataset], axis=0)
     c2w_test = np.stack(
         [torch.linalg.inv(item["world_view_transform"].T) for item in test_dataset],
         axis=0,

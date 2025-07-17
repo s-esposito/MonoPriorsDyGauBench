@@ -32,9 +32,7 @@ def warp_flow(img, flow):
     flow_new[:, :, 0] += np.arange(w)
     flow_new[:, :, 1] += np.arange(h)[:, np.newaxis]
 
-    res = cv2.remap(
-        img, flow_new, None, cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT
-    )
+    res = cv2.remap(img, flow_new, None, cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT)
     return res
 
 
@@ -45,20 +43,14 @@ def compute_fwdbwd_mask(fwd_flow, bwd_flow):
     bwd2fwd_flow = warp_flow(bwd_flow, fwd_flow)
     fwd_lr_error = np.linalg.norm(fwd_flow + bwd2fwd_flow, axis=-1)
     fwd_mask = (
-        fwd_lr_error
-        < alpha_1
-        * (np.linalg.norm(fwd_flow, axis=-1) + np.linalg.norm(bwd2fwd_flow, axis=-1))
-        + alpha_2
+        fwd_lr_error < alpha_1 * (np.linalg.norm(fwd_flow, axis=-1) + np.linalg.norm(bwd2fwd_flow, axis=-1)) + alpha_2
     )
 
     fwd2bwd_flow = warp_flow(fwd_flow, bwd_flow)
     bwd_lr_error = np.linalg.norm(bwd_flow + fwd2bwd_flow, axis=-1)
 
     bwd_mask = (
-        bwd_lr_error
-        < alpha_1
-        * (np.linalg.norm(bwd_flow, axis=-1) + np.linalg.norm(fwd2bwd_flow, axis=-1))
-        + alpha_2
+        bwd_lr_error < alpha_1 * (np.linalg.norm(bwd_flow, axis=-1) + np.linalg.norm(fwd2bwd_flow, axis=-1)) + alpha_2
     )
 
     return fwd_mask, bwd_mask
@@ -125,9 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir", type=str, help="Input image directory")
     parser.add_argument("--model", help="restore RAFT checkpoint")
     parser.add_argument("--small", action="store_true", help="use small model")
-    parser.add_argument(
-        "--mixed_precision", action="store_true", help="use mixed precision"
-    )
+    parser.add_argument("--mixed_precision", action="store_true", help="use mixed precision")
     args = parser.parse_args()
 
     input_path = os.path.join(args.dataset_path, args.input_dir)
@@ -136,9 +126,7 @@ if __name__ == "__main__":
     create_dir(output_path)
     # create_dir(output_img_path)
 
-    left_images = glob.glob(os.path.join(input_path, "*left*.png")) + glob.glob(
-        os.path.join(input_path, "*left*.jpg")
-    )
+    left_images = glob.glob(os.path.join(input_path, "*left*.png")) + glob.glob(os.path.join(input_path, "*left*.jpg"))
     right_images = glob.glob(os.path.join(input_path, "*right*.png")) + glob.glob(
         os.path.join(input_path, "*right*.jpg")
     )
@@ -147,9 +135,7 @@ if __name__ == "__main__":
         for img in os.listdir(input_path)
         if (img.endswith(".png") or img.endswith(".jpg"))
     ]
-    rest_images = [
-        img for img in rest_images if img not in left_images and img not in right_images
-    ]
+    rest_images = [img for img in rest_images if img not in left_images and img not in right_images]
 
     # assert False, rest_images
     # assert False, [left_images[:5], right_images[:5], rest_images[:5]]

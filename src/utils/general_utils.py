@@ -32,9 +32,7 @@ def PILtoTorch(pil_image, resolution=None):
         return resized_image.unsqueeze(dim=-1).permute(2, 0, 1)
 
 
-def get_expon_lr_func(
-    lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
-):
+def get_expon_lr_func(lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000):
     """
     Copied from Plenoxels
 
@@ -85,12 +83,7 @@ def strip_symmetric(sym):
 
 
 def build_rotation(r):
-    norm = torch.sqrt(
-        r[..., 0] * r[..., 0]
-        + r[..., 1] * r[..., 1]
-        + r[..., 2] * r[..., 2]
-        + r[..., 3] * r[..., 3]
-    )
+    norm = torch.sqrt(r[..., 0] * r[..., 0] + r[..., 1] * r[..., 1] + r[..., 2] * r[..., 2] + r[..., 3] * r[..., 3])
 
     q = r / norm[..., None]
     if len(list(r.shape)) == 3:
@@ -121,9 +114,7 @@ def update_quaternion(q, omega, delta_t):
     half_angle = magnitude_omega * delta_t / 2.0
     delta_q_cos = torch.cos(half_angle)
     delta_q_sin = (
-        torch.sin(half_angle)
-        * omega
-        / (magnitude_omega + torch.tensor([1e-8], dtype=torch.float, device="cuda"))
+        torch.sin(half_angle) * omega / (magnitude_omega + torch.tensor([1e-8], dtype=torch.float, device="cuda"))
     )
 
     delta_q = torch.cat((delta_q_cos, delta_q_sin), dim=1)
@@ -165,16 +156,8 @@ def build_rotation_4d(l, r):
     a, b, c, d = q_l.unbind(-1)
     p, q, r, s = q_r.unbind(-1)
 
-    M_l = (
-        torch.stack([a, -b, -c, -d, b, a, -d, c, c, d, a, -b, d, -c, b, a])
-        .view(4, 4, -1)
-        .permute(2, 0, 1)
-    )
-    M_r = (
-        torch.stack([p, q, r, s, -q, p, -s, r, -r, s, p, -q, -s, -r, q, p])
-        .view(4, 4, -1)
-        .permute(2, 0, 1)
-    )
+    M_l = torch.stack([a, -b, -c, -d, b, a, -d, c, c, d, a, -b, d, -c, b, a]).view(4, 4, -1).permute(2, 0, 1)
+    M_r = torch.stack([p, q, r, s, -q, p, -s, r, -r, s, p, -q, -s, -r, q, p]).view(4, 4, -1).permute(2, 0, 1)
     A = M_l @ M_r
     return A
 
@@ -205,9 +188,7 @@ def safe_state(silent):
                     old_f.write(
                         x.replace(
                             "\n",
-                            " [{}]\n".format(
-                                str(datetime.now().strftime("%d/%m %H:%M:%S"))
-                            ),
+                            " [{}]\n".format(str(datetime.now().strftime("%d/%m %H:%M:%S"))),
                         )
                     )
                 else:
@@ -224,9 +205,7 @@ def safe_state(silent):
     torch.cuda.set_device(torch.device("cuda:0"))
 
 
-def get_linear_noise_func(
-    lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
-):
+def get_linear_noise_func(lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000):
     """
     Copied from Plenoxels
 

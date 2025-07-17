@@ -125,9 +125,7 @@ def interpolate_point(pcd, N=4):
             xyznnpoints = knn(2, xyzinput, xyzinput, False)
 
             nearestneibourindx = xyznnpoints[0, 1].long()  # N x 1
-            spatialdistance = torch.norm(
-                xyzinput - xyzinput[:, nearestneibourindx, :], dim=2
-            )  #  1 x N
+            spatialdistance = torch.norm(xyzinput - xyzinput[:, nearestneibourindx, :], dim=2)  #  1 x N
             spatialdistance = spatialdistance.squeeze(0)
 
             diff_sorted, _ = torch.sort(spatialdistance)
@@ -146,9 +144,7 @@ def interpolate_point(pcd, N=4):
     newtime = np.concatenate(newtime, axis=0)
     assert newxyz.shape[0] == newcolor.shape[0]
 
-    newpcd = BasicPointCloud(
-        points=newxyz, colors=newcolor, normals=None, times=newtime
-    )
+    newpcd = BasicPointCloud(points=newxyz, colors=newcolor, normals=None, times=newtime)
 
     return newpcd
 
@@ -182,12 +178,8 @@ def interpolate_pointv3(pcd, N=4, m=0.25):
             xyzinput = xyzinput.unsqueeze(0).contiguous()  # 1 x N x 3
             xyznnpoints = knn(2, xyzinput, xyzinput, False)
 
-            nearestneibourindx = xyznnpoints[
-                0, 1
-            ].long()  # N x 1  skip the first one, we select the second closest one
-            spatialdistance = torch.norm(
-                xyzinput - xyzinput[:, nearestneibourindx, :], dim=2
-            )  #  1 x N
+            nearestneibourindx = xyznnpoints[0, 1].long()  # N x 1  skip the first one, we select the second closest one
+            spatialdistance = torch.norm(xyzinput - xyzinput[:, nearestneibourindx, :], dim=2)  #  1 x N
             spatialdistance = spatialdistance.squeeze(0)
 
             diff_sorted, _ = torch.sort(spatialdistance)
@@ -206,9 +198,7 @@ def interpolate_pointv3(pcd, N=4, m=0.25):
     newtime = np.concatenate(newtime, axis=0)
     assert newxyz.shape[0] == newcolor.shape[0]
 
-    newpcd = BasicPointCloud(
-        points=newxyz, colors=newcolor, normals=None, times=newtime
-    )
+    newpcd = BasicPointCloud(points=newxyz, colors=newcolor, normals=None, times=newtime)
 
     return newpcd
 
@@ -244,9 +234,7 @@ def interpolate_partuse(pcd, N=4):
     newtime = np.concatenate(newtime, axis=0)
     assert newxyz.shape[0] == newcolor.shape[0]
 
-    newpcd = BasicPointCloud(
-        points=newxyz, colors=newcolor, normals=None, times=newtime
-    )
+    newpcd = BasicPointCloud(points=newxyz, colors=newcolor, normals=None, times=newtime)
 
     return newpcd
 
@@ -287,12 +275,8 @@ def padding_point(pcd, N=4):
 
             xyznnpoints = knn(2, xyzinput, xyzinput, False)
 
-            nearestneibourindx = xyznnpoints[
-                0, 1
-            ].long()  # N x 1  skip the first one, we select the second closest one
-            spatialdistance = torch.norm(
-                xyzinput - xyzinput[:, nearestneibourindx, :], dim=2
-            )  #  1 x N
+            nearestneibourindx = xyznnpoints[0, 1].long()  # N x 1  skip the first one, we select the second closest one
+            spatialdistance = torch.norm(xyzinput - xyzinput[:, nearestneibourindx, :], dim=2)  #  1 x N
             spatialdistance = spatialdistance.squeeze(0)
 
             diff_sorted, _ = torch.sort(spatialdistance)
@@ -314,9 +298,7 @@ def padding_point(pcd, N=4):
     newtime = np.concatenate(newtime, axis=0)
     assert newxyz.shape[0] == newcolor.shape[0]
 
-    newpcd = BasicPointCloud(
-        points=newxyz, colors=newcolor, normals=None, times=newtime
-    )
+    newpcd = BasicPointCloud(points=newxyz, colors=newcolor, normals=None, times=newtime)
 
     return newpcd
 

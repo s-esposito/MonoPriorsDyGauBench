@@ -48,21 +48,13 @@ class RAFT(nn.Module):
 
         # feature network, context network, and update block
         if args.small:
-            self.fnet = SmallEncoder(
-                output_dim=128, norm_fn="instance", dropout=args.dropout
-            )
-            self.cnet = SmallEncoder(
-                output_dim=hdim + cdim, norm_fn="none", dropout=args.dropout
-            )
+            self.fnet = SmallEncoder(output_dim=128, norm_fn="instance", dropout=args.dropout)
+            self.cnet = SmallEncoder(output_dim=hdim + cdim, norm_fn="none", dropout=args.dropout)
             self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim)
 
         else:
-            self.fnet = BasicEncoder(
-                output_dim=256, norm_fn="instance", dropout=args.dropout
-            )
-            self.cnet = BasicEncoder(
-                output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout
-            )
+            self.fnet = BasicEncoder(output_dim=256, norm_fn="instance", dropout=args.dropout)
+            self.cnet = BasicEncoder(output_dim=hdim + cdim, norm_fn="batch", dropout=args.dropout)
             self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
 
     def freeze_bn(self):
@@ -92,9 +84,7 @@ class RAFT(nn.Module):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
-    def forward(
-        self, image1, image2, iters=12, flow_init=None, upsample=True, test_mode=False
-    ):
+    def forward(self, image1, image2, iters=12, flow_init=None, upsample=True, test_mode=False):
         """Estimate optical flow between pair of frames"""
 
         image1 = 2 * (image1 / 255.0) - 1.0

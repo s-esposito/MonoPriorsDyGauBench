@@ -73,11 +73,7 @@ else:
 
                     big_name, small_name = method.split("/")
                     # get this method's runs
-                    method_runs = [
-                        run
-                        for run in scene_runs
-                        if (run.name).startswith("_".join([big_name, small_name]))
-                    ]
+                    method_runs = [run for run in scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
 
                     exps = []
                     # run each variant for 3 times
@@ -92,20 +88,12 @@ else:
                         }
 
                         train_run = [
-                            run
-                            for run in method_runs
-                            if run.name
-                            == "_".join([big_name, small_name + run_id, "fit"])
+                            run for run in method_runs if run.name == "_".join([big_name, small_name + run_id, "fit"])
                         ]
                         test_run = [
-                            run
-                            for run in method_runs
-                            if run.name
-                            == "_".join([big_name, small_name + run_id, "test"])
+                            run for run in method_runs if run.name == "_".join([big_name, small_name + run_id, "test"])
                         ]
-                        local_path = os.path.join(
-                            scene_dir, big_name, small_name + run_id
-                        )
+                        local_path = os.path.join(scene_dir, big_name, small_name + run_id)
 
                         # skip this experiment if train run or test run is not found, or local path does not exist
                         # if (len(train_run) < 1) or (len(test_run) < 1) or (not os.path.isdir(local_path)):
@@ -124,29 +112,19 @@ else:
                             test_run = test_run[-1]
                             # skip this experiment if psnr is lower than 10 (means crashed)
                             test_psnr = float(
-                                test_run.history(keys=["test/avg_psnr"], pandas=False)[
-                                    0
-                                ]["test/avg_psnr"]
+                                test_run.history(keys=["test/avg_psnr"], pandas=False)[0]["test/avg_psnr"]
                             )
                             test_ssim = float(
-                                test_run.history(keys=["test/avg_ssim"], pandas=False)[
-                                    0
-                                ]["test/avg_ssim"]
+                                test_run.history(keys=["test/avg_ssim"], pandas=False)[0]["test/avg_ssim"]
                             )
                             test_msssim = float(
-                                test_run.history(
-                                    keys=["test/avg_msssim"], pandas=False
-                                )[0]["test/avg_msssim"]
+                                test_run.history(keys=["test/avg_msssim"], pandas=False)[0]["test/avg_msssim"]
                             )
                             test_lpips = float(
-                                test_run.history(keys=["test/avg_lpips"], pandas=False)[
-                                    0
-                                ]["test/avg_lpips"]
+                                test_run.history(keys=["test/avg_lpips"], pandas=False)[0]["test/avg_lpips"]
                             )
                             test_render_time = float(
-                                test_run.history(
-                                    keys=["test/avg_render_time"], pandas=False
-                                )[0]["test/avg_render_time"]
+                                test_run.history(keys=["test/avg_render_time"], pandas=False)[0]["test/avg_render_time"]
                             )
                         except:
                             with open(os.path.join(local_path, "test.txt"), "r") as f:
@@ -161,9 +139,7 @@ else:
                                     if line.startswith("Average LPIPS:"):
                                         test_lpips = float(line.strip().split(" ")[-1])
                                     if line.startswith("Average Render Time:"):
-                                        test_render_time = float(
-                                            line.strip().split(" ")[-1]
-                                        )
+                                        test_render_time = float(line.strip().split(" ")[-1])
                                     line = f.readline()
 
                         test_FPS = 1.0 / test_render_time
@@ -178,14 +154,7 @@ else:
 
                         train_iter = len(train_run) - 1
                         while train_iter >= 0:
-                            if (
-                                len(
-                                    train_run[train_iter].history(
-                                        keys=["trainer/global_step"], pandas=False
-                                    )
-                                )
-                                >= 1
-                            ):
+                            if len(train_run[train_iter].history(keys=["trainer/global_step"], pandas=False)) >= 1:
                                 break
                             train_iter -= 1
                         if train_iter < 0:
@@ -193,20 +162,14 @@ else:
                         else:
                             train_run = train_run[train_iter]
                             train_step = int(
-                                train_run.history(
-                                    keys=["trainer/global_step"], pandas=False
-                                )[-1]["trainer/global_step"]
+                                train_run.history(keys=["trainer/global_step"], pandas=False)[-1]["trainer/global_step"]
                             )
                             if train_step == 29999:
                                 start_time = train_run.created_at
                                 end_time = train_run.heartbeatAt
                                 # Convert the start and end times to datetime objects
-                                start_datetime = datetime.strptime(
-                                    start_time, "%Y-%m-%dT%H:%M:%S"
-                                )
-                                end_datetime = datetime.strptime(
-                                    end_time, "%Y-%m-%dT%H:%M:%S"
-                                )
+                                start_datetime = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S")
+                                end_datetime = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%S")
                                 # Calculate the total training time
                                 total_time = end_datetime - start_datetime
                                 exp["train_time"] = total_time.total_seconds()
@@ -226,19 +189,13 @@ else:
 
                         # for each metric, get this dataset, scene, method's mean and variance
                         for key in exps[0]:
-                            scene_result = [
-                                item[key] for item in exps if item[key] is not None
-                            ]
+                            scene_result = [item[key] for item in exps if item[key] is not None]
                             if len(scene_result) != 0:
                                 # get mean metric
                                 mean = sum(scene_result) / float(len(scene_result))
                                 # get variance metric
-                                variance = sum(
-                                    (x - mean) ** 2 for x in scene_result
-                                ) / float(len(scene_result))
-                                result_final[dataset][method][scene][key].append(
-                                    (mean, variance)
-                                )
+                                variance = sum((x - mean) ** 2 for x in scene_result) / float(len(scene_result))
+                                result_final[dataset][method][scene][key].append((mean, variance))
                     else:
                         print("Empty Exps! ", dataset, scene, method)
 
@@ -261,9 +218,7 @@ for dataset in datasets:
             for key in result_final[dataset][method][scene]:
                 if key not in result_final[dataset][method]["all"]:
                     result_final[dataset][method]["all"][key] = []
-                result_final[dataset][method]["all"][key] += result_final[dataset][
-                    method
-                ][scene][key]
+                result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][key]
 
 
 method_colors = ["steelblue", "red", "yellow", "green", "orange", "purple"]
@@ -308,9 +263,7 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
             if (dataset == "dnerf") and (method == "TRBF/vanilla"):
                 continue
             method_id = methods.index(method)
-            bar_positions.append(
-                dataset_id * len(methods) + method_id + gap * (dataset_id + 1.0)
-            )
+            bar_positions.append(dataset_id * len(methods) + method_id + gap * (dataset_id + 1.0))
             if (key not in result_final[dataset][method][sub_class]) or (
                 len(result_final[dataset][method][sub_class][key]) == 0
             ):
@@ -318,12 +271,12 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
                 variances.append(0)
             else:
                 # average the mean and variance across all scenes
-                mean = sum(
-                    [x[0] for x in result_final[dataset][method][sub_class][key]]
-                ) / float(len(result_final[dataset][method][sub_class][key]))
-                variance = sum(
-                    [x[1] for x in result_final[dataset][method][sub_class][key]]
-                ) / float(len(result_final[dataset][method][sub_class][key]))
+                mean = sum([x[0] for x in result_final[dataset][method][sub_class][key]]) / float(
+                    len(result_final[dataset][method][sub_class][key])
+                )
+                variance = sum([x[1] for x in result_final[dataset][method][sub_class][key]]) / float(
+                    len(result_final[dataset][method][sub_class][key])
+                )
                 means.append(mean)
                 variances.append(variance)
             bar_colors.append(method_colors[method_id])
@@ -360,10 +313,7 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
     # ax.set_xticks(bar_positions)
     # Set ticks labels for x-axis
     # ax.set_xticklabels(methods * len(datasets), rotation='vertical', fontsize=18)
-    xticks_positions = [
-        gap * (i + 1.0) + (len(methods) / 2.0) + i * len(methods) - 0.5
-        for i in range(len(datasets))
-    ]
+    xticks_positions = [gap * (i + 1.0) + (len(methods) / 2.0) + i * len(methods) - 0.5 for i in range(len(datasets))]
     ax.set_xticks(xticks_positions)
     ax.set_xticklabels(datasets)
 
@@ -391,18 +341,14 @@ for dataset in datasets:
     dataset_dir = os.path.join(root_dir, dataset)
     scenes = [os.path.join(dataset_dir, scene) for scene in os.listdir(dataset_dir)]
     scene_dirs = [scene for scene in scenes if os.path.isdir(scene)]
-    common_scenes = [
-        scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"
-    ]
+    common_scenes = [scene.split("/")[-1] for scene in scene_dirs if scene.split("/")[-1] != "all"]
 
     for key in lims:
         plt.rcParams["font.family"] = "Arial"
         plt.rcParams["font.size"] = 12
 
         # Set up the figure and axes
-        fig, ax = plt.subplots(
-            figsize=(2 * len(scene_dirs), 6)
-        )  # Adjust the figure size as needed
+        fig, ax = plt.subplots(figsize=(2 * len(scene_dirs), 6))  # Adjust the figure size as needed
 
         # lim = lims[key]
         # if lim[0] is not None:
@@ -424,9 +370,7 @@ for dataset in datasets:
                     continue  # Skip the scene if it's not present in the method's results
 
                 method_id = methods.index(method)
-                bar_positions.append(
-                    scene_id * len(methods) + method_id + gap * (scene_id + 1.0)
-                )
+                bar_positions.append(scene_id * len(methods) + method_id + gap * (scene_id + 1.0))
 
                 if (key not in result_final[dataset][method][scene]) or (
                     len(result_final[dataset][method][scene][key]) == 0
@@ -434,12 +378,12 @@ for dataset in datasets:
                     means.append(0)
                     variances.append(0)
                 else:
-                    mean = sum(
-                        [x[0] for x in result_final[dataset][method][scene][key]]
-                    ) / float(len(result_final[dataset][method][scene][key]))
-                    variance = sum(
-                        [x[1] for x in result_final[dataset][method][scene][key]]
-                    ) / float(len(result_final[dataset][method][scene][key]))
+                    mean = sum([x[0] for x in result_final[dataset][method][scene][key]]) / float(
+                        len(result_final[dataset][method][scene][key])
+                    )
+                    variance = sum([x[1] for x in result_final[dataset][method][scene][key]]) / float(
+                        len(result_final[dataset][method][scene][key])
+                    )
                     means.append(mean)
                     variances.append(variance)
 
@@ -474,8 +418,7 @@ for dataset in datasets:
         ax.spines["right"].set_visible(False)
 
         xticks_positions = [
-            gap * (i + 1.0) + (len(methods) / 2.0) + i * len(methods) - 0.5
-            for i in range(len(common_scenes))
+            gap * (i + 1.0) + (len(methods) / 2.0) + i * len(methods) - 0.5 for i in range(len(common_scenes))
         ]
         ax.set_xticks(xticks_positions)
         ax.set_xticklabels(common_scenes)

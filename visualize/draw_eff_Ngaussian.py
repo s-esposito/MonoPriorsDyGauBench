@@ -132,9 +132,7 @@ def create_plot(data, y_label, output_file, is_fps=False):
     legend_ax.axis("off")
     for i, dataset in enumerate(dataset_names):
         legend_ax.scatter([], [], color=list(colors.values())[i], label=dataset, s=100)
-    legend_ax.plot(
-        [], [], color="black", linestyle="-", linewidth=2, label="Linear Fit"
-    )
+    legend_ax.plot([], [], color="black", linestyle="-", linewidth=2, label="Linear Fit")
     legend = legend_ax.legend(
         ncol=6,
         loc="center",
@@ -240,9 +238,7 @@ def create_plot(data, y_label, output_file, is_fps=False):
         ax.xaxis.set_major_locator(plt.MaxNLocator(5))
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
 
-    plt.subplots_adjust(
-        top=0.90, bottom=0.1, left=0.1, right=0.9, hspace=0.3, wspace=0.4
-    )
+    plt.subplots_adjust(top=0.90, bottom=0.1, left=0.1, right=0.9, hspace=0.3, wspace=0.4)
     plt.savefig(output_file, bbox_inches="tight", dpi=80)
     plt.close(fig)
 
