@@ -37,3 +37,4 @@ motion_iphone/*
 compress_datasets_log.txt
 *.txt
 .vscode
+wandb

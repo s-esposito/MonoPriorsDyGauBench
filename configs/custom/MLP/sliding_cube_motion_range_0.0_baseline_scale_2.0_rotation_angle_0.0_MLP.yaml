@@ -1,0 +1,103 @@
+ckpt_path: null
+data:
+  class_path: src.data.CustomDataModule
+  init_args:
+    M: 10
+    batch_size: 1
+    datadir: data/custom/sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0
+    eval: true
+    load_flow: false
+    num_pts: 0
+    num_pts_ratio: 0.0
+    ratio: 1.0
+    seed: null
+    white_background: true
+group: custom_dataset_test_sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0
+logger: wandb
+model:
+  class_path: src.models.GS3d
+  init_args:
+    color_mode: rgb
+    decoder_lr: 0.0001
+    deform_feature: false
+    deform_lr_delay_mult: 0.01
+    deform_lr_final: 1.6e-05
+    deform_lr_init: 0.00016
+    deform_lr_max_steps: 30000
+    deform_opacity: false
+    deform_scale: true
+    densification_interval: 100
+    densify_from_iter: 500
+    densify_grad_threshold: 0.0002
+    densify_until_iter: 15000
+    emsstartfromiterations: 5000000000
+    emsthr: 0.6
+    feature_lr: 0.0025
+    flow_start: 5000
+    grid_lr_delay_mult: 0.01
+    grid_lr_final: 1.6e-05
+    grid_lr_init: 0.0016
+    grid_lr_max_steps: 30000
+    init_mode: D3G
+    is_blender: true
+    l1_l2_switch: 0
+    l1_time_planes_weight: 0.0001
+    lambda_dssim: 0.2
+    lambda_flow: 0.0
+    log_image_interval: 1000
+    motion_mode: MLP
+    num_ems: 2
+    numperay: 2
+    opacity_lr: 0.05
+    opacity_reset_interval: 3000
+    percent_dense: 0.01
+    plane_tv_weight: 0.0002
+    position_lr_delay_mult: 0.01
+    position_lr_final: 1.6e-06
+    position_lr_init: 0.00016
+    position_lr_max_steps: 30000
+    position_t_lr_init: 0.00016
+    post_act: true
+    ratioend: 7.5
+    raystart: 0.7
+    rot_4d: true
+    rotation_lr: 0.001
+    scaling_lr: 0.005
+    selectedlength: 5000
+    sh_degree: 3
+    sh_degree_t: 2
+    time_smoothness_weight: 0.001
+    trbfc_lr: 0.0001
+    trbfs_lr: 0.03
+    trbfslinit: -2.0
+    use_AST: true
+    use_static: false
+    warm_up: 3000
+name: sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0_MLP
+output: output/custom/custom_dataset_test/sliding_cube_motion_range_0.0_baseline_scale_2.0_rotation_angle_0.0/MLP
+project: GaussianDiff_dnerf
+seed_everything: false
+trainer:
+  accelerator: gpu
+  callbacks:
+  - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+    init_args:
+      dirpath: null
+      filename: model-{step:06d}-{val/avg_ssim_train:.2f}
+      mode: max
+      monitor: val/avg_ssim_train
+      save_last: true
+      save_on_train_epoch_end: true
+      save_top_k: 0
+  devices: auto
+  enable_checkpointing: true
+  enable_model_summary: true
+  enable_progress_bar: true
+  log_every_n_steps: 50
+  logger: true
+  max_epochs: 1
+  max_steps: 30000
+  num_nodes: 1
+  precision: 32
+  strategy: ddp_find_unused_parameters_true
+  val_check_interval: 1000

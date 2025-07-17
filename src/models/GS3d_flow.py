@@ -48,11 +48,11 @@ import imageio
 import numpy as np
 import shutil
 
-from .diff_gaussian_rasterization import (
+from diff_gaussian_rasterization_4d import (
     GaussianRasterizationSettings4D,
     GaussianRasterizer4D,
 )
-from .diff_gaussian_rasterization_4dch9 import (
+from diff_gaussian_rasterization_4dch9 import (
     GaussianRasterizationSettings4D_ch9,
     GaussianRasterizer4D_ch9,
 )

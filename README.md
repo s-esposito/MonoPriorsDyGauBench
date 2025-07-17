@@ -81,60 +81,32 @@ this_repo
 ```
 
 ## Installation
-This code has been developed with Anaconda (Python 3.7), CUDA 11.8.0 on Red Hat Enterprise Linux 9.2, one NVIDIA GeForce RTX 3090 GPU.  
+This code has been developed with Anaconda (Python 3.9), CUDA 12.4.1, one NVIDIA GeForce RTX 4090 GPU.  
 
 ```Shell
-conda create -p [YourEnv] python=3.9
-conda activate [YourEnv]
-
-conda install -c anaconda libstdcxx-ng
-conda install -c menpo opencv 
-
+conda create -n monodybench python=3.9
+conda activate monodybench
+# conda installs
+conda install nvidia/label/cuda-12.4.1::cuda-toolkit
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 conda install -c conda-forge plyfile==0.8.1
-pip install tqdm imageio
+conda install conda-forge::glm
 
-pip install torch==2xx # find the torch version that works for your cuda device
-
-pip install torchmetrics
-
-pip install requests 
-
-pip install tensorboard 
-
-pip install scipy
-
-pip install kornia
-
-
-
-pip install lightning=2.2.1 # recommend to use this version for stability!
-pip install "jsonargparse[signatures]"
-
-pip install wandb
-pip install lpips
-
-pip install pytorch-msssim
-
-pip install ninja
-pip install timm==0.4.5
+# pip installs
+pip install -r requirements.txt
 
 # install from local folders 
 pip install submodules/diff-gaussian-rasterization
+pip install submodules/diff_gaussian_rasterization_4d
 pip install submodules/depth-diff-gaussian-rasterization
-pip install submodules/gaussian-rasterization_ch3
-pip install submodules/gaussian-rasterization_ch9
+pip install submodules/gaussian_rasterization_ch3
+pip install submodules/gaussian_rasterization_ch9
+pip install submodules/diff_gaussian_rasterization_4dch9
 pip install submodules/simple-knn
 
+# create wandb project following instruction
+wandb init  
 ```
-
-
-After activating conda environment
-```
-wandb init
-
-paste API key and create first project following instruction
-```
-
 
 ## Usage
 
