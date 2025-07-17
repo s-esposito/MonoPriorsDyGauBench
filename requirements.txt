@@ -1,0 +1,22 @@
+imageio
+ipython
+jsonargparse[signatures]
+kornia
+lightning
+lpips
+matplotlib
+ninja
+numpy
+opencv-python
+pillow
+pytorch-lightning
+pytorch-msssim
+PyYAML
+scipy
+tensorboard
+timm==0.4.5
+tqdm
+wandb
+flake8
+black
+# gsplat @ git+https://github.com/nerfstudio-project/gsplat.git
