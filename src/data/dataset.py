@@ -1,10 +1,14 @@
 from torch.utils.data import Dataset
-from src.data.temporal_cameras import TemporalCamera as Camera, TemporalCamera_Flow as Camera_Flow
+from src.data.temporal_cameras import (
+    TemporalCamera as Camera,
+    TemporalCamera_Flow as Camera_Flow,
+)
 import numpy as np
 from src.utils.general_utils import PILtoTorch
 from src.utils.graphics_utils import fov2focal, focal2fov
 import torch
 import kornia
+
 
 class FourDGSdataset(Dataset):
     def __init__(
@@ -13,26 +17,27 @@ class FourDGSdataset(Dataset):
         split,
         load_flow=False,
         load_mask=False,
-        #args,
+        # args,
     ):
         self.dataset = dataset
-        self.split = split # could be train/test
-        #self.args = args
-        self.kernel_size = 1.
+        self.split = split  # could be train/test
+        # self.args = args
+        self.kernel_size = 1.0
         self.load_flow = load_flow
         self.load_mask = load_mask
+
     def __getitem__(self, index):
 
         try:
-            #assert False, "depth not supported"
+            # assert False, "depth not supported"
             image, w2c, time = self.dataset[index]
-            R,T = w2c
+            R, T = w2c
             FovX = focal2fov(self.dataset.focal[0], image.shape[2])
             FovY = focal2fov(self.dataset.focal[0], image.shape[1])
             depth = None
-            fwd_flow = None 
+            fwd_flow = None
             fwd_flow_mask = None
-            bwd_flow = None 
+            bwd_flow = None
             bwd_flow_mask = None
         except:
             caminfo = self.dataset[index]
@@ -61,7 +66,7 @@ class FourDGSdataset(Dataset):
 
                 fwd_flow = caminfo.fwd_flow
                 fwd_flow_mask = caminfo.fwd_flow_mask
-                bwd_flow = caminfo.bwd_flow 
+                bwd_flow = caminfo.bwd_flow
                 bwd_flow_mask = caminfo.bwd_flow_mask
             else:
                 R_prev = None
@@ -74,27 +79,45 @@ class FourDGSdataset(Dataset):
                 FovX_post = None
                 FovY_post = None
                 time_post = None
-                fwd_flow = None 
+                fwd_flow = None
                 fwd_flow_mask = None
-                bwd_flow = None 
+                bwd_flow = None
                 bwd_flow_mask = None
-        #assert False, [type(image), image.shape]
-        if self.kernel_size > 1.:
+        # assert False, [type(image), image.shape]
+        if self.kernel_size > 1.0:
             image = image.unsqueeze(0)
-            image = kornia.filters.gaussian_blur2d(image, (self.kernel_size, self.kernel_size), (self.kernel_size/2., self.kernel_size/2.))[0]
-            #image = kornia.filters.bilateral_blur(image, (self.kernel_size, self.kernel_size), 0.1, (self.kernel_size/2., self.kernel_size/2.))[0]
-            #print(image.shape)
-            #image = kornia.filters.median_blur(image, (self.kernel_size, self.kernel_size))[0]
-            #assert False, image.shape
+            image = kornia.filters.gaussian_blur2d(
+                image,
+                (self.kernel_size, self.kernel_size),
+                (self.kernel_size / 2.0, self.kernel_size / 2.0),
+            )[0]
+            # image = kornia.filters.bilateral_blur(image, (self.kernel_size, self.kernel_size), 0.1, (self.kernel_size/2., self.kernel_size/2.))[0]
+            # print(image.shape)
+            # image = kornia.filters.median_blur(image, (self.kernel_size, self.kernel_size))[0]
+            # assert False, image.shape
             if depth is not None:
                 depth = depth[None, None, ...]
-                depth = kornia.filters.gaussian_blur2d(depth, (self.kernel_size, self.kernel_size), (self.kernel_size/2., self.kernel_size/2.))[0, 0]
-        
+                depth = kornia.filters.gaussian_blur2d(
+                    depth,
+                    (self.kernel_size, self.kernel_size),
+                    (self.kernel_size / 2.0, self.kernel_size / 2.0),
+                )[0, 0]
+
         if not self.load_flow:
-            camera = Camera(colmap_id=index,R=R,T=T,FoVx=FovX,FoVy=FovY,image=image,gt_alpha_mask=None,
-                          image_name=f"{index}",uid=index, time=time,
-                          depth=depth)
-        
+            camera = Camera(
+                colmap_id=index,
+                R=R,
+                T=T,
+                FoVx=FovX,
+                FoVy=FovY,
+                image=image,
+                gt_alpha_mask=None,
+                image_name=f"{index}",
+                uid=index,
+                time=time,
+                depth=depth,
+            )
+
             result = {
                 "time": camera.time,
                 "FoVx": camera.FoVx,
@@ -106,22 +129,45 @@ class FourDGSdataset(Dataset):
                 "camera_center": camera.camera_center,
                 "original_image": camera.original_image,
                 #'rayo': camera.rayo,
-                #"rayd": camera.rayd,
+                # "rayd": camera.rayd,
                 "rays": camera.rays,
                 "image_name": camera.image_name,
-                "split": self.split
+                "split": self.split,
             }
         else:
-            camera = Camera_Flow(colmap_id=index,R=R,T=T,FoVx=FovX,FoVy=FovY,image=image,gt_alpha_mask=None,
-                            image_name=f"{index}",uid=index, time=time,
-                            depth=depth,
-                            R_prev=R_prev, T_prev=T_prev, FoVx_prev=FovX_prev, FoVy_prev=FovY_prev, time_prev=time_prev,
-                            R_post=R_post, T_post=T_post, FoVx_post=FovX_post, FoVy_post=FovY_post, time_post=time_post,
-                            fwd_flow=fwd_flow, fwd_flow_mask=fwd_flow_mask,
-                            bwd_flow=bwd_flow, bwd_flow_mask=bwd_flow_mask)
-            
-            print(index, camera.fwd_flow.shape if camera.fwd_flow is not None else None,
-                camera.bwd_flow.shape if camera.bwd_flow is not None else None)
+            camera = Camera_Flow(
+                colmap_id=index,
+                R=R,
+                T=T,
+                FoVx=FovX,
+                FoVy=FovY,
+                image=image,
+                gt_alpha_mask=None,
+                image_name=f"{index}",
+                uid=index,
+                time=time,
+                depth=depth,
+                R_prev=R_prev,
+                T_prev=T_prev,
+                FoVx_prev=FovX_prev,
+                FoVy_prev=FovY_prev,
+                time_prev=time_prev,
+                R_post=R_post,
+                T_post=T_post,
+                FoVx_post=FovX_post,
+                FoVy_post=FovY_post,
+                time_post=time_post,
+                fwd_flow=fwd_flow,
+                fwd_flow_mask=fwd_flow_mask,
+                bwd_flow=bwd_flow,
+                bwd_flow_mask=bwd_flow_mask,
+            )
+
+            print(
+                index,
+                camera.fwd_flow.shape if camera.fwd_flow is not None else None,
+                camera.bwd_flow.shape if camera.bwd_flow is not None else None,
+            )
 
             result = {
                 "time": camera.time,
@@ -137,22 +183,22 @@ class FourDGSdataset(Dataset):
                 "original_image": camera.original_image,
                 "world_view_transform_prev": camera.world_view_transform_prev,
                 "world_view_transform_post": camera.world_view_transform_post,
-                "fwd_flow": camera.fwd_flow, 
+                "fwd_flow": camera.fwd_flow,
                 "fwd_flow_mask": camera.fwd_flow_mask,
-                "bwd_flow": camera.bwd_flow, 
+                "bwd_flow": camera.bwd_flow,
                 "bwd_flow_mask": camera.bwd_flow_mask,
-                #"depth": camera.depth,
+                # "depth": camera.depth,
                 #'rayo': camera.rayo,
-                #"rayd": camera.rayd,
+                # "rayd": camera.rayd,
                 "rays": camera.rays,
                 "image_name": camera.image_name,
-                "split": self.split
+                "split": self.split,
             }
         if camera.depth is not None:
             result["depth"] = camera.depth
         if mask is not None:
             result["mask"] = mask
-        '''
+        """
         if fwd_flow is not None:
             #if (fwd_flow_mask is None) or (bwd_flow_mask is None) or (bwd_flow is None):
             #    print(camera.image_name)
@@ -165,11 +211,12 @@ class FourDGSdataset(Dataset):
                 "bwd_flow": camera.bwd_flow, 
                 "bwd_flow_mask": camera.bwd_flow_mask
                 })
-        '''
+        """
         return result
+
     def __len__(self):
-        
+
         return len(self.dataset)
-    
+
     def reset_kernel_size(self, kernel_size):
         self.kernel_size = kernel_size

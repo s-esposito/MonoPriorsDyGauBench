@@ -1,8 +1,14 @@
 from lightning import LightningDataModule
 import numpy as np
 from typing import NamedTuple, Optional
-from src.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
+from src.utils.graphics_utils import (
+    getWorld2View2,
+    focal2fov,
+    fov2focal,
+    BasicPointCloud,
+)
 from lightning.pytorch import seed_everything
+
 
 class MyDataModuleBaseClass(LightningDataModule):
     def __init__(self, seed: Optional[int]) -> None:
@@ -28,7 +34,6 @@ class InfiniteDataLoader:
         return data
 
 
-
 class CameraInfo(NamedTuple):
     uid: int
     R: np.array
@@ -40,7 +45,7 @@ class CameraInfo(NamedTuple):
     image_name: str
     width: int
     height: int
-    time : float
+    time: float
     depth: Optional[np.array] = None
     mask: Optional[np.array] = None
     # previous camera info
@@ -60,7 +65,6 @@ class CameraInfo(NamedTuple):
     fwd_flow_mask: Optional[np.array] = None
     bwd_flow: Optional[np.array] = None
     bwd_flow_mask: Optional[np.array] = None
-
 
 
 def getNerfppNorm(cam_info):
@@ -85,6 +89,7 @@ def getNerfppNorm(cam_info):
     translate = -center
 
     return {"translate": translate, "radius": radius}
+
 
 class SceneInfo(NamedTuple):
     point_cloud: BasicPointCloud

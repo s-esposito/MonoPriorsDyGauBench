@@ -228,7 +228,9 @@ class Visualizer:
         if self.tracks_leave_trace != 0:
             for t in range(query_frame + 1, T):
                 first_ind = (
-                    max(0, t - self.tracks_leave_trace) if self.tracks_leave_trace >= 0 else 0
+                    max(0, t - self.tracks_leave_trace)
+                    if self.tracks_leave_trace >= 0
+                    else 0
                 )
                 curr_tracks = tracks[first_ind : t + 1]
                 curr_colors = vector_colors[first_ind : t + 1]
@@ -248,7 +250,9 @@ class Visualizer:
                     curr_colors,
                 )
                 if gt_tracks is not None:
-                    res_video[t] = self._draw_gt_tracks(res_video[t], gt_tracks[first_ind : t + 1])
+                    res_video[t] = self._draw_gt_tracks(
+                        res_video[t], gt_tracks[first_ind : t + 1]
+                    )
 
         #  draw points
         for t in range(query_frame, T):
@@ -302,7 +306,11 @@ class Visualizer:
                     )
             if self.tracks_leave_trace > 0:
                 rgb = Image.fromarray(
-                    np.uint8(add_weighted(np.array(rgb), alpha, np.array(original), 1 - alpha, 0))
+                    np.uint8(
+                        add_weighted(
+                            np.array(rgb), alpha, np.array(original), 1 - alpha, 0
+                        )
+                    )
                 )
         rgb = np.array(rgb)
         return rgb

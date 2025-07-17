@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -15,8 +15,10 @@ from datetime import datetime
 import numpy as np
 import random
 
+
 def inverse_sigmoid(x):
-    return torch.log(x/(1-x))
+    return torch.log(x / (1 - x))
+
 
 def PILtoTorch(pil_image, resolution=None):
     if resolution is None:
@@ -28,6 +30,7 @@ def PILtoTorch(pil_image, resolution=None):
         return resized_image.permute(2, 0, 1)
     else:
         return resized_image.unsqueeze(dim=-1).permute(2, 0, 1)
+
 
 def get_expon_lr_func(
     lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
@@ -64,6 +67,7 @@ def get_expon_lr_func(
 
     return helper
 
+
 def strip_lowerdiag(L):
     uncertainty = torch.zeros((L.shape[0], 6), dtype=torch.float, device="cuda")
 
@@ -75,40 +79,52 @@ def strip_lowerdiag(L):
     uncertainty[:, 5] = L[:, 2, 2]
     return uncertainty
 
+
 def strip_symmetric(sym):
     return strip_lowerdiag(sym)
 
+
 def build_rotation(r):
-    norm = torch.sqrt(r[...,0]*r[...,0] + r[...,1]*r[...,1] + r[...,2]*r[...,2] + r[...,3]*r[...,3])
-    
+    norm = torch.sqrt(
+        r[..., 0] * r[..., 0]
+        + r[..., 1] * r[..., 1]
+        + r[..., 2] * r[..., 2]
+        + r[..., 3] * r[..., 3]
+    )
+
     q = r / norm[..., None]
     if len(list(r.shape)) == 3:
-        R = torch.zeros((q.size(0), q.size(1), 3, 3), device='cuda')
+        R = torch.zeros((q.size(0), q.size(1), 3, 3), device="cuda")
     else:
-        R = torch.zeros((q.size(0), 3, 3), device='cuda')
+        R = torch.zeros((q.size(0), 3, 3), device="cuda")
 
     r = q[..., 0]
     x = q[..., 1]
     y = q[..., 2]
     z = q[..., 3]
 
-    R[..., 0, 0] = 1 - 2 * (y*y + z*z)
-    R[..., 0, 1] = 2 * (x*y - r*z)
-    R[..., 0, 2] = 2 * (x*z + r*y)
-    R[..., 1, 0] = 2 * (x*y + r*z)
-    R[..., 1, 1] = 1 - 2 * (x*x + z*z)
-    R[..., 1, 2] = 2 * (y*z - r*x)
-    R[..., 2, 0] = 2 * (x*z - r*y)
-    R[..., 2, 1] = 2 * (y*z + r*x)
-    R[..., 2, 2] = 1 - 2 * (x*x + y*y)
+    R[..., 0, 0] = 1 - 2 * (y * y + z * z)
+    R[..., 0, 1] = 2 * (x * y - r * z)
+    R[..., 0, 2] = 2 * (x * z + r * y)
+    R[..., 1, 0] = 2 * (x * y + r * z)
+    R[..., 1, 1] = 1 - 2 * (x * x + z * z)
+    R[..., 1, 2] = 2 * (y * z - r * x)
+    R[..., 2, 0] = 2 * (x * z - r * y)
+    R[..., 2, 1] = 2 * (y * z + r * x)
+    R[..., 2, 2] = 1 - 2 * (x * x + y * y)
     return R
+
 
 # adopted from https://github.com/oppo-us-research/SpacetimeGaussians/blob/main/thirdparty/gaussian_splatting/utils/general_utils.py
 def update_quaternion(q, omega, delta_t):
     magnitude_omega = torch.norm(omega, dim=1, keepdim=True)
     half_angle = magnitude_omega * delta_t / 2.0
     delta_q_cos = torch.cos(half_angle)
-    delta_q_sin = torch.sin(half_angle) * omega / (magnitude_omega + torch.tensor([1e-8], dtype=torch.float, device="cuda"))
+    delta_q_sin = (
+        torch.sin(half_angle)
+        * omega
+        / (magnitude_omega + torch.tensor([1e-8], dtype=torch.float, device="cuda"))
+    )
 
     delta_q = torch.cat((delta_q_cos, delta_q_sin), dim=1)
 
@@ -116,20 +132,28 @@ def update_quaternion(q, omega, delta_t):
     q0_delta_q0 = q[:, 0:1] * delta_q[:, 0:1]
     cross_product = torch.cross(q[:, 1:], delta_q[:, 1:], dim=1)
     dot_product = (q[:, 1:] * delta_q[:, 1:]).sum(dim=1, keepdim=True)
-    q_prime = torch.cat((q0_delta_q0 - dot_product, q[:, 0:1]*delta_q[:, 1:] + delta_q[:, 0:1]*q[:, 1:] + cross_product), dim=1)
-    
+    q_prime = torch.cat(
+        (
+            q0_delta_q0 - dot_product,
+            q[:, 0:1] * delta_q[:, 1:] + delta_q[:, 0:1] * q[:, 1:] + cross_product,
+        ),
+        dim=1,
+    )
+
     return q_prime
+
 
 def build_scaling_rotation(s, r):
     L = torch.zeros((s.shape[0], 3, 3), dtype=torch.float, device="cuda")
     R = build_rotation(r)
 
-    L[:,0,0] = s[:,0]
-    L[:,1,1] = s[:,1]
-    L[:,2,2] = s[:,2]
+    L[:, 0, 0] = s[:, 0]
+    L[:, 1, 1] = s[:, 1]
+    L[:, 2, 2] = s[:, 2]
 
     L = R @ L
     return L
+
 
 def build_rotation_4d(l, r):
     l_norm = torch.norm(l, dim=-1, keepdim=True)
@@ -141,31 +165,36 @@ def build_rotation_4d(l, r):
     a, b, c, d = q_l.unbind(-1)
     p, q, r, s = q_r.unbind(-1)
 
-    M_l = torch.stack([a,-b,-c,-d,
-                       b, a,-d, c,
-                       c, d, a,-b,
-                       d,-c, b, a]).view(4,4,-1).permute(2,0,1)
-    M_r = torch.stack([ p, q, r, s,
-                       -q, p,-s, r,
-                       -r, s, p,-q,
-                       -s,-r, q, p]).view(4,4,-1).permute(2,0,1)
+    M_l = (
+        torch.stack([a, -b, -c, -d, b, a, -d, c, c, d, a, -b, d, -c, b, a])
+        .view(4, 4, -1)
+        .permute(2, 0, 1)
+    )
+    M_r = (
+        torch.stack([p, q, r, s, -q, p, -s, r, -r, s, p, -q, -s, -r, q, p])
+        .view(4, 4, -1)
+        .permute(2, 0, 1)
+    )
     A = M_l @ M_r
     return A
+
 
 def build_scaling_rotation_4d(s, l, r):
     L = torch.zeros((s.shape[0], 4, 4), dtype=torch.float, device="cuda")
     R = build_rotation_4d(l, r)
 
-    L[:,0,0] = s[:,0]
-    L[:,1,1] = s[:,1]
-    L[:,2,2] = s[:,2]
-    L[:,3,3] = s[:,3]
+    L[:, 0, 0] = s[:, 0]
+    L[:, 1, 1] = s[:, 1]
+    L[:, 2, 2] = s[:, 2]
+    L[:, 3, 3] = s[:, 3]
 
     L = R @ L
     return L
 
+
 def safe_state(silent):
     old_f = sys.stdout
+
     class F:
         def __init__(self, silent):
             self.silent = silent
@@ -173,7 +202,14 @@ def safe_state(silent):
         def write(self, x):
             if not self.silent:
                 if x.endswith("\n"):
-                    old_f.write(x.replace("\n", " [{}]\n".format(str(datetime.now().strftime("%d/%m %H:%M:%S")))))
+                    old_f.write(
+                        x.replace(
+                            "\n",
+                            " [{}]\n".format(
+                                str(datetime.now().strftime("%d/%m %H:%M:%S"))
+                            ),
+                        )
+                    )
                 else:
                     old_f.write(x)
 
@@ -187,8 +223,9 @@ def safe_state(silent):
     torch.manual_seed(0)
     torch.cuda.set_device(torch.device("cuda:0"))
 
+
 def get_linear_noise_func(
-        lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
+    lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
 ):
     """
     Copied from Plenoxels
@@ -221,4 +258,3 @@ def get_linear_noise_func(
         return delay_rate * log_lerp
 
     return helper
-

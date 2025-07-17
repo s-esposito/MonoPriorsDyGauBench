@@ -1,5 +1,5 @@
-"""Compute depth maps for images in the input folder.
-"""
+"""Compute depth maps for images in the input folder."""
+
 import os
 import glob
 import torch
@@ -18,6 +18,7 @@ from src.dpt.models import DPTDepthModel
 from src.dpt.midas_net import MidasNet_large
 from src.dpt.transforms import Resize, NormalizeImage, PrepareForNet
 
+
 def read_image(path):
     """Read image and output RGB image (0-1).
 
@@ -35,6 +36,7 @@ def read_image(path):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
 
     return img
+
 
 def write_pfm(path, image, scale=1):
     """Write pfm file.
@@ -74,6 +76,7 @@ def write_pfm(path, image, scale=1):
 
         image.tofile(file)
 
+
 def write_depth(path, depth, bits=1, absolute_depth=False):
     """Write depth map to pfm and png file.
 
@@ -81,7 +84,7 @@ def write_depth(path, depth, bits=1, absolute_depth=False):
         path (str): filepath without extension
         depth (array): depth
     """
-    #write_pfm(path + ".pfm", depth.astype(np.float32))
+    # write_pfm(path + ".pfm", depth.astype(np.float32))
     if absolute_depth:
         out = depth
     else:
@@ -96,26 +99,32 @@ def write_depth(path, depth, bits=1, absolute_depth=False):
             out = np.zeros(depth.shape, dtype=depth.dtype)
 
     if bits == 1:
-        cv2.imwrite(path + ".png", out.astype("uint8"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+        cv2.imwrite(
+            path + ".png", out.astype("uint8"), [cv2.IMWRITE_PNG_COMPRESSION, 0]
+        )
     elif bits == 2:
-        cv2.imwrite(path + ".png", out.astype("uint16"), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+        cv2.imwrite(
+            path + ".png", out.astype("uint16"), [cv2.IMWRITE_PNG_COMPRESSION, 0]
+        )
 
     return
 
-def get_mask_pallete(npimg, dataset='detail'):
+
+def get_mask_pallete(npimg, dataset="detail"):
     """Get image color pallete for visualizing masks"""
     # recovery boundary
-    if dataset == 'pascal_voc':
-        npimg[npimg==21] = 255
+    if dataset == "pascal_voc":
+        npimg[npimg == 21] = 255
     # put colormap
-    out_img = Image.fromarray(npimg.squeeze().astype('uint8'))
-    if dataset == 'ade20k':
+    out_img = Image.fromarray(npimg.squeeze().astype("uint8"))
+    if dataset == "ade20k":
         out_img.putpalette(adepallete)
-    elif dataset == 'citys':
+    elif dataset == "citys":
         out_img.putpalette(citypallete)
-    elif dataset in ('detail', 'pascal_voc', 'pascal_aug'):
+    elif dataset in ("detail", "pascal_voc", "pascal_aug"):
         out_img.putpalette(vocpallete)
     return out_img
+
 
 def read_pfm(path):
     """Read pfm file.
@@ -274,8 +283,6 @@ def resize_depth(depth, width, height):
     return depth_resized
 
 
-
-
 def write_segm_img(path, image, labels, palette="detail", alpha=0.5):
     """Write depth map to pfm and png file.
 
@@ -287,7 +294,7 @@ def write_segm_img(path, image, labels, palette="detail", alpha=0.5):
 
     mask = get_mask_pallete(labels, "ade20k")
 
-    img = Image.fromarray(np.uint8(255*image)).convert("RGBA")
+    img = Image.fromarray(np.uint8(255 * image)).convert("RGBA")
     seg = mask.convert("RGBA")
 
     out = Image.blend(img, seg, alpha)
@@ -471,7 +478,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-m", "--model_weights", default='./src/dpt/dpt_large-midas-2f21e586.pt', help="path to model weights"
+        "-m",
+        "--model_weights",
+        default="./src/dpt/dpt_large-midas-2f21e586.pt",
+        help="path to model weights",
     )
 
     parser.add_argument(

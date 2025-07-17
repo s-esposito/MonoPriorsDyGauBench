@@ -7,5 +7,5 @@ if __name__ == "__main__":
         MyModelBaseClass,
         MyDataModuleBaseClass,
         subclass_mode_model=True,
-        subclass_mode_data=True
+        subclass_mode_data=True,
     )
