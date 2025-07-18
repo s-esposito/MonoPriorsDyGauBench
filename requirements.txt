@@ -19,4 +19,12 @@ tqdm
 wandb
 flake8
 black
+plyfile==0.8.1
 # gsplat @ git+https://github.com/nerfstudio-project/gsplat.git
+submodules/diff-gaussian-rasterization
+submodules/diff_gaussian_rasterization_4d
+submodules/depth-diff-gaussian-rasterization
+submodules/gaussian_rasterization_ch3
+submodules/gaussian_rasterization_ch9
+submodules/diff_gaussian_rasterization_4dch9
+submodules/simple-knn

@@ -84,25 +84,16 @@ this_repo
 This code has been developed with Anaconda (Python 3.9), CUDA 12.4.1, one NVIDIA GeForce RTX 4090 GPU.  
 
 ```Shell
+# create conda env
 conda create -n monodybench python=3.9
 conda activate monodybench
+
 # conda installs
 conda install nvidia/label/cuda-12.4.1::cuda-toolkit
 pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
-conda install -c conda-forge plyfile==0.8.1
-conda install conda-forge::glm
 
 # pip installs
 pip install -r requirements.txt
-
-# install from local folders 
-pip install submodules/diff-gaussian-rasterization
-pip install submodules/diff_gaussian_rasterization_4d
-pip install submodules/depth-diff-gaussian-rasterization
-pip install submodules/gaussian_rasterization_ch3
-pip install submodules/gaussian_rasterization_ch9
-pip install submodules/diff_gaussian_rasterization_4dch9
-pip install submodules/simple-knn
 
 # create wandb project following instruction
 wandb init  
