@@ -20,6 +20,7 @@ wandb
 flake8
 black
 plyfile==0.8.1
+imageio[ffmpeg]
 # gsplat @ git+https://github.com/nerfstudio-project/gsplat.git
 submodules/diff-gaussian-rasterization
 submodules/diff_gaussian_rasterization_4d
