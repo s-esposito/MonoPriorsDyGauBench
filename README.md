@@ -81,16 +81,21 @@ this_repo
 ```
 
 ## Installation
-This code has been developed with Anaconda (Python 3.9), CUDA 12.4.1, one NVIDIA GeForce RTX 4090 GPU.  
+This code has been developed with Anaconda (Python 3.9), PyTorch 2.4, CUDA 12.1, one NVIDIA GeForce RTX 4090 GPU.  
 
 ```Shell
+# select gcc > 9.0 (uni-cluster)
+source scl_source enable gcc-toolset-11
+
 # create conda env
 conda create -n monodybench python=3.9
 conda activate monodybench
 
-# conda installs
-conda install nvidia/label/cuda-12.4.1::cuda-toolkit
-pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+# cuda toolkit
+conda install -c nvidia/label/cuda-12.1.1 cuda-toolkit
+
+# torch
+pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu121
 
 # pip installs
 pip install -r requirements.txt
