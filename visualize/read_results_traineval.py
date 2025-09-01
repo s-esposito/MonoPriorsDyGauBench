@@ -16,21 +16,24 @@ os.makedirs(exp_prefix, exist_ok=True)
 
 sub_class = "all"
 # specify dataset output directory
-datasets = ["iphone", "nerfies", "hypernerf", "nerfds", "dnerf"]
-# datasets=["nerfds"]#, "nerfds"]#,  "hypernerf", "dnerf"]
-root_dir = "../output"
+# datasets = ["iphone", "nerfies", "hypernerf", "nerfds", "dnerf"]
+# # datasets=["nerfds"]#, "nerfds"]#,  "hypernerf", "dnerf"]
+# for depth test
+datasets = ["nerfies"]# , "nerfds"]  # ,  "hypernerf", "dnerf"]
+
+root_dir = "../output/vis_script_test"  
 tineuvox_root_dir = "../../TiNeuVox/logs"
 
 # specify experiments to track
 methods = [
-    "TiNeuVox/vanilla",
-    "MLP/nodeform",
+    #"TiNeuVox/vanilla",
+    #"MLP/nodeform",
     "MLP/vanilla",
     "Curve/vanilla",
-    "FourDim/vanilla",
+    #"FourDim/vanilla",
     "HexPlane/vanilla",
-    "TRBF/nodecoder",
-    "TRBF/vanilla",
+    #"TRBF/nodecoder",
+    #"TRBF/vanilla",
 ]
 # methods=["Curve/vanilla", "FourDim/vanilla", "HexPlane/vanilla", "MLP/vanilla", "TRBF/nodecoder", "TRBF/vanilla"]
 
@@ -56,6 +59,7 @@ def process_methods(dataset, methods_subset):
         scene_runs = [run for run in runs if run.group == scene]
         tineuvox_scene_runs = [run for run in tineuvox_runs_ if run.name.startswith(scene)]
         for method_id, method in tqdm(enumerate(methods_subset)):
+            print("Komme ich hier rein ?????")
             big_name, small_name = method.split("/")
             if big_name == "TiNeuVox":
                 method_runs = [
@@ -65,10 +69,11 @@ def process_methods(dataset, methods_subset):
                 method_runs = [run for run in scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
             else:
                 assert False, f"Unknown method {big_name}!"
+            print("method_runs: ", method_runs)
             # tineuvox_method_runs = [run for run in tineuvox_scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
             # method_runs = method_runs + tineuvox_scene_runs
             exps = []
-            for run_id in ["1", "2", "3"]:
+            for run_id in ["1", "2"]: #, "3"]:
                 exp = {
                     "train_time": None,
                     "render_FPS": None,
@@ -254,7 +259,7 @@ if os.path.exists(f"{exp_prefix}.pkl"):
     with open(f"{exp_prefix}.pkl", "rb") as file:
         result_final = pickle.load(file)
 else:
-    wandb.login(key="a552a3104d9784010a88b7361592931dd61ecc7d")
+    wandb.login(key="1c19e048ca5da79c677efbf93e742cd1114c0d5b") # a552a3104d9784010a88b7361592931dd61ecc7d")
     api = wandb.Api()
     projects = api.projects()
 
@@ -266,23 +271,26 @@ else:
     num_processes = N
 
     # load all tineuvox wandb runs
-    tineuvox_runs = api.runs(path="GaussianDiff_TiNeuVox")
-    tineuvox_runs = [run for run in tineuvox_runs]
-    tineuvox_runs.sort(key=lambda run: run.created_at)
-    tineuvox_runs = [run for run in tineuvox_runs if run.state != "crashed"]
+    # tineuvox_runs = api.runs(path="GaussianDiff_TiNeuVox")
+    # tineuvox_runs = [run for run in tineuvox_runs]
+    # tineuvox_runs.sort(key=lambda run: run.created_at)
+    # tineuvox_runs = [run for run in tineuvox_runs if run.state != "crashed"]
+    tineuvox_runs = []
     for dataset in datasets:
         print(f"Dataset: {dataset}")
 
         for dataset_id, project in tqdm(enumerate(projects)):
-            if project.name != f"GaussianDiff_{dataset}":
+            if project.name != f"vis_script_test": # "GaussianDiff_{dataset}": 
                 continue
             runs = api.runs(path=f"{project.name}")
 
             runs = [run for run in runs]
+            print("runs: ", runs)
             runs.sort(key=lambda run: run.created_at)
             runs = [run for run in runs if run.state != "crashed"]
 
             method_subsets = [methods[i::num_processes] for i in range(num_processes)]
+            print("method_subsets: ", method_subsets)
 
             with multiprocessing.Pool(processes=num_processes) as pool:
                 results = pool.starmap(process_methods, [(dataset, subset) for subset in method_subsets])
@@ -364,7 +372,8 @@ for color, method in zip(method_colors[: len(methods)], methods):
 #    "train_time": (None, None),
 # }
 
-
+print("RESULT: ")
+print(result_final)
 for key in result_final[datasets[0]][methods[0]]["all"]:
     # plt.rcParams['font.family'] = 'Arial'
     plt.rcParams["font.size"] = 12

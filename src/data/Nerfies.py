@@ -38,6 +38,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         load_flow: Optional[bool] = False,
         eval_train: Optional[bool] = False,
         load_mask: Optional[bool] = False,
+        depth_method: Optional[str] = None,
         # sample_interval: int,
         # num_pts: int,
         # num_pts_stat: int,
@@ -45,6 +46,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
     ) -> None:
         super().__init__(seed=seed)
 
+        self.depth_method = depth_method
         self.datadir = datadir
         self.eval = eval
         self.ratio = ratio
@@ -76,6 +78,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             eval=eval,
             load_flow=self.load_flow,
             load_mask=self.load_mask,
+            depth_method=self.depth_method,
         )
         self.test_cam_infos = Load_hyper_data(
             datadir,
@@ -85,6 +88,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             eval=eval,
             load_flow=self.load_flow,
             load_mask=self.load_mask,
+            depth_method=self.depth_method,
         )
 
         train_cam = format_hyper_data(self.train_cam_infos, "train")

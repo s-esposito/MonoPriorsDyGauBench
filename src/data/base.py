@@ -34,7 +34,10 @@ class InfiniteDataLoader:
         return data
 
 
-class CameraInfo(NamedTuple):
+from dataclasses import dataclass
+
+@dataclass
+class CameraInfo:
     uid: int
     R: np.array
     T: np.array
@@ -65,6 +68,18 @@ class CameraInfo(NamedTuple):
     fwd_flow_mask: Optional[np.array] = None
     bwd_flow: Optional[np.array] = None
     bwd_flow_mask: Optional[np.array] = None
+    
+    def __post_init__(self):
+        import matplotlib.pyplot as plt
+        # print("depth shape", self.depth.shape)
+        # print("img shape", self.image.shape)
+        # print("fwd_flow shape", self.fwd_flow.shape if self.fwd_flow is not None else None)
+        # print("bwd_flow shape", self.bwd_flow.shape if self.bwd_flow is not None else None)
+        # print("fwd_flow_mask shape", self.fwd_flow_mask.shape if self.fwd_flow_mask is not None else None)
+        # print("bwd_flow_mask shape", self.bwd_flow_mask.shape if self.bwd_flow_mask is not None else None)
+        
+        # plt.imsave("/home/geiger/gwb215/MonoPriorsDyGauBench/depth_vis.png", self.depth, cmap="Spectral")
+        # print("Save depth image to /home/geiger/gwb215/MonoPriorsDyGauBench")
 
 
 def getNerfppNorm(cam_info):

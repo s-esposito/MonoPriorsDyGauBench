@@ -27,7 +27,7 @@ def decompose_extrinsics(matrix):
     return np.transpose(R), T
 
 
-def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True):
+def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True, load_depth=True):
     cam_infos = []
     color_files = os.listdir(osp.join(path, "color" + ("_nvs" if nvs else "")))
     frames = len(color_files)
@@ -35,6 +35,7 @@ def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True
     intrinsics = np.load(osp.join(path, "cams" + ("_nvs" if nvs else ""), "color_intrinsics.npy"))
     forward_flow_dir = osp.join(path, "estimated_forward_flow" + ("_nvs" if nvs else ""))
     backward_flow_dir = osp.join(path, "estimated_backward_flow" + ("_nvs" if nvs else ""))
+    depth_dir = osp.join(path, "depth" + ("_nvs" if nvs else ""))
 
     # Focal: 519.49
     fovx = focal2fov(intrinsics[0, 0], intrinsics[0, 2] * 2)
@@ -85,6 +86,7 @@ def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True
         fwd_flow_mask = None
         bwd_flow_mask = None
         mask = None
+        depth = None
         # Read flows
         if load_mask:
             mask = 1 - np.load(
@@ -138,6 +140,59 @@ def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True
                 FovX_prev = FovX
                 FovY_prev = FovY
                 bwd_flow_mask = torch.from_numpy(np.ones_like(bwd_flow[..., 0]))
+                
+        # TODO:
+        if True:
+            depth_name = f"{idx+1:04d}.npy"
+            depth_path = osp.join(depth_dir, depth_name)
+            if os.path.exists(depth_path):
+                print(f"Reading depth {depth_path}")
+                original_depth = np.load(depth_path)
+                w, h = original_depth.shape[:2]
+                original_depth = original_depth.swapaxes(0, 1)
+                # Resize to match image shape
+                depth = cv2.resize(original_depth, (w // downsample, h // downsample), interpolation=cv2.INTER_NEAREST) # or INTER_LINEAR
+                print("width, height, downsample", w, h, downsample)
+                depth = torch.from_numpy(depth).float()
+                # Permute the dimensions to (w, h)
+                depth = np.transpose(depth, (1, 0))
+                # if idx % 15 == 0:
+                #     # save depth for visualization
+                #     print(f"Saving black white depth visualization for {depth_name}")
+                #     depth_save_path = osp.join(path, "depth_visualization", f"{image_name}_depth.png")
+                #     original_depth_save_path = osp.join(path, "depth_visualization", f"original_{image_name}_depth.png")
+                #     os.makedirs(osp.dirname(depth_save_path), exist_ok=True)
+# 
+                #     depth_vis = depth.numpy()
+                #     depth_vis = (depth_vis - depth_vis.min()) / (depth_vis.max() - depth_vis.min() + 1e-8)
+                #     depth_vis = (depth_vis * 255).astype(np.uint8)
+                #     Image.fromarray(depth_vis).save(depth_save_path)
+# 
+                #     original_vis = np.squeeze(original_depth)
+                #     original_vis = (original_vis - original_vis.min()) / (original_vis.max() - original_vis.min() + 1e-8)
+                #     original_vis = (original_vis * 255).astype(np.uint8)
+                #     Image.fromarray(original_vis).save(original_depth_save_path)   
+# 
+                #     print(f"Saving colorful visualization for {depth_name}")
+                #     import matplotlib.pyplot as plt
+                #     depth_save_path = osp.join(path, "depth_visualization", f"{image_name}_spectral_depth.png")
+                #     original_depth_save_path = osp.join(path, "depth_visualization", f"original_{image_name}_spectral_depth.png")
+                #     # Normalize resized depth for visualization
+                #     depth_vis = depth.numpy()
+                #     #depth_vis = (depth_vis - depth_vis.min()) / (depth_vis.max() - depth_vis.min() + 1e-8)
+# 
+                #     # Normalize original depth
+                #     original_vis = np.squeeze(original_depth)
+                #     #original_vis = (original_vis - original_vis.min()) / (original_vis.max() - original_vis.min() + 1e-8)
+# 
+                #     # Save with matplotlib using Spectral colormap
+                #     plt.imsave(depth_save_path, depth_vis, cmap="Spectral")
+                #     plt.imsave(original_depth_save_path, original_vis, cmap="Spectral")
+            else:
+                print(f"Depth {depth_path} not found")
+                raise FileNotFoundError(f"Depth file {depth_path} not found")
+        else:
+            depth = None
 
         cam_infos.append(
             CameraInfo(
@@ -167,6 +222,7 @@ def readCustomData(path, downsample=1, nvs=False, load_flow=True, load_mask=True
                 fwd_flow_mask=fwd_flow_mask,
                 bwd_flow_mask=bwd_flow_mask,
                 mask=mask,
+                depth=depth,
             )
         )
 

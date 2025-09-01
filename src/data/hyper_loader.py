@@ -63,9 +63,12 @@ class Load_hyper_data(Dataset):
         eval=False,
         load_flow=False,
         load_mask=False,
+        depth_method=None,
     ):
 
         from .utils import Camera
+        
+        self.depth_method = depth_method
 
         datadir = os.path.expanduser(datadir)
         with open(f"{datadir}/scene.json", "r") as f:
@@ -291,12 +294,24 @@ class Load_hyper_data(Dataset):
         image_path = "/".join(self.all_img[idx].split("/")[:-1])
         image_name = self.all_img[idx].split("/")[-1]
 
-        depth_path = image_path + "_midasdepth"
-        # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
-        if os.path.exists(os.path.join(depth_path, image_name)):
-            depth = cv.imread(os.path.join(depth_path, image_name), -1) / (2**16 - 1)
-            depth = depth.astype(float)
-            depth = torch.from_numpy(depth.copy())
+        if self.depth_method is not None:
+            depth_path = image_path + "_" + self.depth_method
+            base_name, _ = os.path.splitext(image_name)  # "left1_000004"
+            # possible datatypes: png, npy
+            depth_file_img = os.path.join(depth_path, image_name)       # e.g. left1_000004.png
+            depth_file_npy = os.path.join(depth_path, base_name + ".npy")  # e.g. left1_000004.npy
+            # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
+            
+            if os.path.exists(depth_file_npy):
+                depth = np.load(depth_file_npy)
+                depth = torch.from_numpy(depth.copy()).float()
+                # reading npy depth print statements
+                print("reading npy depths from method ", self.depth_method)
+            elif os.path.exists(depth_file_img):
+                depth = cv.imread(depth_file_img, -1) / (2**16 - 1)
+                depth = depth.astype(float)
+                depth = torch.from_numpy(depth.copy())
+                print("reading img depths from method ", self.depth_method)
         else:
             depth = None
 
@@ -320,6 +335,8 @@ class Load_hyper_data(Dataset):
             bwd_flow, bwd_flow_mask  = None, None
         """
         # fwd_flow, fwd_flow_mask, bwd_flow, bwd_flow_mask = None, None, None, None
+
+        print("WIE SEHEN DENN DIE BILDER AUS: ", image.shape)
 
         caminfo = CameraInfo(
             uid=idx,
@@ -369,7 +386,7 @@ class Load_hyper_data(Dataset):
         image_path = "/".join(self.all_img[idx].split("/")[:-1])
         image_name = self.all_img[idx].split("/")[-1]
 
-        depth_path = image_path + "_midasdepth"
+        depth_path = image_path + "_" + self.depth_method
         # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
         if os.path.exists(os.path.join(depth_path, image_name)):
             depth = cv.imread(os.path.join(depth_path, image_name), -1) / (2**16 - 1)

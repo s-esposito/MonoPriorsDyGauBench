@@ -28,6 +28,7 @@ def readCamerasFromTransforms(
     extension=".png",
     downsample=1,
     load_flow=False,
+    depth_method=None  # default depth method
 ):
     if load_flow:
         return readCamerasFromTransforms_flow(path, transformsfile, white_background, extension=".png", downsample=1)
@@ -54,13 +55,19 @@ def readCamerasFromTransforms(
             image_name = Path(cam_name).stem
             image = Image.open(cam_name)
 
-            depth_path = os.path.dirname(cam_name) + "_midasdepth"
+            depth_path = os.path.dirname(cam_name) + "_" + depth_method
+            depth_ext = cam_name.split(".")[-1]  # usually "png" or "jpg"
             # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
-            if os.path.exists(os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1])):
-                depth = cv2.imread(
-                    os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1]),
-                    -1,
-                ) / (2**16 - 1)
+            base_name = os.path.splitext(image_name)[0]
+            # candidates
+            depth_file_npy = os.path.join(depth_path, base_name + ".npy")
+            depth_file_img = os.path.join(depth_path, f"{image_name}.{depth_ext}")
+            if os.path.exists(depth_file_npy):
+                # load as numpy
+                depth = np.load(depth_file)
+                depth = torch.from_numpy(depth.copy()).float()
+            elif os.path.exists(depth_file_img):
+                depth = cv2.imread(depth_file, -1) / (2**16 - 1)
                 depth = depth.astype(float)
                 depth = torch.from_numpy(depth.copy())
             else:
@@ -116,6 +123,7 @@ def readCamerasFromTransforms_flow(
     white_background,
     extension=".png",
     downsample=1,
+    depth_method=None,  # default depth method
 ):
 
     cam_infos = []
@@ -159,7 +167,7 @@ def readCamerasFromTransforms_flow(
             image_name = Path(cam_name).stem
             image = Image.open(cam_name)
 
-            depth_path = os.path.dirname(cam_name) + "_midasdepth"
+            depth_path = os.path.dirname(cam_name) + "_" + depth_method
             # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
             # print(cam_name, image_name, depth_path, os.path.join(depth_path, image_name+"."+cam_name.split(".")[-1]))
             if os.path.exists(os.path.join(depth_path, image_name + "." + cam_name.split(".")[-1])):
@@ -362,6 +370,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         seed: Optional[int] = None,
         load_flow: Optional[bool] = False,
         eval_train: Optional[bool] = False,
+        depth_method: Optional[str] = None,  # default depth method
     ) -> None:
         super().__init__(seed=seed)
 
@@ -375,6 +384,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         self.num_pts = num_pts
         self.num_pts_ratio = num_pts_ratio
         self.eval_train = eval_train
+        self.depth_method = depth_method
         self.save_hyperparameters()
 
     def setup(self, stage: str):
@@ -391,6 +401,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
             extension,
             downsample=downsample,
             load_flow=self.load_flow,
+            depth_method=self.depth_method,  # default depth method
         )
         print("Reading Test Transforms")
         self.test_cam_infos = readCamerasFromTransforms(
@@ -400,6 +411,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
             extension,
             downsample=downsample,
             load_flow=self.load_flow,
+            depth_method=self.depth_method,  # default depth method
         )
 
         # self.train_cam_infos = Load_hyper_data(datadir,ratio,use_bg_points,split ="train", eval=eval)
@@ -450,7 +462,7 @@ class SyntheticDataModule(MyDataModuleBaseClass):
         #                   #maxtime=max_time
         #                   )
 
-        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train", load_flow=self.load_flow)
+        self.train_cameras = FourDGSdataset(self.train_cam_infos, split="train", load_flow=self.load_flow, )
         self.test_cameras = FourDGSdataset(self.test_cam_infos, split="test", load_flow=self.load_flow)
         # assert False, "change to 5 train, 5 test; and save image_name somewhere for both DneRF and Nerfies"
         is_val_train = [idx % len(self.train_cameras) for idx in range(5, 30, 5)]

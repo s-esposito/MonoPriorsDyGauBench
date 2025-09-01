@@ -19,6 +19,7 @@ def create_from_pcd_vanilla(pcd: BasicPointCloud, spatial_lr_scale: float, max_s
     print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
     dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+    # print("mache ich hier die scales ?????????????????????")
     scales = torch.log(torch.sqrt(dist2))[..., None].repeat(1, 3)
     rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
     rots[:, 0] = 1
@@ -35,7 +36,7 @@ def create_from_pcd_vanilla(pcd: BasicPointCloud, spatial_lr_scale: float, max_s
     )
 
 
-def create_from_pcd_D3G(pcd: BasicPointCloud, spatial_lr_scale: float, max_sh_degree: int):
+def create_from_pcd_D3G(pcd: BasicPointCloud, spatial_lr_scale: float, max_sh_degree: int, using_isotropic_gaussians: bool = False):
 
     fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()
     fused_color_raw = torch.tensor(np.asarray(pcd.colors)).float().cuda()
@@ -47,7 +48,10 @@ def create_from_pcd_D3G(pcd: BasicPointCloud, spatial_lr_scale: float, max_sh_de
     print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
     dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
-    scales = torch.log(torch.sqrt(dist2))[..., None].repeat(1, 3)
+    if using_isotropic_gaussians:
+        scales = torch.log(torch.sqrt(dist2))[..., None]  # .repeat(1, 3)
+    else:
+        scales = torch.log(torch.sqrt(dist2))[..., None].repeat(1, 3)
     rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
     rots[:, 0] = 1
 

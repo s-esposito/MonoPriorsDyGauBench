@@ -8,27 +8,28 @@ import pickle
 import matplotlib.cm as cm
 
 sub_class = "all"
-datasets = ["iphone", "nerfies", "hypernerf", "nerfds", "dnerf"]
+# datasets = ["iphone", "nerfies", "hypernerf", "nerfds", "dnerf"]
+datasets = ["nerfies"]
 methods = [
-    "TiNeuVox/vanilla",
-    "MLP/nodeform",
-    "MLP/vanilla",
+    # "TiNeuVox/vanilla",
+    # "MLP/nodeform",
+#"MLP/vanilla",
     "Curve/vanilla",
-    "FourDim/vanilla",
+    # "FourDim/vanilla",
     "HexPlane/vanilla",
-    "TRBF/nodecoder",
-    "TRBF/vanilla",
+    # "TRBF/nodecoder",
+    # "TRBF/vanilla",
 ]
 
 methods_to_show = [
-    "TiNeuVox",
-    "3DGS",
-    "DeformableGS",
+    # "TiNeuVox",
+    # "3DGS",
+#"DeformableGS",
     "EffGS",
-    "RTGS",
+    # "RTGS",
     "4DGS",
-    "STG-decoder",
-    "STG",
+    # "STG-decoder",
+    # "STG",
 ]
 
 exp_prefix = "perdataset"

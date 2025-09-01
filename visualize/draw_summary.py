@@ -25,12 +25,12 @@ os.makedirs(exp_prefix, exist_ok=True)
 # datasets=["nerfds"]
 # dataset_name = "NeRF-DS dataset"
 # labelname=datasets[0]
-# datasets=["nerfies"]
-# dataset_name = "Nerfies dataset"
-# labelname=datasets[0]
-datasets = ["iphone"]
-dataset_name = "iPhone dataset"
-labelname = datasets[0]
+datasets=["nerfies"]
+dataset_name = "Nerfies dataset"
+labelname=datasets[0]
+# datasets = ["iphone"]
+# dataset_name = "iPhone dataset"
+# labelname = datasets[0]
 
 with open("traineval.pkl", "rb") as file:
     result_final = pickle.load(file)
@@ -63,14 +63,14 @@ for dataset in datasets:
 
 # Define a mapping of old method names to new method names
 method_name_mapping = {
-    "TiNeuVox/vanilla": "TiNeuVox",
+    # "TiNeuVox/vanilla": "TiNeuVox",
     "HexPlane/vanilla": "4DGS",
-    "MLP/nodeform": "3DGS",
-    "MLP/vanilla": "DeformableGS",
-    "TRBF/nodecoder": "STG-decoder",
-    "TRBF/vanilla": "STG",
+    # "MLP/nodeform": "3DGS",
+# "MLP/vanilla": "DeformableGS",
+    # "TRBF/nodecoder": "STG-decoder",
+    # "TRBF/vanilla": "STG",
     "Curve/vanilla": "EffGS",
-    "FourDim/vanilla": "RTGS",
+    # "FourDim/vanilla": "RTGS",
 }
 
 # Define a mapping of old metric names to new metric names
@@ -128,14 +128,14 @@ def generate_latex_table(data, method_mapping, metric_mapping):
                 mean_values[method][metric] = f"{value:.2f}"
 
     for method in [
-        "TiNeuVox/vanilla",
-        "MLP/nodeform",
+        # "TiNeuVox/vanilla",
+        # "MLP/nodeform",
         "Curve/vanilla",
-        "TRBF/nodecoder",
-        "TRBF/vanilla",
-        "MLP/vanilla",
+        # "TRBF/nodecoder",
+        # "TRBF/vanilla",
+    #"MLP/vanilla",
         "HexPlane/vanilla",
-        "FourDim/vanilla",
+        # "FourDim/vanilla",
     ]:
         latex_code += method_mapping[method]
         for metric in metrics:
