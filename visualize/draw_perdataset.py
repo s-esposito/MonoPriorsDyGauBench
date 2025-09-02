@@ -13,21 +13,28 @@ datasets = ["nerfies"]
 methods = [
     # "TiNeuVox/vanilla",
     # "MLP/nodeform",
-#"MLP/vanilla",
+    "MLP/vanilla",
+    "MLP-videoda/vanilla",
     "Curve/vanilla",
+    "Curve-videoda/vanilla",
     # "FourDim/vanilla",
     "HexPlane/vanilla",
+    "HexPlane-videoda/vanilla",
     # "TRBF/nodecoder",
     # "TRBF/vanilla",
 ]
+custom_font_size = 16
 
 methods_to_show = [
     # "TiNeuVox",
     # "3DGS",
-#"DeformableGS",
+    "DeformableGS",
+    "DeformableGS + VideoDA",
     "EffGS",
+    "EffGS + VideoDA",
     # "RTGS",
     "4DGS",
+    "4DGS + VideoDA",
     # "STG-decoder",
     # "STG",
 ]
@@ -173,15 +180,15 @@ for key in metric_name_mapping:
             linewidth=0.5,
         )
 
-    plt.ylabel(metric_name_mapping[key], fontsize=24)
+    plt.ylabel(metric_name_mapping[key], fontsize=custom_font_size)
 
-    ax.tick_params(axis="both", which="major", labelsize=24)
+    ax.tick_params(axis="both", which="major", labelsize=custom_font_size)
 
     # Add legend
     legend_handles = [
         plt.Rectangle((0, 0), 1, 1, color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))
     ]
-    ax.legend(handles=legend_handles, loc="upper right", fontsize=24, ncol=3)
+    ax.legend(handles=legend_handles, loc="upper right", fontsize=custom_font_size, ncol=2)
 
     # plt.subplots_adjust(bottom=0.15)
 

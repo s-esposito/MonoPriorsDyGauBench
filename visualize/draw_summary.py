@@ -65,11 +65,14 @@ for dataset in datasets:
 method_name_mapping = {
     # "TiNeuVox/vanilla": "TiNeuVox",
     "HexPlane/vanilla": "4DGS",
+    "HexPlane-videoda/vanilla": "4DGS + VideoDA",
     # "MLP/nodeform": "3DGS",
-# "MLP/vanilla": "DeformableGS",
+    "MLP/vanilla": "DeformableGS",
+    "MLP-videoda/vanilla": "DeformableGS + VideoDA",
     # "TRBF/nodecoder": "STG-decoder",
     # "TRBF/vanilla": "STG",
     "Curve/vanilla": "EffGS",
+    "Curve-videoda/vanilla": "EffGS + VideoDA",
     # "FourDim/vanilla": "RTGS",
 }
 
@@ -131,10 +134,13 @@ def generate_latex_table(data, method_mapping, metric_mapping):
         # "TiNeuVox/vanilla",
         # "MLP/nodeform",
         "Curve/vanilla",
+        "Curve-videoda/vanilla",
         # "TRBF/nodecoder",
         # "TRBF/vanilla",
-    #"MLP/vanilla",
+        "MLP/vanilla",
+        "MLP-videoda/vanilla",
         "HexPlane/vanilla",
+        "HexPlane-videoda/vanilla",
         # "FourDim/vanilla",
     ]:
         latex_code += method_mapping[method]

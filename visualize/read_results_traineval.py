@@ -21,7 +21,7 @@ sub_class = "all"
 # for depth test
 datasets = ["nerfies"]# , "nerfds"]  # ,  "hypernerf", "dnerf"]
 
-root_dir = "../output/vis_script_test"  
+root_dir = "../output/depth_experiment"  
 tineuvox_root_dir = "../../TiNeuVox/logs"
 
 # specify experiments to track
@@ -29,9 +29,12 @@ methods = [
     #"TiNeuVox/vanilla",
     #"MLP/nodeform",
     "MLP/vanilla",
+    "MLP-videoda/vanilla",
     "Curve/vanilla",
+    "Curve-videoda/vanilla",
     #"FourDim/vanilla",
     "HexPlane/vanilla",
+    "HexPlane-videoda/vanilla",
     #"TRBF/nodecoder",
     #"TRBF/vanilla",
 ]
@@ -56,24 +59,34 @@ def process_methods(dataset, methods_subset):
     tineuvox_runs_ = [run for run in tineuvox_runs if run.group == dataset]
     for scene_dir in tqdm(scene_dirs):
         scene = scene_dir.split("/")[-1]
-        scene_runs = [run for run in runs if run.group == scene]
+        
+        scene_runs = [run for run in runs if scene in run.name]#run.group == scene]
+        print("scene runs: ", scene_runs)
+        
         tineuvox_scene_runs = [run for run in tineuvox_runs_ if run.name.startswith(scene)]
         for method_id, method in tqdm(enumerate(methods_subset)):
-            print("Komme ich hier rein ?????")
             big_name, small_name = method.split("/")
+            
+            print("run name print: ", methods) 
             if big_name == "TiNeuVox":
                 method_runs = [
                     run for run in tineuvox_scene_runs if (run.name).startswith("/".join([scene, small_name]))
                 ]
-            elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF"]:
-                method_runs = [run for run in scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
+            elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF", "MLP-videoda", "Curve-videoda", "HexPlane-videoda"]:
+                method_runs = [run for run in scene_runs if big_name in run.name] # (run.name).startswith("_".join([big_name, small_name]))]
+                print("method runs: ", method_runs)
+                # for run in runs:
+                #     print(run.name)
+                #     if scene in run.name:
+                #         print("gefunden !!!!!!!!!!!!!!!!!!!!")
+                #         exit(0)
             else:
                 assert False, f"Unknown method {big_name}!"
             print("method_runs: ", method_runs)
             # tineuvox_method_runs = [run for run in tineuvox_scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
             # method_runs = method_runs + tineuvox_scene_runs
             exps = []
-            for run_id in ["1", "2"]: #, "3"]:
+            for run_id in ["1"]: #, "2"]: #, "3"]:
                 exp = {
                     "train_time": None,
                     "render_FPS": None,
@@ -95,10 +108,15 @@ def process_methods(dataset, methods_subset):
                     train_run = [run for run in method_runs if run.name == "/".join([scene, small_name + run_id])]
                     # assert False, ["/".join([scene, small_name+run_id]), len(train_run)]
                     local_path = os.path.join(tineuvox_root_dir, dataset, scene, small_name + run_id)
-                elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF"]:
+                elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF", "MLP-videoda", "Curve-videoda", "HexPlane-videoda"]:
+                    #for run in runs:
+                        #print("TOooooooooooooooooles printttttttttttt")
+                        #print("_".join(["GaussianDiff", dataset, scene, big_name, small_name + run_id, "fit"]))
                     train_run = [
-                        run for run in method_runs if run.name == "_".join([big_name, small_name + run_id, "fit"])
+                        run for run in method_runs if run.name == f"GaussianDiff_{dataset}_{scene}-{big_name}_{small_name}{run_id}_fit"
+                        #"_".join(["GaussianDiff", dataset, scene, big_name, small_name + run_id, "fit"])# "_".join(["GaussianDiff", big_name, small_name + run_id, "fit"]) #big_name in run.name 
                     ]
+                    print("train run: ", train_run)
                     test_run = [
                         run for run in method_runs if run.name == "_".join([big_name, small_name + run_id, "test"])
                     ]
@@ -172,6 +190,9 @@ def process_methods(dataset, methods_subset):
                     "MLP",
                     "TRBF",
                     "TiNeuVox",
+                    "MLP-videoda", 
+                    "Curve-videoda", 
+                    "HexPlane-videoda",
                 ]:
                     exp["crash"] = 0.0
                     exp["test_psnr"] = test_psnr
@@ -218,8 +239,8 @@ def process_methods(dataset, methods_subset):
                             if big_name == "TiNeuVox" or train_step == 29999:
                                 start_time = train_run.created_at
                                 end_time = train_run.heartbeatAt
-                                start_datetime = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S")
-                                end_datetime = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%S")
+                                start_datetime = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ")
+                                end_datetime = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%SZ")
                                 total_time = end_datetime - start_datetime
                                 exp["train_time"] = total_time.total_seconds()
                                 exp["OOM"] = 0.0
@@ -228,7 +249,7 @@ def process_methods(dataset, methods_subset):
                                 exp["OOM"] = 1.0
                 else:
                     assert False, f"Unknown method {big_name}!"
-
+                print("exp: ", exp)
                 exps.append(exp)
 
             if len(exps):
@@ -254,11 +275,12 @@ def process_methods(dataset, methods_subset):
 
     return result_subset
 
-
-if os.path.exists(f"{exp_prefix}.pkl"):
-    with open(f"{exp_prefix}.pkl", "rb") as file:
-        result_final = pickle.load(file)
-else:
+# always save a new .pkl file
+# if os.path.exists(f"{exp_prefix}.pkl"):
+#     with open(f"{exp_prefix}.pkl", "rb") as file:
+#         result_final = pickle.load(file)
+# else:
+if True:
     wandb.login(key="1c19e048ca5da79c677efbf93e742cd1114c0d5b") # a552a3104d9784010a88b7361592931dd61ecc7d")
     api = wandb.Api()
     projects = api.projects()
@@ -280,7 +302,7 @@ else:
         print(f"Dataset: {dataset}")
 
         for dataset_id, project in tqdm(enumerate(projects)):
-            if project.name != f"vis_script_test": # "GaussianDiff_{dataset}": 
+            if project.name != f"depth_experiment": # "GaussianDiff_{dataset}": 
                 continue
             runs = api.runs(path=f"{project.name}")
 
