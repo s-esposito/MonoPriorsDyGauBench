@@ -11,11 +11,63 @@
 
 import torch
 import torch.nn.functional as F
+import numpy as np
 from torch.autograd import Variable
+from src.utils.depth_utils import get_scaled_shifted_depth
 from math import exp
 
 
-def compute_depth_loss(pred_depth, gt_depth):
+def get_depth_loss(pred, gt, log_output=False, mask=None):
+    pred = get_scaled_shifted_depth(pred, gt, mask)
+    if mask is None:
+        mask = torch.ones_like(pred)
+    if log_output:
+        loss = torch.abs(pred - gt) * mask
+    else:
+        loss = torch.sum(torch.abs(pred - gt) * mask) / torch.sum(mask)
+    return loss
+
+def get_depth_decay_func(
+    lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000, slope=1.0
+):
+    """
+    Copied from Plenoxels
+
+    Continuous learning rate decay function. Adapted from JaxNeRF
+    The returned rate is lr_init when step=0 and lr_final when step=max_steps, and
+    is log-linearly interpolated elsewhere (equivalent to exponential decay).
+    If lr_delay_steps>0 then the learning rate will be scaled by some smooth
+    function of lr_delay_mult, such that the initial learning rate is
+    lr_init*lr_delay_mult at the beginning of optimization but will be eased back
+    to the normal learning rate when steps>lr_delay_steps.
+    :param conf: config subtree 'lr' or similar
+    :param max_steps: int, the number of steps during optimization.
+    :return HoF which takes step as input
+    """
+
+    def helper(step):
+        if step < 0 or (lr_init == 0.0 and lr_final == 0.0):
+            # Disable this parameter
+            return 0.0
+        if lr_delay_steps > 0:
+            # A kind of reverse cosine decay.
+            delay_rate = lr_delay_mult + (1 - lr_delay_mult) * np.sin(
+                0.5 * np.pi * np.clip(step / lr_delay_steps, 0, 1)
+            )
+        else:
+            delay_rate = 1.0
+        t = np.clip(step / max_steps, 0, 1)
+        log_lerp = np.exp(np.log(lr_init) * (1 - (t**slope)) + np.log(lr_final) * (t**slope))
+        return delay_rate * log_lerp
+
+    return helper
+
+def compute_depth_loss(pred_depth, gt_depth, log_output=False):
+    eps = 1e-6
+    # pred_depth = F.softplus(pred_depth)
+    # pred_depth_log = torch.log(pred_depth + eps) # 1.0 / (pred_depth + eps)
+    # gt_depth_log   = torch.log(gt_depth + eps) # 1.0 / (gt_depth + eps)
+    
     # pred_depth_e = NDC2Euclidean(pred_depth_ndc)
     t_pred = torch.median(pred_depth)
     s_pred = torch.mean(torch.abs(pred_depth - t_pred))
@@ -23,11 +75,75 @@ def compute_depth_loss(pred_depth, gt_depth):
     t_gt = torch.median(gt_depth)
     s_gt = torch.mean(torch.abs(gt_depth - t_gt))
 
-    pred_depth_n = (pred_depth - t_pred) / s_pred
-    gt_depth_n = (gt_depth - t_gt) / s_gt
+    pred_depth_n = (pred_depth - t_pred) / (s_pred + 1e-8)
+    gt_depth_n = (gt_depth - t_gt) / (s_gt + 1e-8)
 
+    alpha = 0.5
     # return torch.mean(torch.abs(pred_depth_n - gt_depth_n))
-    return torch.mean(torch.pow(pred_depth_n - gt_depth_n, 2))
+    if log_output:
+        # loss_l1 = torch.abs(pred_depth_n - gt_depth_n)
+        # loss_l2 = torch.pow(pred_depth_n - gt_depth_n, 2)
+        # loss = alpha * loss_l1 + (1 - alpha) * loss_l2
+        return torch.abs(pred_depth_n - gt_depth_n)
+    else:
+        # loss_l1 = torch.mean(torch.abs(pred_depth_n - gt_depth_n))
+        # loss_l2 = torch.mean(torch.pow(pred_depth_n - gt_depth_n, 2))
+        # loss = alpha * loss_l1 + (1 - alpha) * loss_l2
+        return torch.mean(torch.abs(pred_depth_n - gt_depth_n))
+    # return loss
+    
+# def compute_depth_loss(pred_depth, gt_depth, log_output=False, use_lidar=False):
+#     if use_lidar:
+#         print("using lidar depth loss")
+#         # Mask out invalid LiDAR pixels (value = 0.0)
+#         valid_mask = gt_depth > 0.0
+#         pred_vals = pred_depth[valid_mask]
+#         gt_vals = gt_depth[valid_mask]
+#     else:
+#         # Use all pixels
+#         pred_vals = pred_depth
+#         gt_vals = gt_depth
+# 
+#     # Compute median and mean absolute deviation
+#     t_pred = torch.median(pred_vals)
+#     s_pred = torch.mean(torch.abs(pred_vals - t_pred))
+# 
+#     t_gt = torch.median(gt_vals)
+#     s_gt = torch.mean(torch.abs(gt_vals - t_gt))
+# 
+#     # Normalize
+#     pred_depth_n = (pred_depth - t_pred) / (s_pred + 1e-8)
+#     gt_depth_n = (gt_depth - t_gt) / (s_gt + 1e-8)
+# 
+#     # Compute squared differences
+#     diff = torch.pow(pred_depth_n - gt_depth_n, 2)
+# 
+#     if use_lidar:
+#         # Mask out invalid pixels for loss computation
+#         diff = diff * valid_mask
+# 
+#     if log_output:
+#         return diff
+#     else:
+#         # Mean over valid pixels if LiDAR, otherwise over all pixels
+#         return diff.sum() / (valid_mask.sum() if use_lidar else diff.numel())
+
+# def compute_depth_loss(pred_depth, gt_depth, log_output=False):
+#     # pred_depth_e = NDC2Euclidean(pred_depth_ndc)
+#     t_pred = torch.median(pred_depth)
+#     s_pred = torch.mean(torch.abs(pred_depth - t_pred))
+# 
+#     t_gt = torch.median(gt_depth)
+#     s_gt = torch.mean(torch.abs(gt_depth - t_gt))
+# 
+#     pred_depth_n = (pred_depth - t_pred) / (s_pred + 1e-8)
+#     gt_depth_n = (gt_depth - t_gt) / (s_gt + 1e-8)
+# 
+#     # return torch.mean(torch.abs(pred_depth_n - gt_depth_n))
+#     if log_output:
+#         return torch.pow(pred_depth_n - gt_depth_n, 2)
+#     else:
+#         return torch.mean(torch.pow(pred_depth_n - gt_depth_n, 2))
 
 
 def compute_flow_loss(render_flow_fwd, render_flow_bwd, fwd_flow, bwd_flow, fwd_flow_mask, bwd_flow_mask):

@@ -12,7 +12,7 @@ data:
     datadir: 'data/nerfies/curls'
     eval: True
     ratio: 0.25
-    white_background: true
+    white_background: false
     batch_size: 2 # 1 if syntethic, 2 if real
     num_pts_ratio: 0.0
     num_pts: 0

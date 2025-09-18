@@ -33,6 +33,8 @@ from src.utils.loss_utils import (
     l2_loss,
     compute_depth_loss,
     compute_flow_loss,
+    get_depth_loss,
+    get_depth_decay_func,
 )
 from src.utils.loss_utils_mask import ssim as ssim_mask, ms_ssim as ms_ssim_mask
 from src.utils.sh_utils import RGB2SH
@@ -152,6 +154,8 @@ class GS3d(MyModelBaseClass):
         verbose: Optional[bool] = False,
         eval_mask: Optional[bool] = False,
         using_isotropic_gaussians: Optional[bool] = False,
+        lambda_depth: Optional[float] = 0.0,
+        using_lidar_depth: Optional[bool] = False,
         **kwargs,
     ):
         super().__init__()
@@ -176,6 +180,10 @@ class GS3d(MyModelBaseClass):
         self._opacity = torch.empty(0)
         
         self.using_isotropic_gaussians = using_isotropic_gaussians
+        self.lambda_depth = lambda_depth
+        self.MAX_GAUSSIANS = 1400000
+        self.max_depth_weight = 1.0
+        self.min_depth_weight = 0.001
 
         # densification required tracker
         self.max_radii2D = torch.empty(0)
@@ -368,7 +376,7 @@ class GS3d(MyModelBaseClass):
     # have to put create_from_pcd here as need read datamodule info
     def setup(self, stage: str) -> None:
 
-        white_background = False # self.trainer.datamodule.white_background
+        white_background = False # self.trainer.datamodule.white_background   # Hard set it to True here
         if white_background:
             bg_color = [1, 1, 1]
         else:
@@ -1109,12 +1117,27 @@ class GS3d(MyModelBaseClass):
                     prefiltered=False,
                     debug=False,
                 )
+                print("background color:", self.bg_color.to(batch["time"]))
                 raster_settings = GaussianRasterizationSettings(
                     image_height=int(batch["image_height"][idx]),
                     image_width=int(batch["image_width"][idx]),
                     tanfovx=tanfovx,
                     tanfovy=tanfovy,
                     bg=self.bg_color.to(batch["time"].device),
+                    scale_modifier=scaling_modifier,
+                    viewmatrix=batch["world_view_transform"][idx],
+                    projmatrix=batch["full_proj_transform"][idx],
+                    sh_degree=self.active_sh_degree,
+                    campos=batch["camera_center"][idx],
+                    prefiltered=False,
+                    debug=False,
+                )
+                depth_raster_settings = GaussianRasterizationSettings(
+                    image_height=int(batch["image_height"][idx]),
+                    image_width=int(batch["image_width"][idx]),
+                    tanfovx=tanfovx,
+                    tanfovy=tanfovy,
+                    bg=torch.ones_like(self.bg_color.to(batch["time"].device))*0.0,
                     scale_modifier=scaling_modifier,
                     viewmatrix=batch["world_view_transform"][idx],
                     projmatrix=batch["full_proj_transform"][idx],
@@ -1145,6 +1168,7 @@ class GS3d(MyModelBaseClass):
                 )
                 
                 rasterizer = GaussianRasterizer(raster_settings=raster_settings)
+                depth_rasterizer = GaussianRasterizer(raster_settings=depth_raster_settings)
                 rasterizer_ch3 = GaussianRasterizer(raster_settings=raster_settings_ch3)
                 rasterizer_4D = GaussianRasterizer4D(raster_settings=raster_settings_4d)
 
@@ -1197,10 +1221,14 @@ class GS3d(MyModelBaseClass):
                 else:
                     scales = result["scales"]
 
+                # print("--------------------------------------------------------------------------")
+                # print("-------------- Current Number of Max Gaussians is: " + str(self.MAX_GAUSSIANS) + " --------------")
+                # print("--------------- Current Number of Gaussians is: " + str(self.get_xyz.shape[0]) + " ---------------")
+                # print("--------------------------------------------------------------------------")
 
                 # print("pre_render scales: ", result["scales"])
                 # 3D rasterizer call
-                rendered_image, radii, _ = rasterizer(
+                rendered_image, radii, undif_depth = rasterizer(
                     means3D=result["means3D"],
                     means2D=means2D,
                     shs=result["shs"],
@@ -1211,95 +1239,83 @@ class GS3d(MyModelBaseClass):
                     cov3D_precomp=result["cov3D_precomp"],
                 )
                 
-                N = result["means3D"].shape[0]
-                homog_means = torch.cat([result["means3D"], torch.ones(N, 1, device=result["means3D"].device)], dim=1)
-                camera_coords = (homog_means @ raster_settings.viewmatrix.T)[:, :3]
-                point_depths = camera_coords[:, 2:3]  # z-axis is depth along view
-                point_depths_rgb = point_depths.expand(-1, 3)  # shape [N,3]
+                # -----------------------------
+                # Compute screen-space depth
+                # -----------------------------
+                # Get 3D points in camera/view space
+                points3D = result["means3D"]
+
+                # Transform points to camera/view space
+                viewmatrix = raster_settings.viewmatrix
+
+                # Apply to all points
+                if viewmatrix.ndim == 2 and viewmatrix.shape == (4, 4):
+                    m = viewmatrix.flatten()
+                else:
+                    m = viewmatrix
+
+                x = points3D[:, 0]
+                y = points3D[:, 1]
+                z = points3D[:, 2]
+
+                tx = m[0] * x + m[4] * y + m[8] * z + m[12]
+                ty = m[1] * x + m[5] * y + m[9] * z + m[13]
+                tz = m[2] * x + m[6] * y + m[10] * z + m[14]
+
+                depths = torch.stack([tx, ty, tz], dim=-1)
+                depths = depths[:, 2:3]  # (N,1), positive = in front of camera
+                eps = 1e-6
+                inverse_depths = 1 / (depths + eps)
+                point_depths_rgb = inverse_depths.expand(-1, 3)  # shape [N,3]
+
+                # -----------------------------
+                # Rasterize depth
+                # -----------------------------
                 
-                rendered_depth, _, _ = rasterizer(
-                    means3D=result["means3D"],
+                rendered_depth, _, _ = depth_rasterizer(
+                    means3D=points3D,
                     means2D=means2D,
                     shs=None,
                     colors_precomp=point_depths_rgb,
-                    opacities=result["opacity"],
-                    scales=scales, # result["scales"],
-                    rotations=result["rotations"],
-                    cov3D_precomp=result["cov3D_precomp"],
+                    opacities=result["opacity"],         # no detach
+                    scales=result["scales"],             # no detach
+                    rotations=result["rotations"],       # no detach
+                    cov3D_precomp=result["cov3D_precomp"]# no detach
                 )
                 rendered_depth = rendered_depth[0:1, :, :]
-                
-
-                # save depth for visualization in folder depth_vis
-#                 if self.global_step % 1000 == 0:
+                    
+                    
+##################################################################################################################################################################
+#                 # save depth for visualization in folder depth_vis
+#                 if self.global_step % 100 == 0:
 #                     # print shape and dim of depth
 #                     print("rendered_depth", rendered_depth.shape, rendered_depth.dim())
+#                     print("undif_depth", undif_depth.shape, undif_depth.dim())
 #                     render_depth = rendered_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-#                     save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/depth_vis_with_colorar"
+#                     undif_depth = undif_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
+#                     save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/depth_rendering_comp"
+#                     
+#                     # --- Create figure with 2 subplots ---
+#                     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+# 
+#                     # Rendered depth
+#                     im0 = axes[0].imshow(render_depth, cmap="Spectral")
+#                     axes[0].set_title("Rendered Depth")
+#                     plt.colorbar(im0, ax=axes[0])
+# 
+#                     # Undifferentiated depth
+#                     im1 = axes[1].imshow(undif_depth, cmap="Spectral")
+#                     axes[1].set_title("Undifferentiated Depth")
+#                     plt.colorbar(im1, ax=axes[1])
+# 
+#                     # Save figure
 #                     os.makedirs(save_dir, exist_ok=True)
 #                     save_path = os.path.join(save_dir, f"depth_step_{self.global_step:06d}.png")
-#                     # --- Create figure with colorbar ---
-#                     fig, ax = plt.subplots()
-#                     im = ax.imshow(render_depth, cmap="Spectral")
-#                     plt.colorbar(im, ax=ax)  # adds colorbar
-#                     # --- Save locally (with colorbar included) ---
+#                     plt.tight_layout()
 #                     fig.savefig(save_path, bbox_inches="tight")
-#                     print("saved rendered depth with colorbar to ", save_path)
-#                     #plt.imsave(save_path, render_depth, cmap="Spectral")
-#                     #print("saved rendered depth to ", save_path)
-                
-                #print("rendered_depth shape", rendered_depth.shape, rendered_depth.dim())
-
-                
-                
-                
-                
-                
-#                 # Per-point depth in camera space (e.g., z after view transform)
-#                 point_depths = result["means3D"][:, 2:3]   # shape [N,1]
-#                 
-#                 # Normalize between 0 and 1 using near/far plane if available
-#                 near, far = 0.1, 10.0
-#                 point_depths = (point_depths - near) / (far - near)
-#                 point_depths = torch.clamp(point_depths, 0.0, 1.0)
-#                 
-#                 # Render depth as if it were "color"
-#                 rendered_depth, _, _ = rasterizer(
-#                     means3D=result["means3D"],
-#                     means2D=means2D,
-#                     shs=torch.empty(0, device=result["means3D"].device),
-#                     colors_precomp=point_depths,
-#                     opacities=result["opacity"],
-#                     scales=result["scales"],
-#                     rotations=result["rotations"],
-#                     cov3D_precomp=result["cov3D_precomp"],
-#                 )
-#                 
-#                 print("rendered_depth", rendered_depth.shape)
-                
-                
-
-                # save depth for visualization in folder depth_vis
-                # if self.global_step % 100 == 0:
-                #     # print shape and dim of depth
-                #     print("rendered_depth", depth.shape, depth.dim())
-                #     render_depth = depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-                #     save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/depth_vis"
-                #     os.makedirs(save_dir, exist_ok=True)
-                #     save_path = os.path.join(save_dir, f"depth_step_{self.global_step:06d}.png")
-                #     plt.imsave(save_path, render_depth, cmap="Spectral")
-                #     print("saved rendered depth to ", save_path)
-
-                # depth, radii, _ = rasterizer(
-                #     means3D=result["means3D"],
-                #     means2D=means2D,
-                #     shs=None,
-                #     colors_precomp=distfromcamera(result["means3D"]),
-                #     opacities=result["opacity"],
-                #     scales=result["scales"],
-                #     rotations=result["rotations"],
-                #     cov3D_precomp=result["cov3D_precomp"],
-                # )
+#                     plt.close(fig)  # close to free memory
+# 
+#                     print("Saved depth comparison to", save_path)
                 
                 rendered_image = self.postprocess(
                     rendered_image=rendered_image,
@@ -1441,36 +1457,23 @@ class GS3d(MyModelBaseClass):
         
         depths = render_pkg["depth"] # a list of 1xHxW
         if "depth" in batch:
-            gt_depths = batch["depth"]
+            gt_depths = batch["depth"].squeeze(-1)
             gt_depths_available = True
         else:
             gt_depths = torch.rand_like(images[0][:1, :, :]) # no gt_depth maps available
             gt_depths_available = False
 
-        
-        # if (self.global_step > 0) & (self.global_step % 100 == 0):
-        #     save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/custom_HexPlane_depth_vis"
-        #     os.makedirs(save_dir, exist_ok=True)
-        #     
-        #     # GROUND TRUTH DEPTH VISUALIZATION
-        #     gt_depth = batch["depth"]
-        #     gt_depth = gt_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-        #     save_gt_path = os.path.join(save_dir, f"ground_truth_depth_step_{self.global_step:06d}.png")
-        #     plt.imsave(save_gt_path, gt_depth, cmap="Spectral")
-        #     print("saved ground truth depth to ", save_gt_path)
-        #     
-        #     # RENDERED DEPTH VISUALIZATION
-        #     depth = render_pkg["depth"][0]
-        #     render_depth = depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-        #     
-        #     save_path = os.path.join(save_dir, f"depth_step_{self.global_step:06d}.png")
-        #     plt.imsave(save_path, render_depth, cmap="Spectral")
-        #     print("saved rendered depth to ", save_path)
-
+        self.depth_weight_args = get_depth_decay_func(
+            lr_init=self.max_depth_weight,
+            lr_final=self.min_depth_weight,
+            max_steps=30000,
+            slope=0.7
+        )
 
         batch_size = gt_images.shape[0]
         Ll1 = 0.0
         ssim1 = 0.0
+        depth_loss = 0.0
         ssim_list = []
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 = 0.0
@@ -1496,24 +1499,15 @@ class GS3d(MyModelBaseClass):
                 ) # torch.tensor(0)
                 # for image, gt_image in zip(images, gt_images)) / float(len(images))
             # ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
+            print("Image shapes of Renderings: ", images[idx].shape, "and GT: ", gt_images[idx][:3].shape)
             if gt_depths_available:
                 assert depths[idx].shape == gt_depths[idx:idx+1].shape, f"Depth shape mismatch: {depths[idx].shape} vs {gt_depths[idx:idx+1].shape}"
                 print(f"Depth shapes: rendered {depths[idx].shape}, GT {gt_depths[idx:idx+1].shape}")
-                # print min max values of depth and gt_depths
-                # print(f"Depth min/max: {depths[idx].min().item()}/{depths[idx].max().item()}, GT Depth min/max: {gt_depths[idx:idx+1].min().item()}/{gt_depths[idx:idx+1].max().item()}")
-                
                 # depth_loss = l1_loss(depths[idx], gt_depths[idx:idx+1])
-                depth_loss = compute_depth_loss(depths[idx], gt_depths[idx:idx+1])
-                if (self.global_step > 0) & (self.global_step % 1000 == 0):
-                    save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/L1_depth_loss_vis"
-                    os.makedirs(save_dir, exist_ok=True)
-                    vis_l1_loss = torch.abs((depths[idx] - gt_depths[idx:idx+1]))
-                    print("Depth loss shape", vis_l1_loss.shape, vis_l1_loss.dim())
-                    # L1 DEPTH LOSS VISUALIZATION
-                    vis = vis_l1_loss.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-                    save_gt_path = os.path.join(save_dir, f"ground_truth_depth_step_{self.global_step:06d}.png")
-                    plt.imsave(save_gt_path, vis, cmap="Spectral")
-                    print("saved L1 depth loss to ", save_gt_path)
+                eps = 1e-6
+                gt_depth_inverted = 1 / (gt_depths[idx:idx+1] + eps)
+                # depth_loss = compute_depth_loss(depths[idx], gt_depth_inverted, False) #, True) # <<<------ Caution hard codeded
+                depth_loss += get_depth_loss(depths[idx], gt_depth_inverted, False) 
 
             ssim1_ = ssim(
                 images[idx], gt_images[idx][:3]
@@ -1560,15 +1554,18 @@ class GS3d(MyModelBaseClass):
         Ll1 /= float(batch_size)
         ssim1 /= float(batch_size)
         
-        depth_lambda = max(((self.global_step-30000)/300000), 0)
+        #self.lambda_depth = max(((self.global_step-30000)/300000), 0)
         if gt_depths_available:
             depth_loss /= float(batch_size)
-            print(f"Depth lambda: {depth_lambda}, Global step: {self.global_step}")
+            print(f"Depth lambda: {self.lambda_depth}, Global step: {self.global_step}")
         else:
             depth_loss = torch.tensor(0.0).to(Ll1.device)
-            depth_lambda = 0.0
-        print(f"Depth loss: {depth_loss.item()}")
-        loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1) + depth_lambda * depth_loss
+            self.lambda_depth = 0.0
+        depth_weight = self.depth_weight_args(self.iteration)
+        weighted_depth_loss = depth_loss * depth_weight
+        print(f"Depth loss: {depth_loss.item()} with weight {depth_weight} at iteration {self.iteration} equals to added loss of {weighted_depth_loss.item()}")
+        loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1) + weighted_depth_loss # self.lambda_depth * depth_loss
+        # loss = weighted_depth_loss
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 /= float(batch_size)
             loss += tv1
@@ -1579,38 +1576,43 @@ class GS3d(MyModelBaseClass):
         if (self.lambda_flow > 0.0) and (self.iteration > self.flow_start):
             loss += self.lambda_flow * flow_loss
 
+        ################## LOGGING AREA
         # assert False, [Ll1, ssim1, loss, l1_loss(images[0], gt_images[0]), ssim(images[0], gt_images[0])]
         self.log(f"{mode}/loss_L1", (1.0 - self.lambda_dssim) * Ll1)
         self.log(f"{mode}/loss_ssim", (self.lambda_dssim * (1.0 - ssim1)))
         self.log(f"{mode}/loss", loss, prog_bar=True)
-        self.log(f"{mode}/loss_depth", depth_lambda * depth_loss) if gt_depths_available else None
+        self.log(f"{mode}/loss_depth", weighted_depth_loss) if gt_depths_available else None
+        self.log(f"{mode}/depth_weight", depth_weight) if gt_depths_available else None
 
         if (mode == "train") and (self.global_step > 0) and (self.global_step % 1000 == 0):
             # normalize to [0,1]
             depth = depths[0]
             gt_depth = gt_depths[0:1]
-            # #depth = torch.cat([depth, gt_depths], dim=2)
-            # depth = (depth - depth.min()) / (depth.max() - depth.min() + 1e-5)
-            # gt_depth = (gt_depths - gt_depths.min()) / (gt_depths.max() - gt_depths.min() + 1e-5)
-            # # log as single image
-            # 
-            # self.logger.log_image(
-            #     key=f"{mode}_visualizations/Depth",
-            #     images=[
-            #         wandb.Image(depth, caption=f"Predicted (Step: {self.global_step})"), # "Predicted"),
-            #         wandb.Image(gt_depth, caption=f"Ground Truth (Step: {self.global_step})"), # "Ground Truth"),
-            #     ],             # list of images
-            #     step=self.global_step
-            # )
+            gt_depth_inverted = 1 / (gt_depth + 1e-6)
             
             gt_depth_np = gt_depth.squeeze().detach().cpu().numpy()
             depth_np = depth.squeeze().detach().cpu().numpy()
-            # gt_depths
+            gt_depth_inverted_np = gt_depth_inverted.squeeze().detach().cpu().numpy()
+            
+            # log loss map
+            if gt_depths_available:
+                gt_depth_inverted = 1 / (gt_depth + 1e-6)
+                # depth_loss_img = compute_depth_loss(depth, gt_depth_inverted, True).squeeze().detach().cpu().numpy()
+                depth_loss_img = get_depth_loss(depth, gt_depth_inverted, True).squeeze().detach().cpu().numpy()
+            else:
+                depth_loss_img = gt_depth.squeeze().detach().cpu().numpy()
+            fig3, ax3 = plt.subplots()
+            im3 = ax3.imshow(depth_loss_img, cmap="Spectral")
+            plt.colorbar(im3, ax=ax3)  # adds colorbar
+            fig3.tight_layout()
+
+            # log gt depths
             fig, ax = plt.subplots()
-            im = ax.imshow(gt_depth_np, cmap="Spectral")
+            im = ax.imshow(gt_depth_inverted_np, cmap="Spectral")
             plt.colorbar(im, ax=ax)  # adds colorbar
             fig.tight_layout()
-            # rendered depths
+            
+            # log rendered depths
             fig2, ax2 = plt.subplots()
             im2 = ax2.imshow(depth_np, cmap="Spectral")
             plt.colorbar(im2, ax=ax2)  # adds colorbar
@@ -1619,13 +1621,15 @@ class GS3d(MyModelBaseClass):
             self.logger.log_image(
                 key=f"{mode}_visualizations/Depth",
                 images=[
-                    wandb.Image(fig2, caption=f"Predicted (Step: {self.global_step})"), # "Predicted"),
-                    wandb.Image(fig, caption=f"Ground Truth (Step: {self.global_step})"), # "Ground Truth"),
-                ],             # list of images
+                    wandb.Image(fig2, caption=f"Predicted (Step: {self.global_step})"),     # Predicted
+                    wandb.Image(fig, caption=f"Ground Truth (Step: {self.global_step})"),   # Ground Truth
+                    wandb.Image(fig3, caption=f"Loss Map (Step: {self.global_step})"),      # Loss Map
+                ],
                 step=self.global_step
             )
             plt.close(fig)
             plt.close(fig2)
+            plt.close(fig3)
             
             image = images[0]
             image = (image - image.min()) / (image.max() - image.min() + 1e-8)  # rescale to [0,1]
@@ -1766,7 +1770,7 @@ class GS3d(MyModelBaseClass):
                         self.cameras_extent,
                         size_threshold,
                     )
-
+                
                 if (self.iteration > self.emsstartfromiterations) and (self.iteration - self.lasterems > 100):
                     for idx in range(0, len(viewspace_point_tensor_list)):
                         if self.emscnt >= self.selectedlength:
@@ -1922,27 +1926,7 @@ class GS3d(MyModelBaseClass):
                                 batch["image_width"][idx],
                                 self.depthdict[image_name],
                             )
-                            
-#                             MAX_GAUSSIANS = 1400000
-#                             # **Hard cap logic**
-#                             current_gaussians = self.get_xyz.shape[0]  # method or tensor length
-#                             new_gaussians = badindices.shape[0]
-#                             if current_gaussians + new_gaussians > MAX_GAUSSIANS:
-#                                 new_gaussians = max(0, MAX_GAUSSIANS - current_gaussians)
-#                                 if new_gaussians == 0:
-#                                     continue  # skip adding
-#                             # Only add up to allowed number
-#                             self.addgaussians(
-#                                             badindices[:new_gaussians],  # slice to respect hard cap
-#                                             depth,
-#                                             gt_image,
-#                                             camera2world,
-#                                             projectinverse,
-#                                             batch["camera_center"][idx],
-#                                             batch["image_height"][idx],
-#                                             batch["image_width"][idx],
-#                                             self.depthdict[image_name],
-#                             )
+
 
                 if (iteration % self.opacity_reset_interval == 0) or (
                     self.white_background
@@ -2015,7 +1999,7 @@ class GS3d(MyModelBaseClass):
             gt = torch.clamp(batch["original_image"][0][:3], 0.0, 1.0)
 
             depth = render_pkg["depth"][0]
-            depth = imutils.np2png_d([depth[0, ...].cpu().numpy()], None, colormap="jet")
+            depth = imutils.np2png_d([depth[0, ...].cpu().numpy()], None, colormap="Spectral")
             depth = torch.from_numpy(depth).permute(2, 0, 1) / 255.0
 
             try:
@@ -2115,11 +2099,13 @@ class GS3d(MyModelBaseClass):
         self.log_dir_test = os.path.join(self.logger.save_dir, "test")
         self.log_dir_gt = os.path.join(self.logger.save_dir, "gt")
         self.log_dir_depth = os.path.join(self.logger.save_dir, "depth")
+        self.log_dir_gt_depth = os.path.join(self.logger.save_dir, "gt_depth")
         self.log_dir_flow = os.path.join(self.logger.save_dir, "flow")
         self.log_dir_error = os.path.join(self.logger.save_dir, "error")
         os.makedirs(self.log_dir_test, exist_ok=True)
         os.makedirs(self.log_dir_gt, exist_ok=True)
         os.makedirs(self.log_dir_depth, exist_ok=True)
+        os.makedirs(self.log_dir_gt_depth, exist_ok=True)
         os.makedirs(self.log_dir_flow, exist_ok=True)
         os.makedirs(self.log_dir_error, exist_ok=True)
         if self.trainer.datamodule.eval_train:
@@ -2145,6 +2131,7 @@ class GS3d(MyModelBaseClass):
         )  # self.get_render_mode(eval=True)
         # print(batch_idx, type(batch))
         # get normal render
+        gt_depths_available = True if "depth" in batch else False
 
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
@@ -2177,8 +2164,13 @@ class GS3d(MyModelBaseClass):
             mask = batch["mask"][0].view(gt.shape[-2], gt.shape[-1])
 
         depth = render_pkg["depth"][0]
-        depth = imutils.np2png_d([depth[0, ...].cpu().numpy()], None, colormap="jet")
+        depth = imutils.np2png_d([depth[0, ...].cpu().numpy()], None, colormap="Spectral")
         depth = torch.from_numpy(depth).permute(2, 0, 1)
+        
+        if gt_depths_available:
+            gt_depth = 1/(batch["depth"].squeeze(-1)+1e-6)
+            gt_depth = imutils.np2png_d([gt_depth[0, ...].cpu().numpy()], None, colormap="Spectral")
+            gt_depth = torch.from_numpy(gt_depth).permute(2, 0, 1)
 
         try:
             rendered_flow_fwd = render_pkg["render_flow_fwd"][0][:2, ...].permute(1, 2, 0).cpu().numpy()
@@ -2267,6 +2259,8 @@ class GS3d(MyModelBaseClass):
                 rendered_flow_bwd[None],
                 os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx),
             )
+            if gt_depths_available:
+                torchvision.utils.save_image(gt_depth[None], os.path.join(self.log_dir_gt_depth, "%05d.png" % batch_idx))
 
             _, _, flow_loss_list = self.compute_loss(render_pkg, batch, mode="test")
             _psnr = psnr(image[None], gt[None]).mean()
@@ -2301,15 +2295,23 @@ class GS3d(MyModelBaseClass):
             flow_fwd = imageio.imread(f"{self.logger.save_dir}/flow/%05d_fwd.png" % i)
             flow_bwd = imageio.imread(f"{self.logger.save_dir}/flow/%05d_bwd.png" % i)
             error = imageio.imread(f"{self.logger.save_dir}/error/%05d.png" % i)
-
-            result_top = np.concatenate([gt, test, depth], axis=1)
-            result_bottom = np.concatenate([error, flow_fwd, flow_bwd], axis=1)
+            
+            path = f"{self.logger.save_dir}/gt_depth/%05d.png" % i
+            black_img = np.zeros((test.shape[0], test.shape[1], 3), dtype=np.uint8)
+            if os.path.exists(path):
+                gt_depth = imageio.imread(f"{self.logger.save_dir}/gt_depth/%05d.png" % i)
+                result_top = np.concatenate([gt, test, gt_depth, depth], axis=1)
+                result_bottom = np.concatenate([error, flow_fwd, flow_bwd, black_img], axis=1)
+            else:
+                result_top = np.concatenate([gt, test, black_img, depth], axis=1)
+                result_bottom = np.concatenate([error, flow_fwd, flow_bwd, black_img], axis=1)
             result = np.concatenate([result_top, result_bottom], axis=0)
             writer.append_data(result)
         writer.close()
         if not self.verbose:
             shutil.rmtree(f"{self.logger.save_dir}/gt")
             shutil.rmtree(f"{self.logger.save_dir}/depth")
+            shutil.rmtree(f"{self.logger.save_dir}/gt_depth")
             shutil.rmtree(f"{self.logger.save_dir}/test")
             shutil.rmtree(f"{self.logger.save_dir}/flow")
             shutil.rmtree(f"{self.logger.save_dir}/error")
@@ -2322,6 +2324,7 @@ class GS3d(MyModelBaseClass):
         avg_lpips = sum(self.test_lpips_total) / (self.test_num_batches + 1e-16)
         avg_flow = sum(self.test_flow_total) / (self.test_num_batches + 1e-16)
 
+#comment this out for no logging
         with open(self.log_txt, "w") as f:
             f.write("image_name, time, render_time, psnr, ssim, msssim, lpips\n")
             for i in range(len(self.test_image_name)):
@@ -2342,6 +2345,7 @@ class GS3d(MyModelBaseClass):
         self.log("test/avg_msssim", avg_msssim)
         self.log("test/avg_lpips", avg_lpips)
         self.log("test/avg_flow", avg_flow)
+##
 
         self.test_image_name = []
         self.test_times = []
@@ -2657,8 +2661,24 @@ class GS3d(MyModelBaseClass):
             new_opacity_t,
             new_features_t,
         )
+    
+    def n_current_gaussians(self):
+        return int(self.get_xyz.shape[0])
+
+    def n_available_slots(self):
+        if (self.global_step < 8000) and (self.motion_mode == "MLP"):
+            self.MAX_GAUSSIANS = 240000
+        else:
+            self.MAX_GAUSSIANS = 1000000
+        return max(0, self.MAX_GAUSSIANS - self.n_current_gaussians())
+    
+    def n_safe_slots(self, requested):
+        return min(requested, self.n_available_slots())
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
+        # ACTIVATE LIMITED GAUSSIANS HERE
+        if self.n_available_slots() == 0:
+            return
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
 
@@ -2681,6 +2701,25 @@ class GS3d(MyModelBaseClass):
             selected_pts_mask,
             torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent,
         )
+        print("Current num of Gaussians: ", self.n_current_gaussians())
+        # check how many gaussians can be added
+        n_requested = selected_pts_mask.sum().item()
+        print("Num of Gaussians wanting to add: ", n_requested)
+        n_allowed = self.n_safe_slots(n_requested)
+        if n_allowed == 0:
+            return
+        # get all candidate indices
+        selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
+        if selected_indices.numel() == 0:
+            return
+        # either deterministic:
+        # selected_indices = selected_indices[:n_allowed]
+        # or random:
+        perm = torch.randperm(selected_indices.shape[0], device="cuda")
+        selected_indices = selected_indices[perm[:n_allowed]]
+        # create a fresh mask with exactly n_allowed points
+        selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
+        selected_pts_mask[selected_indices] = True
 
         new_xyz = self._xyz[selected_pts_mask]
         new_features_dc = self._features_dc[selected_pts_mask]
@@ -2688,6 +2727,9 @@ class GS3d(MyModelBaseClass):
         new_opacities = self._opacity[selected_pts_mask]
         new_scaling = self._scaling[selected_pts_mask]
         new_rotation = self._rotation[selected_pts_mask]
+        
+        n_cloned = new_xyz.shape[0]
+        self.log("train/n_cloned", n_cloned, prog_bar=True, on_step=True, on_epoch=True)
 
         new_t = None
         new_scaling_t = None
@@ -2751,6 +2793,32 @@ class GS3d(MyModelBaseClass):
             selected_pts_mask,
             torch.max(self.get_scaling, dim=1).values > self.percent_dense * scene_extent,
         )
+        print("Current num of Gaussians: ", n_init_points)
+        
+        
+        # check how many gaussians can be added
+        n_requested = selected_pts_mask.sum().item() * N
+        print("Num of Gaussians wanting to add: ", n_requested)
+        n_allowed = self.n_safe_slots(n_requested)
+        if n_allowed == 0:
+            return
+        max_selected = n_allowed // N
+        # get all candidate indices
+        selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
+        if selected_indices.numel() == 0:
+            return
+        # either deterministic:
+        # selected_indices = selected_indices[:n_allowed]
+        # or random:
+        perm = torch.randperm(selected_indices.shape[0], device="cuda")
+        selected_indices = selected_indices[perm[:max_selected]]
+        # create a fresh mask with exactly n_allowed points
+        selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
+        selected_pts_mask[selected_indices] = True
+        
+        n_selected = selected_pts_mask.sum().item()
+        n_splitted = n_selected * N
+        self.log("train/n_splitted", n_splitted, prog_bar=True, on_step=True, on_epoch=True)
 
         if self.motion_mode == "FourDim":
             new_rotation = self._rotation[selected_pts_mask].repeat(N, 1)
@@ -3092,3 +3160,18 @@ class GS3d(MyModelBaseClass):
 
                 optimizable_tensors[group["name"]] = group["params"][0]
         return optimizable_tensors
+
+# Deprecated:
+# #depth = torch.cat([depth, gt_depths], dim=2)
+# depth = (depth - depth.min()) / (depth.max() - depth.min() + 1e-5)
+# gt_depth = (gt_depths - gt_depths.min()) / (gt_depths.max() - gt_depths.min() + 1e-5)
+# # log as single image
+# 
+# self.logger.log_image(
+#     key=f"{mode}_visualizations/Depth",
+#     images=[
+#         wandb.Image(depth, caption=f"Predicted (Step: {self.global_step})"), # "Predicted"),
+#         wandb.Image(gt_depth, caption=f"Ground Truth (Step: {self.global_step})"), # "Ground Truth"),
+#     ],             # list of images
+#     step=self.global_step
+# )

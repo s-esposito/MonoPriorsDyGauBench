@@ -31,6 +31,13 @@ def readCamerasFromTransforms(
     depth_method=None  # default depth method
 ):
     if load_flow:
+        print("-----------------------------------------------------------------------------------------")
+        print("-----------------------------------------------------------------------------------------")
+        print("-----------------------------------------------------------------------------------------")
+        print("Ich benutze flows")
+        print("-----------------------------------------------------------------------------------------")
+        print("-----------------------------------------------------------------------------------------")
+        print("-----------------------------------------------------------------------------------------")
         return readCamerasFromTransforms_flow(path, transformsfile, white_background, extension=".png", downsample=1)
     cam_infos = []
 
@@ -55,21 +62,30 @@ def readCamerasFromTransforms(
             image_name = Path(cam_name).stem
             image = Image.open(cam_name)
 
-            depth_path = os.path.dirname(cam_name) + "_" + depth_method
-            depth_ext = cam_name.split(".")[-1]  # usually "png" or "jpg"
-            # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
-            base_name = os.path.splitext(image_name)[0]
-            # candidates
-            depth_file_npy = os.path.join(depth_path, base_name + ".npy")
-            depth_file_img = os.path.join(depth_path, f"{image_name}.{depth_ext}")
-            if os.path.exists(depth_file_npy):
-                # load as numpy
-                depth = np.load(depth_file)
-                depth = torch.from_numpy(depth.copy()).float()
-            elif os.path.exists(depth_file_img):
-                depth = cv2.imread(depth_file, -1) / (2**16 - 1)
-                depth = depth.astype(float)
-                depth = torch.from_numpy(depth.copy())
+            if depth_method is not None:
+                depth_path = os.path.dirname(cam_name) + "_" + depth_method
+                depth_ext = cam_name.split(".")[-1]  # usually "png" or "jpg"
+                # depth_name = image_name.split(".")[0]+"-dpt_beit_large_512.png"
+                base_name = os.path.splitext(image_name)[0]
+                # candidates
+                depth_file_npy = os.path.join(depth_path, base_name + ".npy")
+                depth_file_img = os.path.join(depth_path, f"{image_name}.{depth_ext}")
+                if os.path.exists(depth_file_npy):
+                    # load as numpy
+                    depth = np.load(depth_file_npy)
+                    
+                    w, h = image.size[:2]
+                    # original_depth = original_depth.swapaxes(0, 1)
+                    # Resize to match image shape
+                    depth = cv2.resize(depth, (w // downsample, h // downsample), interpolation=cv2.INTER_NEAREST) # or INTER_LINEAR
+                    
+                    depth = torch.from_numpy(depth.copy()).float()
+                    print("reading npy depths from method ", depth_method)
+                elif os.path.exists(depth_file_img):
+                    depth = cv2.imread(depth_file_img, -1) / (2**16 - 1)
+                    depth = depth.astype(float)
+                    depth = torch.from_numpy(depth.copy())
+                    print("reading img depths from method ", depth_method)
             else:
                 depth = None
 

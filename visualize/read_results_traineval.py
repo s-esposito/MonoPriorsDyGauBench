@@ -26,17 +26,55 @@ tineuvox_root_dir = "../../TiNeuVox/logs"
 
 # specify experiments to track
 methods = [
-    #"TiNeuVox/vanilla",
-    #"MLP/nodeform",
     "MLP/vanilla",
+    "MLP-DecayingInvAlignLoss-videoda/vanilla",
     "MLP-videoda/vanilla",
+    "MLP-0.01-videoda/vanilla",
+    "MLP-0.01LogSSI-videoda/vanilla",
+    "MLP-InvAlignLossvideoda/vanilla",
+    "MLP-0.01InvAlignLossvideoda/vanilla",
+    
     "Curve/vanilla",
+    "Curve-DecayingInvAlignLoss-videoda/vanilla",
     "Curve-videoda/vanilla",
-    #"FourDim/vanilla",
+    "Curve-0.01-videoda/vanilla",
+    "Curve-0.01LogSSI-videoda/vanilla",
+    "Curve-InvAlignLossvideoda/vanilla",
+    "Curve-0.01InvAlignLossvideoda/vanilla",
+
     "HexPlane/vanilla",
+    "HexPlane-DecayingInvAlignLoss-videoda/vanilla",
     "HexPlane-videoda/vanilla",
-    #"TRBF/nodecoder",
-    #"TRBF/vanilla",
+    "HexPlane-0.01-videoda/vanilla",
+    "HexPlane-0.01LogSSI-videoda/vanilla",
+    "HexPlane-InvAlignLossvideoda/vanilla",
+    "HexPlane-0.01InvAlignLossvideoda/vanilla",
+]
+
+big_names_list = [
+    "MLP",
+    "MLP-DecayingInvAlignLoss-videoda",
+    "MLP-videoda",
+    "MLP-0.01-videoda", 
+    "MLP-0.01LogSSI-videoda",
+    "MLP-InvAlignLossvideoda",
+    "MLP-0.01InvAlignLossvideoda",
+    
+    "Curve",
+    "Curve-DecayingInvAlignLoss-videoda",
+    "Curve-videoda",
+    "Curve-0.01-videoda",
+    "Curve-0.01LogSSI-videoda",
+    "Curve-InvAlignLossvideoda",
+    "Curve-0.01InvAlignLossvideoda",
+    
+    "HexPlane",
+    "HexPlane-DecayingInvAlignLoss-videoda",
+    "HexPlane-videoda", 
+    "HexPlane-0.01-videoda",
+    "HexPlane-0.01LogSSI-videoda",
+    "HexPlane-InvAlignLossvideoda",
+    "HexPlane-0.01InvAlignLossvideoda",
 ]
 # methods=["Curve/vanilla", "FourDim/vanilla", "HexPlane/vanilla", "MLP/vanilla", "TRBF/nodecoder", "TRBF/vanilla"]
 
@@ -61,20 +99,20 @@ def process_methods(dataset, methods_subset):
         scene = scene_dir.split("/")[-1]
         
         scene_runs = [run for run in runs if scene in run.name]#run.group == scene]
-        print("scene runs: ", scene_runs)
+        #print("scene runs: ", scene_runs)
         
         tineuvox_scene_runs = [run for run in tineuvox_runs_ if run.name.startswith(scene)]
         for method_id, method in tqdm(enumerate(methods_subset)):
             big_name, small_name = method.split("/")
             
-            print("run name print: ", methods) 
+            #print("run name print: ", methods) 
             if big_name == "TiNeuVox":
                 method_runs = [
                     run for run in tineuvox_scene_runs if (run.name).startswith("/".join([scene, small_name]))
                 ]
-            elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF", "MLP-videoda", "Curve-videoda", "HexPlane-videoda"]:
+            elif big_name in big_names_list:
                 method_runs = [run for run in scene_runs if big_name in run.name] # (run.name).startswith("_".join([big_name, small_name]))]
-                print("method runs: ", method_runs)
+                # print("method runs: ", method_runs)
                 # for run in runs:
                 #     print(run.name)
                 #     if scene in run.name:
@@ -82,7 +120,7 @@ def process_methods(dataset, methods_subset):
                 #         exit(0)
             else:
                 assert False, f"Unknown method {big_name}!"
-            print("method_runs: ", method_runs)
+            # print("method_runs: ", method_runs)
             # tineuvox_method_runs = [run for run in tineuvox_scene_runs if (run.name).startswith("_".join([big_name, small_name]))]
             # method_runs = method_runs + tineuvox_scene_runs
             exps = []
@@ -108,7 +146,7 @@ def process_methods(dataset, methods_subset):
                     train_run = [run for run in method_runs if run.name == "/".join([scene, small_name + run_id])]
                     # assert False, ["/".join([scene, small_name+run_id]), len(train_run)]
                     local_path = os.path.join(tineuvox_root_dir, dataset, scene, small_name + run_id)
-                elif big_name in ["Curve", "FourDim", "HexPlane", "MLP", "TRBF", "MLP-videoda", "Curve-videoda", "HexPlane-videoda"]:
+                elif big_name in big_names_list:
                     #for run in runs:
                         #print("TOooooooooooooooooles printttttttttttt")
                         #print("_".join(["GaussianDiff", dataset, scene, big_name, small_name + run_id, "fit"]))
@@ -116,7 +154,7 @@ def process_methods(dataset, methods_subset):
                         run for run in method_runs if run.name == f"GaussianDiff_{dataset}_{scene}-{big_name}_{small_name}{run_id}_fit"
                         #"_".join(["GaussianDiff", dataset, scene, big_name, small_name + run_id, "fit"])# "_".join(["GaussianDiff", big_name, small_name + run_id, "fit"]) #big_name in run.name 
                     ]
-                    print("train run: ", train_run)
+                    # print("train run: ", train_run)
                     test_run = [
                         run for run in method_runs if run.name == "_".join([big_name, small_name + run_id, "test"])
                     ]
@@ -183,17 +221,7 @@ def process_methods(dataset, methods_subset):
                     print(["crashed! ", local_path, test_psnr])
                     exp["crash"] = 1.0
 
-                elif big_name in [
-                    "Curve",
-                    "FourDim",
-                    "HexPlane",
-                    "MLP",
-                    "TRBF",
-                    "TiNeuVox",
-                    "MLP-videoda", 
-                    "Curve-videoda", 
-                    "HexPlane-videoda",
-                ]:
+                elif big_name in big_names_list:
                     exp["crash"] = 0.0
                     exp["test_psnr"] = test_psnr
                     exp["test_ssim"] = test_ssim
@@ -249,7 +277,7 @@ def process_methods(dataset, methods_subset):
                                 exp["OOM"] = 1.0
                 else:
                     assert False, f"Unknown method {big_name}!"
-                print("exp: ", exp)
+                # print("exp: ", exp)
                 exps.append(exp)
 
             if len(exps):
@@ -276,9 +304,9 @@ def process_methods(dataset, methods_subset):
     return result_subset
 
 # always save a new .pkl file
-# if os.path.exists(f"{exp_prefix}.pkl"):
-#     with open(f"{exp_prefix}.pkl", "rb") as file:
-#         result_final = pickle.load(file)
+if os.path.exists(f"{exp_prefix}.pkl"):
+    with open(f"{exp_prefix}.pkl", "rb") as file:
+        result_final = pickle.load(file)
 # else:
 if True:
     wandb.login(key="1c19e048ca5da79c677efbf93e742cd1114c0d5b") # a552a3104d9784010a88b7361592931dd61ecc7d")
@@ -299,7 +327,7 @@ if True:
     # tineuvox_runs = [run for run in tineuvox_runs if run.state != "crashed"]
     tineuvox_runs = []
     for dataset in datasets:
-        print(f"Dataset: {dataset}")
+        # print(f"Dataset: {dataset}")
 
         for dataset_id, project in tqdm(enumerate(projects)):
             if project.name != f"depth_experiment": # "GaussianDiff_{dataset}": 
@@ -307,12 +335,12 @@ if True:
             runs = api.runs(path=f"{project.name}")
 
             runs = [run for run in runs]
-            print("runs: ", runs)
+            # print("runs: ", runs)
             runs.sort(key=lambda run: run.created_at)
             runs = [run for run in runs if run.state != "crashed"]
 
             method_subsets = [methods[i::num_processes] for i in range(num_processes)]
-            print("method_subsets: ", method_subsets)
+            # print("method_subsets: ", method_subsets)
 
             with multiprocessing.Pool(processes=num_processes) as pool:
                 results = pool.starmap(process_methods, [(dataset, subset) for subset in method_subsets])
@@ -367,14 +395,19 @@ for dataset in datasets:
                 result_vanilla_final[dataset][method]["all"][key] += result_vanilla_final[dataset][method][scene][key]
 """
 
+# method_colors = (
+#     [color for color in cm.pink(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Greens(np.linspace(0.4, 0.8, 2))]
+#     + [color for color in cm.Blues(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Reds(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Purples(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Oranges(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Grays(np.linspace(0.6, 0.8, 2))]
+# )
 method_colors = (
-    [color for color in cm.pink(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Greens(np.linspace(0.4, 0.8, 2))]
-    + [color for color in cm.Blues(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Reds(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Purples(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Oranges(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Grays(np.linspace(0.6, 0.8, 1))]
+    [color for color in cm.Greens(np.linspace(0.3, 0.85, 7))]   # 7 greens
+    + [color for color in cm.Blues(np.linspace(0.3, 0.85, 7))]  # 7 blues
+    + [color for color in cm.Reds(np.linspace(0.3, 0.85, 7))]   # 7 reds
 )
 
 # method_colors = ['steelblue', "red", "yellow", "green", "orange", "purple", ""]
@@ -394,8 +427,8 @@ for color, method in zip(method_colors[: len(methods)], methods):
 #    "train_time": (None, None),
 # }
 
-print("RESULT: ")
-print(result_final)
+# print("RESULT: ")
+# print(result_final)
 for key in result_final[datasets[0]][methods[0]]["all"]:
     # plt.rcParams['font.family'] = 'Arial'
     plt.rcParams["font.size"] = 12
@@ -495,7 +528,13 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
             linewidth=0.5,
         )
 
-    plt.legend(handles=pops, loc="best")
+    # plt.legend(handles=pops, loc="best")
+    plt.legend(
+        handles=pops,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.15),  # y < 0 places it below
+        ncol=2,                       # number of columns in legend
+    )
 
     if key == "train_time":
         plt.ylabel(key + " (second)")
@@ -623,7 +662,14 @@ for dataset in datasets:
 
         ax.set_xlim(left=bar_positions[0] - bar_width * 2.0)
 
-        plt.legend(handles=pops, loc="best")
+        # individual scene plots
+        # plt.legend(handles=pops, loc="best")
+        plt.legend(
+            handles=pops,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.15),  # y < 0 places it below
+            ncol=6,                       # number of columns in legend
+        )
 
         if key == "train_time":
             plt.ylabel(key + " (second)")

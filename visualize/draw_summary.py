@@ -35,6 +35,16 @@ labelname=datasets[0]
 with open("traineval.pkl", "rb") as file:
     result_final = pickle.load(file)
 
+methods = [
+        "Curve/vanilla",
+        "Curve-videoda/vanilla",
+        
+        "MLP/vanilla",
+        "MLP-videoda/vanilla",
+        
+        "HexPlane/vanilla",
+        "HexPlane-videoda/vanilla",
+    ]
 
 formatted_metrics = {}
 
@@ -63,17 +73,20 @@ for dataset in datasets:
 
 # Define a mapping of old method names to new method names
 method_name_mapping = {
-    # "TiNeuVox/vanilla": "TiNeuVox",
     "HexPlane/vanilla": "4DGS",
     "HexPlane-videoda/vanilla": "4DGS + VideoDA",
-    # "MLP/nodeform": "3DGS",
+    "HexPlane-0.01-videoda/vanilla": "4DGS + 0.01 VideoDA",
+    "HexPlane-0.01LogSSI-videoda/vanilla": "4DGS + 0.01*LogSSI VideoDA",
+
     "MLP/vanilla": "DeformableGS",
     "MLP-videoda/vanilla": "DeformableGS + VideoDA",
-    # "TRBF/nodecoder": "STG-decoder",
-    # "TRBF/vanilla": "STG",
+    "MLP-0.01-videoda/vanilla": "DeformableGS + 0.01*LogSSI VideoDA",
+    "MLP-0.01LogSSI-videoda/vanilla": "DeformableGS + 0.01*LogSSI VideoDA",
+
     "Curve/vanilla": "EffGS",
     "Curve-videoda/vanilla": "EffGS + VideoDA",
-    # "FourDim/vanilla": "RTGS",
+    "Curve-0.01-videoda/vanilla": "EffGS + 0.01 VideoDA",
+    "Curve-0.01LogSSI-videoda/vanilla": "EffGS + 0.01*LogSSI VideoDA",
 }
 
 # Define a mapping of old metric names to new metric names
@@ -130,19 +143,7 @@ def generate_latex_table(data, method_mapping, metric_mapping):
             else:
                 mean_values[method][metric] = f"{value:.2f}"
 
-    for method in [
-        # "TiNeuVox/vanilla",
-        # "MLP/nodeform",
-        "Curve/vanilla",
-        "Curve-videoda/vanilla",
-        # "TRBF/nodecoder",
-        # "TRBF/vanilla",
-        "MLP/vanilla",
-        "MLP-videoda/vanilla",
-        "HexPlane/vanilla",
-        "HexPlane-videoda/vanilla",
-        # "FourDim/vanilla",
-    ]:
+    for method in methods:
         latex_code += method_mapping[method]
         for metric in metrics:
             latex_code += f" & {mean_values[method][metric]}"

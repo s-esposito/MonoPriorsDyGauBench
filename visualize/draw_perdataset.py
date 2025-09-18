@@ -9,34 +9,58 @@ import matplotlib.cm as cm
 
 sub_class = "all"
 # datasets = ["iphone", "nerfies", "hypernerf", "nerfds", "dnerf"]
-datasets = ["nerfies"]
+datasets = ["nerfies"] #, "dnerf"]
 methods = [
-    # "TiNeuVox/vanilla",
-    # "MLP/nodeform",
     "MLP/vanilla",
+    "MLP-DecayingInvAlignLoss-videoda/vanilla",
     "MLP-videoda/vanilla",
+    "MLP-0.01-videoda/vanilla",
+    "MLP-0.01LogSSI-videoda/vanilla",
+    "MLP-InvAlignLossvideoda/vanilla",
+    "MLP-0.01InvAlignLossvideoda/vanilla",
+    
     "Curve/vanilla",
+    "Curve-DecayingInvAlignLoss-videoda/vanilla",
     "Curve-videoda/vanilla",
-    # "FourDim/vanilla",
+    "Curve-0.01-videoda/vanilla",
+    "Curve-0.01LogSSI-videoda/vanilla",
+    "Curve-InvAlignLossvideoda/vanilla",
+    "Curve-0.01InvAlignLossvideoda/vanilla",
+
     "HexPlane/vanilla",
+    "HexPlane-DecayingInvAlignLoss-videoda/vanilla",
     "HexPlane-videoda/vanilla",
-    # "TRBF/nodecoder",
-    # "TRBF/vanilla",
+    "HexPlane-0.01-videoda/vanilla",
+    "HexPlane-0.01LogSSI-videoda/vanilla",
+    "HexPlane-InvAlignLossvideoda/vanilla",
+    "HexPlane-0.01InvAlignLossvideoda/vanilla",
 ]
 custom_font_size = 16
 
 methods_to_show = [
-    # "TiNeuVox",
-    # "3DGS",
     "DeformableGS",
+    "DeformableGS + DecayingInvAlignLoss VideoDA",
     "DeformableGS + VideoDA",
+    "DeformableGS + 0.01 VideoDA",
+    "DeformableGS + 0.01*LogSSI VideoDA",
+    "DeformableGS + 0.025*InvAlignLoss VideoDA",
+    "DeformableGS + 0.01*InvAlignLoss VideoDA",
+    
     "EffGS",
+    "EffGS + DecayingInvAlignLoss VideoDA",
     "EffGS + VideoDA",
-    # "RTGS",
+    "EffGS + 0.01 VideoDA",
+    "EffGS + 0.01*LogSSI VideoDA",
+    "EffGS + 0.025*InvAlignLoss VideoDA",
+    "EffGS + 0.01*InvAlignLoss VideoDA",
+    
     "4DGS",
+    "4DGS + DecayingInvAlignLoss VideoDA",
     "4DGS + VideoDA",
-    # "STG-decoder",
-    # "STG",
+    "4DGS + 0.01 VideoDA",
+    "4DGS + 0.01*LogSSI VideoDA",
+    "4DGS + 0.025*InvAlignLoss VideoDA",
+    "4DGS + 0.01*InvAlignLoss VideoDA",
 ]
 
 exp_prefix = "perdataset"
@@ -62,14 +86,19 @@ for dataset in datasets:
                 result_final[dataset][method]["all"][key] += result_final[dataset][method][scene][key]
 
 
+# method_colors = (
+#     [color for color in cm.pink(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Greens(np.linspace(0.4, 0.8, 2))]
+#     + [color for color in cm.Blues(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Reds(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Purples(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.Oranges(np.linspace(0.6, 0.8, 2))]
+#     + [color for color in cm.gray(np.linspace(0.6, 0.8, 2))]
+# )
 method_colors = (
-    [color for color in cm.pink(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Greens(np.linspace(0.4, 0.8, 2))]
-    + [color for color in cm.Blues(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Reds(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Purples(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.Oranges(np.linspace(0.6, 0.8, 1))]
-    + [color for color in cm.gray(np.linspace(0.6, 0.8, 1))]
+    [color for color in cm.Greens(np.linspace(0.3, 0.85, 7))]   # 7 greens
+    + [color for color in cm.Blues(np.linspace(0.3, 0.85, 7))]  # 7 blues
+    + [color for color in cm.Reds(np.linspace(0.3, 0.85, 7))]   # 7 reds
 )
 
 assert len(method_colors) >= len(methods)
@@ -97,7 +126,7 @@ for key in metric_name_mapping:
     plt.rcParams["font.family"] = "DejaVu Serif"
     plt.rcParams["font.serif"] = ["Times New Roman"]
 
-    plot_width_multiplier = 0.4
+    plot_width_multiplier = 0.05
     plot_width = len(methods) * (len(datasets) * plot_width_multiplier + 1)
     fig, ax = plt.subplots(figsize=(plot_width, 6))
 
@@ -159,6 +188,14 @@ for key in metric_name_mapping:
         capsize=5,
         elinewidth=1,
     )
+    # Add text labels (numbers) on top of bars
+    ax.bar_label(
+        bars,
+        labels=[f"{m:.2f}" for m in means],  # format to 2 decimals
+        padding=-15,  # space above bar
+        fontsize=10,
+        rotation=0  # vertical text if labels overlap
+    )
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -188,7 +225,15 @@ for key in metric_name_mapping:
     legend_handles = [
         plt.Rectangle((0, 0), 1, 1, color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))
     ]
-    ax.legend(handles=legend_handles, loc="upper right", fontsize=custom_font_size, ncol=2)
+    # ax.legend(handles=legend_handles, loc="upper right", fontsize=custom_font_size, ncol=3)
+    ax.legend(
+        handles=legend_handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.02),   # above the plot
+        fontsize=custom_font_size,
+        ncol=3,                       # many columns → compact row
+        frameon=False
+    )
 
     # plt.subplots_adjust(bottom=0.15)
 

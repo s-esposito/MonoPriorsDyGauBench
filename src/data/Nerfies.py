@@ -99,14 +99,76 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         # video_cam_infos.split="video"
         ply_path = os.path.join(datadir, "points.npy")
         xyz = np.load(ply_path, allow_pickle=True)
+        print("Reading in Points from the provided pointcloud.")
         # if xyz's  shape[0] is greater than 100000, then subsample evenly 100000 points
         if len(xyz) > 100000:
             gap = len(xyz) // 100000
             xyz = xyz[::gap]
+            print("Limiting Points read in from the provided pointcloud")
+            
+        ######################################################################
+        # First try of loading the depth map as pointcloud initialization
+        ######################################################################
+#         depth = np.load("/home/geiger/gwb215/MonoPriorsDyGauBench/data/nerfies/toby-sit/rgb/2x_videoda/left1_000000.npy")
+#         print("reading depth init", depth.shape)
+#         # Load camera
+#         import json
+#         with open("/home/geiger/gwb215/MonoPriorsDyGauBench/data/nerfies/toby-sit/camera/left1_000000.json", "r") as f:
+#             cam = json.load(f)
+#         print("reading cam init")
+# 
+#         H_depth, W_depth = depth.shape
+#         W_cam, H_cam = cam["image_size"]  # usually (width, height)
+# 
+#         scale_x = W_depth / W_cam
+#         scale_y = H_depth / H_cam
+# 
+#         fx = cam["focal_length"] * scale_x
+#         fy = cam["focal_length"] * scale_y
+#         cx = cam["principal_point"][0] * scale_x
+#         cy = cam["principal_point"][1] * scale_y
+#         #fx = fy = cam["focal_length"]
+#         #cx, cy = cam["principal_point"]
+#         aspect = cam["pixel_aspect_ratio"]
+#         skew = cam["skew"]
+# 
+#         # Extrinsics
+#         R = np.array(cam["orientation"])  # 3x3
+#         C = np.array(cam["position"])     # (3,)
+#         T_cam2world = np.eye(4)
+#         T_cam2world[:3,:3] = R
+#         T_cam2world[:3,3] = C
+# 
+#         # Generate pixel grid
+#         us, vs = np.meshgrid(np.arange(W_depth), np.arange(H_depth), indexing='xy')
+#         us = us.flatten()
+#         vs = vs.flatten()
+#         ds = depth.flatten()
+# 
+#         # Backproject to camera coords
+#         Xc = (us - cx) * ds / fx
+#         Yc = (vs - cy) * ds / fy
+#         Zc = ds
+#         cam_points = np.stack([Xc, Yc, Zc, np.ones_like(Zc)], axis=1)  # (N,4)
+# 
+#         # Transform to world
+#         world_points = (T_cam2world @ cam_points.T).T[:, :3]
+# 
+#         xyz = world_points.astype(np.float32)  # (N,3)
+#         print("full shape: ", xyz.shape)
+#         xyz = xyz[::5]
+#         print("1/5 shape: ", xyz.shape)
+        
+        ######################################################################
+        # END
+        ######################################################################
 
         xyz -= self.train_cam_infos.scene_center
         xyz *= self.train_cam_infos.coord_scale
         xyz = xyz.astype(np.float32)
+        
+        # optional saving of the created pointcloud
+        # np.save("/home/geiger/gwb215/MonoPriorsDyGauBench/data/nerfies/toby-sit/my_points.npy", xyz)
 
         shs = np.random.random((xyz.shape[0], 3)) / 255.0
 
@@ -125,7 +187,8 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             xyz = np.random.random((num_pts, 3)) * (max_rand_xyz - min_rand_xyz) + min_rand_xyz
 
             shs = np.random.random((num_pts, 3)) / 255.0
-
+            print("I am only using random points in the Nerfies Dataloader.")
+        # self.num_pts_ratio = 10.0      # <--- hard code activation of adding 10x the amount of sfm points as random points
         if self.num_pts_ratio > 0:
             self.num_static = xyz.shape[0]
             num_pts = int(self.num_pts_ratio * xyz.shape[0])
@@ -140,6 +203,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
                 axis=0,
             )
             shs = np.concatenate([shs, np.random.random((num_pts, 3)) / 255.0], axis=0)
+            print("I am adding random (dynamic) points to the existing read in static points.")
 
         # assert False, [len(times), times]
         # times = np.array(set([cam_info.time for cam_info in train_cam]))
@@ -152,6 +216,8 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             normals=np.zeros((xyz.shape[0], 3)),
             times=np.linspace(0.0, 1.0, self.M),
         )
+        
+        print("xyz size: ", xyz.shape)
 
         # scene_info = SceneInfo(point_cloud=pcd,
         #                   train_cameras=train_cam_infos,
