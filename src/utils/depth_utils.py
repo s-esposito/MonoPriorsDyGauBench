@@ -44,6 +44,7 @@ def normalized_depth_scale_and_shift(prediction, target, mask=None):
     scale = (a_11 * b_0 - a_01 * b_1) / det
     shift = (-a_01 * b_0 + a_00 * b_1) / det
     
-    scale = torch.clamp(scale, min=1e-6)
+    # scale = torch.clamp(scale, min=1e-6)
+    scale = torch.abs(scale)
 
     return scale, shift

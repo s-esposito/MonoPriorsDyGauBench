@@ -1283,7 +1283,24 @@ class GS3d(MyModelBaseClass):
                     cov3D_precomp=result["cov3D_precomp"]# no detach
                 )
                 rendered_depth = rendered_depth[0:1, :, :]
-                    
+                
+#                 # -----------------------------
+#                 # Rasterize mask
+#                 # -----------------------------
+#                 tiny_scales = torch.full_like(result["scales"], 1e-3)
+# 
+#                 mask_img, _, _ = depth_rasterizer(
+#                     means3D=points3D,
+#                     means2D=means2D,
+#                     shs=None,
+#                     colors_precomp=point_depths_rgb,
+#                     opacities=result["opacity"],
+#                     scales=tiny_scales,
+#                     rotations=result["rotations"],
+#                     cov3D_precomp=result["cov3D_precomp"]
+#                 )
+# 
+#                 mask = (mask_img[0:1, :, :] > 0).float()
                     
 ##################################################################################################################################################################
 #                 # save depth for visualization in folder depth_vis
@@ -1316,6 +1333,7 @@ class GS3d(MyModelBaseClass):
 #                     plt.close(fig)  # close to free memory
 # 
 #                     print("Saved depth comparison to", save_path)
+##
                 
                 rendered_image = self.postprocess(
                     rendered_image=rendered_image,
@@ -1328,6 +1346,7 @@ class GS3d(MyModelBaseClass):
                         "visibility_filter": radii > 0,
                         "radii": radii,
                         "depth": rendered_depth,
+                        # "mask": mask,
                     }
                 )
             if render_flow:  # need to rename means2D and screenspace points to prevent gradient error
@@ -1505,9 +1524,15 @@ class GS3d(MyModelBaseClass):
                 print(f"Depth shapes: rendered {depths[idx].shape}, GT {gt_depths[idx:idx+1].shape}")
                 # depth_loss = l1_loss(depths[idx], gt_depths[idx:idx+1])
                 eps = 1e-6
+                # mask=render_pkg["mask"][0]
                 gt_depth_inverted = 1 / (gt_depths[idx:idx+1] + eps)
-                # depth_loss = compute_depth_loss(depths[idx], gt_depth_inverted, False) #, True) # <<<------ Caution hard codeded
-                depth_loss += get_depth_loss(depths[idx], gt_depth_inverted, False) 
+                depth_loss += get_depth_loss(depths[idx], gt_depth_inverted, False)# , mask=mask)
+                
+#                 save_prefix = "/home/geiger/gwb215/MonoPriorsDyGauBench/src/utils/debug"
+#                 np.save(f"{save_prefix}_mask.npy", mask.detach().cpu().numpy())
+#                 np.save(f"{save_prefix}_prediction.npy", depths[idx].detach().cpu().numpy())
+#                 np.save(f"{save_prefix}_target.npy", gt_depth_inverted.detach().cpu().numpy())
+#                 exit(0)
 
             ssim1_ = ssim(
                 images[idx], gt_images[idx][:3]
@@ -2669,7 +2694,7 @@ class GS3d(MyModelBaseClass):
         if (self.global_step < 8000) and (self.motion_mode == "MLP"):
             self.MAX_GAUSSIANS = 240000
         else:
-            self.MAX_GAUSSIANS = 1000000
+            self.MAX_GAUSSIANS = 900000
         return max(0, self.MAX_GAUSSIANS - self.n_current_gaussians())
     
     def n_safe_slots(self, requested):
