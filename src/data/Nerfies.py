@@ -6,6 +6,7 @@ from src.utils.graphics_utils import (
     fov2focal,
     BasicPointCloud,
 )
+from src.data.init_gaussians_with_depth import init_gaussians_with_depth
 from .dataset import FourDGSdataset
 from src.utils.sh_utils import SH2RGB, RGB2SH
 
@@ -106,69 +107,37 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             xyz = xyz[::gap]
             print("Limiting Points read in from the provided pointcloud")
             
-        ######################################################################
-        # First try of loading the depth map as pointcloud initialization
-        ######################################################################
-#         depth = np.load("/home/geiger/gwb215/MonoPriorsDyGauBench/data/nerfies/toby-sit/rgb/2x_videoda/left1_000000.npy")
-#         print("reading depth init", depth.shape)
-#         # Load camera
-#         import json
-#         with open("/home/geiger/gwb215/MonoPriorsDyGauBench/data/nerfies/toby-sit/camera/left1_000000.json", "r") as f:
-#             cam = json.load(f)
-#         print("reading cam init")
-# 
-#         H_depth, W_depth = depth.shape
-#         W_cam, H_cam = cam["image_size"]  # usually (width, height)
-# 
-#         scale_x = W_depth / W_cam
-#         scale_y = H_depth / H_cam
-# 
-#         fx = cam["focal_length"] * scale_x
-#         fy = cam["focal_length"] * scale_y
-#         cx = cam["principal_point"][0] * scale_x
-#         cy = cam["principal_point"][1] * scale_y
-#         #fx = fy = cam["focal_length"]
-#         #cx, cy = cam["principal_point"]
-#         aspect = cam["pixel_aspect_ratio"]
-#         skew = cam["skew"]
-# 
-#         # Extrinsics
-#         R = np.array(cam["orientation"])  # 3x3
-#         C = np.array(cam["position"])     # (3,)
-#         T_cam2world = np.eye(4)
-#         T_cam2world[:3,:3] = R
-#         T_cam2world[:3,3] = C
-# 
-#         # Generate pixel grid
-#         us, vs = np.meshgrid(np.arange(W_depth), np.arange(H_depth), indexing='xy')
-#         us = us.flatten()
-#         vs = vs.flatten()
-#         ds = depth.flatten()
-# 
-#         # Backproject to camera coords
-#         Xc = (us - cx) * ds / fx
-#         Yc = (vs - cy) * ds / fy
-#         Zc = ds
-#         cam_points = np.stack([Xc, Yc, Zc, np.ones_like(Zc)], axis=1)  # (N,4)
-# 
-#         # Transform to world
-#         world_points = (T_cam2world @ cam_points.T).T[:, :3]
-# 
-#         xyz = world_points.astype(np.float32)  # (N,3)
-#         print("full shape: ", xyz.shape)
-#         xyz = xyz[::5]
-#         print("1/5 shape: ", xyz.shape)
+        ### init_gaussians_with_depth
+        if self.depth_method is not None:      
+            # depth
+            depth_dir = f"{datadir}/rgb/{int(1/ratio)}x_{self.depth_method}"
+            npy_files = [f for f in os.listdir(depth_dir) if f.endswith(".npy")]
+            first_depth = sorted(npy_files)[0]
+            depth_path = os.path.join(depth_dir, first_depth)
+            # camera
+            cam_dir = f"{datadir}/camera"
+            first_cam = sorted(os.listdir(cam_dir))[0]
+            cam_json_path = os.path.join(cam_dir, first_cam)
+            # mask
+            mask_dir = f"{datadir}/resized_mask/{int(1/ratio)}x"
+            first_mask = sorted(os.listdir(mask_dir))[0]
+            mask_path = os.path.join(mask_dir, first_mask)
+            # images
+            img_dir = f"{datadir}/rgb/{int(1/ratio)}x"
+            first_img = sorted(os.listdir(img_dir))[0]
+            img_path = os.path.join(img_dir, first_img)
+            
+            print("depth_path: ", depth_path)
+            print("cam_json_path: ", cam_json_path)
+            print("mask_path: ", mask_path)
+            print("img_path: ", img_path)
+            
+            max_points = 50_000 # 2*xyz.shape[0] # 50_000
+            xyz, scales, colors = init_gaussians_with_depth(xyz, depth_path, cam_json_path, mask_path, img_path, max_depth_points=max_points, logging=True)
         
-        ######################################################################
-        # END
-        ######################################################################
-
         xyz -= self.train_cam_infos.scene_center
         xyz *= self.train_cam_infos.coord_scale
         xyz = xyz.astype(np.float32)
-        
-        # optional saving of the created pointcloud
-        # np.save("/home/geiger/gwb215/MonoPriorsDyGauBench/data/nerfies/toby-sit/my_points.npy", xyz)
 
         shs = np.random.random((xyz.shape[0], 3)) / 255.0
 
@@ -209,13 +178,22 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         # times = np.array(set([cam_info.time for cam_info in train_cam]))
         # assert False, [len(times), np.max(times), np.min(times), times.shape]
 
-        # times = np.linspace
-        self.pcd = BasicPointCloud(
-            points=xyz,
-            colors=SH2RGB(shs),
-            normals=np.zeros((xyz.shape[0], 3)),
-            times=np.linspace(0.0, 1.0, self.M),
-        )
+        if self.depth_method is None:
+            # times = np.linspace
+            self.pcd = BasicPointCloud(
+                points=xyz,
+                colors=SH2RGB(shs),
+                normals=np.zeros((xyz.shape[0], 3)),
+                times=np.linspace(0.0, 1.0, self.M),
+            )
+        else:
+            self.pcd = BasicPointCloud(
+                points=xyz,
+                colors=colors,
+                normals=np.zeros((xyz.shape[0], 3)),
+                times=np.linspace(0.0, 1.0, self.M),
+                scales=scales,
+            )
         
         print("xyz size: ", xyz.shape)
 

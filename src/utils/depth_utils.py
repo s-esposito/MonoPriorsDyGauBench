@@ -3,7 +3,10 @@ import torch
 def get_scaled_shifted_depth(prediction, target, mask=None):
     # input: H, W
     scale, shift = normalized_depth_scale_and_shift(prediction, target, mask)
-    print("scale: ", scale.item(), " shift: ", shift.item())
+    scale_val = scale.item() if isinstance(scale, torch.Tensor) else scale
+    shift_val = shift.item() if isinstance(shift, torch.Tensor) else shift
+    print("scale:", scale_val, "shift:", shift_val)
+    # print("scale: ", scale.item(), " shift: ", shift.item())
     depthmap = scale * prediction + shift
     return depthmap
 
@@ -39,8 +42,9 @@ def normalized_depth_scale_and_shift(prediction, target, mask=None):
     # solution: x = A^-1 . b = [[a_11, -a_01], [-a_10, a_00]] / (a_00 * a_11 - a_01 * a_10) . b
     det = a_00 * a_11 - a_01 * a_01
     if det == 0:
-        return 0.0, 0.0
-
+        # return 0.0, 0.0
+        return torch.tensor(0.0, device=prediction.device), torch.tensor(0.0, device=prediction.device)
+    
     scale = (a_11 * b_0 - a_01 * b_1) / det
     shift = (-a_01 * b_0 + a_00 * b_1) / det
     

@@ -13,6 +13,7 @@ import torch
 import math
 import numpy as np
 from typing import NamedTuple
+from typing import Optional
 
 
 class BasicPointCloud(NamedTuple):
@@ -20,6 +21,7 @@ class BasicPointCloud(NamedTuple):
     colors: np.array
     normals: np.array
     times: np.array
+    scales: Optional[np.ndarray] = None
 
 
 def geom_transform_points(points, transf_matrix):

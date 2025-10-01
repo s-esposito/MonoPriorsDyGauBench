@@ -504,6 +504,10 @@ class GS3d(MyModelBaseClass):
             if self.deform_scale:
                 scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
                 self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
+        
+        self.save_ply(f"{self.logger.save_dir}/icp_aligned_init_gaussians.ply")
+        print("saved initial ply")
+        # exit(0)
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -715,6 +719,45 @@ class GS3d(MyModelBaseClass):
 
     def get_covariance(self, scaling_modifier=1):
         return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
+    
+    def construct_list_of_attributes(self):
+        l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
+        # All channels except the 3 DC
+        for i in range(self._features_dc.shape[1]*self._features_dc.shape[2]):
+            l.append('f_dc_{}'.format(i))
+        for i in range(self._features_rest.shape[1]*self._features_rest.shape[2]):
+            l.append('f_rest_{}'.format(i))
+        l.append('opacity')
+        for i in range(self._scaling.shape[1]):
+            l.append('scale_{}'.format(i))
+        for i in range(self._rotation.shape[1]):
+            l.append('rot_{}'.format(i))
+        return l
+    
+    def save_ply(self, path):
+        from plyfile import PlyData, PlyElement
+        from src.utils.system_utils import mkdir_p
+        mkdir_p(os.path.dirname(path))
+
+        xyz = self._xyz.detach().cpu().numpy()
+        if xyz.ndim == 3 and xyz.shape[1] > 1:
+            xyz = xyz[:, 0, :] # Take only the first channel -> shape (N,3) for EffGS
+        normals = np.zeros_like(xyz)
+        f_dc = self._features_dc.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
+        f_rest = self._features_rest.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
+        opacities = self._opacity.detach().cpu().numpy()
+        scale = self._scaling.detach().cpu().numpy()
+        rotation = self._rotation.detach().cpu().numpy()
+        if rotation.ndim == 3 and rotation.shape[1] > 1:
+            rotation = rotation[:, 0, :]  # keep only first channel -> (N,4) for EffGS
+
+        dtype_full = [(attribute, 'f4') for attribute in self.construct_list_of_attributes()]
+
+        elements = np.empty(xyz.shape[0], dtype=dtype_full)
+        attributes = np.concatenate((xyz, normals, f_dc, f_rest, opacities, scale, rotation), axis=1)
+        elements[:] = list(map(tuple, attributes))
+        el = PlyElement.describe(elements, 'vertex')
+        PlyData([el]).write(path)
 
     def deform(self, time: float) -> Dict:
         if self.motion_mode == "FourDim":
@@ -1303,36 +1346,37 @@ class GS3d(MyModelBaseClass):
 #                 mask = (mask_img[0:1, :, :] > 0).float()
                     
 ##################################################################################################################################################################
-#                 # save depth for visualization in folder depth_vis
-#                 if self.global_step % 100 == 0:
-#                     # print shape and dim of depth
-#                     print("rendered_depth", rendered_depth.shape, rendered_depth.dim())
-#                     print("undif_depth", undif_depth.shape, undif_depth.dim())
-#                     render_depth = rendered_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-#                     undif_depth = undif_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-#                     save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/depth_rendering_comp"
-#                     
-#                     # --- Create figure with 2 subplots ---
-#                     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-# 
-#                     # Rendered depth
-#                     im0 = axes[0].imshow(render_depth, cmap="Spectral")
-#                     axes[0].set_title("Rendered Depth")
-#                     plt.colorbar(im0, ax=axes[0])
-# 
-#                     # Undifferentiated depth
-#                     im1 = axes[1].imshow(undif_depth, cmap="Spectral")
-#                     axes[1].set_title("Undifferentiated Depth")
-#                     plt.colorbar(im1, ax=axes[1])
-# 
-#                     # Save figure
-#                     os.makedirs(save_dir, exist_ok=True)
-#                     save_path = os.path.join(save_dir, f"depth_step_{self.global_step:06d}.png")
-#                     plt.tight_layout()
-#                     fig.savefig(save_path, bbox_inches="tight")
-#                     plt.close(fig)  # close to free memory
-# 
-#                     print("Saved depth comparison to", save_path)
+                # save depth for visualization in folder depth_vis
+                if self.global_step % 2 == 0 and self.global_step < 20:
+                    # print shape and dim of depth
+                    print("rendered_depth", rendered_depth.shape, rendered_depth.dim())
+                    print("undif_depth", undif_depth.shape, undif_depth.dim())
+                    render_depth = rendered_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
+                    undif_depth = undif_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
+                    save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/depth_rendering_comp"
+                    
+                    # --- Create figure with 2 subplots ---
+                    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+                    # Rendered depth
+                    im0 = axes[0].imshow(render_depth, cmap="Spectral")
+                    axes[0].set_title("Rendered Depth")
+                    plt.colorbar(im0, ax=axes[0])
+
+                    # Undifferentiated depth
+                    im1 = axes[1].imshow(undif_depth, cmap="Spectral")
+                    axes[1].set_title("Undifferentiated Depth")
+                    plt.colorbar(im1, ax=axes[1])
+
+                    # Save figure
+                    log_dir_fit = os.path.join(self.logger.save_dir, "depth_renderings")
+                    os.makedirs(log_dir_fit, exist_ok=True)
+                    save_path = os.path.join(log_dir_fit, f"depth_step_{self.global_step:06d}.png")
+                    plt.tight_layout()
+                    fig.savefig(save_path, bbox_inches="tight")
+                    plt.close(fig)  # close to free memory
+
+                    print("Saved depth comparison to", save_path)
 ##
                 
                 rendered_image = self.postprocess(
@@ -1587,6 +1631,7 @@ class GS3d(MyModelBaseClass):
             depth_loss = torch.tensor(0.0).to(Ll1.device)
             self.lambda_depth = 0.0
         depth_weight = self.depth_weight_args(self.iteration)
+        # depth_weight = self.lambda_depth # <-------------------- constant lambda
         weighted_depth_loss = depth_loss * depth_weight
         print(f"Depth loss: {depth_loss.item()} with weight {depth_weight} at iteration {self.iteration} equals to added loss of {weighted_depth_loss.item()}")
         loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1) + weighted_depth_loss # self.lambda_depth * depth_loss
