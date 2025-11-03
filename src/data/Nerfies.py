@@ -23,6 +23,45 @@ import torch
 #   as multiple process downloading would corrupt data
 # setup: operations to perform on every GPU
 
+from torch.utils.data import Sampler, DataLoader
+import math
+
+init_with_depth = False
+progressive_sampler = False
+min_fraction_sampler = 0.1
+max_steps_sampler = 3_000
+
+class ProgressiveSampler(Sampler):
+    def __init__(self, data_source, max_steps, min_fraction=min_fraction_sampler):
+        self.data_source = data_source
+        self.max_steps = max_steps
+        self.min_fraction = min_fraction if min_fraction > 1/len(self.data_source) else 1/(len(self.data_source)-1)
+        self.step = 0
+
+    def __iter__(self):
+        total_len = len(self.data_source)
+        while True:
+            frac = min(1.0, self.min_fraction + (1 - self.min_fraction) * self.step / self.max_steps)
+            n = int(len(self.data_source) * frac)
+            indices = torch.arange(n)
+            
+            # Logging
+            if True: #self.step % self.log_interval == 0:
+                print(
+                    f"[ProgressiveSampler] Step {self.step:5d} | "
+                    f"Fraction: {frac*100:6.2f}% | "
+                    f"Samples: {n:6d}/{total_len:6d}"
+                )
+            
+            # yield from indices[torch.randperm(n)].tolist()
+            # self.step += 1
+            for idx in indices[torch.randperm(n)]:
+                yield idx
+                self.step += 1
+
+    def __len__(self):
+        return len(self.data_source)
+
 
 class NerfiesDataModule(MyDataModuleBaseClass):
     def __init__(
@@ -107,8 +146,12 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             xyz = xyz[::gap]
             print("Limiting Points read in from the provided pointcloud")
             
+        xyz -= self.train_cam_infos.scene_center
+        xyz *= self.train_cam_infos.coord_scale
+        xyz = xyz.astype(np.float32)
+        
         ### init_gaussians_with_depth
-        if self.depth_method is not None:      
+        if init_with_depth and stage == "fit":      
             # depth
             depth_dir = f"{datadir}/rgb/{int(1/ratio)}x_{self.depth_method}"
             npy_files = [f for f in os.listdir(depth_dir) if f.endswith(".npy")]
@@ -132,12 +175,28 @@ class NerfiesDataModule(MyDataModuleBaseClass):
             print("mask_path: ", mask_path)
             print("img_path: ", img_path)
             
-            max_points = 50_000 # 2*xyz.shape[0] # 50_000
-            xyz, scales, colors = init_gaussians_with_depth(xyz, depth_path, cam_json_path, mask_path, img_path, max_depth_points=max_points, logging=True)
-        
-        xyz -= self.train_cam_infos.scene_center
-        xyz *= self.train_cam_infos.coord_scale
-        xyz = xyz.astype(np.float32)
+            import imageio.v2 as imageio
+            mask = imageio.imread(mask_path)
+            if mask.ndim == 3:  # convert RGB -> grayscale
+                mask = mask[..., 0]
+            mask = (mask > 0).astype(np.bool_)
+            print("mask sum: ", np.sum(mask), " mask shape: ", mask.shape)
+            background_size = np.sum(mask)
+            mask_size = mask.shape[0] * mask.shape[1]
+            max_points = int(1.0 * (mask_size - background_size)) + xyz.shape[0] # 50_000 2*xyz.shape[0]            
+            xyz, scales, colors = init_gaussians_with_depth(
+                xyz, 
+                depth_path, 
+                cam_json_path, 
+                mask_path, 
+                img_path, 
+                ratio, 
+                self.train_cam_infos, 
+                max_depth_points=max_points, 
+                logging=True, 
+                alignment_method="2d", 
+                use_ransac=False
+            )
 
         shs = np.random.random((xyz.shape[0], 3)) / 255.0
 
@@ -178,7 +237,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         # times = np.array(set([cam_info.time for cam_info in train_cam]))
         # assert False, [len(times), np.max(times), np.min(times), times.shape]
 
-        if self.depth_method is None:
+        if not (init_with_depth and stage == "fit"):
             # times = np.linspace
             self.pcd = BasicPointCloud(
                 points=xyz,
@@ -241,13 +300,20 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         # assert False, [len(self.train_cameras), len(self.test_cameras), len(self.val_cameras)]
 
     def train_dataloader(self):
-        return InfiniteDataLoader(
-            DataLoader(
-                self.train_cameras,
-                batch_size=self.batch_size,
-                shuffle=True,
-            )
-        )
+        sampler = ProgressiveSampler(self.train_cameras, max_steps=max_steps_sampler)
+        if progressive_sampler:
+            loader = DataLoader(self.train_cameras, batch_size=self.batch_size, sampler=sampler)
+        else:
+            loader = DataLoader(self.train_cameras, batch_size=self.batch_size, shuffle=True)
+        return InfiniteDataLoader(loader)
+        
+#         return InfiniteDataLoader(
+#             DataLoader(
+#                 self.train_cameras,
+#                 batch_size=self.batch_size,
+#                 shuffle=True,
+#             )
+#         )
 
     def val_dataloader(self):
         return DataLoader(self.val_cameras, batch_size=1)

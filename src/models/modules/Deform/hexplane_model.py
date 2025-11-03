@@ -15,6 +15,7 @@ import time
 import functools
 import numpy as np
 
+init_weights = False
 
 def compute_plane_smoothness(t):
     batch_size, c, h, w = t.shape
@@ -417,8 +418,10 @@ class Deformation(nn.Module):
     ):
         hidden = self.query_time(rays_pts_emb, scales_emb, rotations_emb, time_feature, time_emb)
         if self.args_static_mlp:
+            assert False, "Not allowed to use static mlp and dynamic deformation at the same time"
             mask = self.static_mlp(hidden)
         elif self.args_empty_voxel:
+            assert False, "Not allowed to use empty voxel and dynamic deformation at the same time"
             mask = self.empty_voxel(rays_pts_emb[:, :3])
         else:
             mask = torch.ones_like(opacity_emb[:, 0]).unsqueeze(-1)
@@ -427,7 +430,11 @@ class Deformation(nn.Module):
             pts = rays_pts_emb[:, :3]
         else:
             dx = self.pos_deform(hidden)
-            pts = torch.zeros_like(rays_pts_emb[:, :3])
+            # dx should be all zeros at the beginning
+            # print("Deformation dx stats: min", dx.min().item(), "max", dx.max().item(), "mean", dx.mean().item())
+            # dx = torch.zeros_like(dx)  # debug check
+            
+            # pts = torch.zeros_like(rays_pts_emb[:, :3])
             pts = rays_pts_emb[:, :3] * mask + dx
         if self.args_no_ds:
 
@@ -435,7 +442,7 @@ class Deformation(nn.Module):
         else:
             ds = self.scales_deform(hidden)
 
-            scales = torch.zeros_like(scales_emb[:, :3])
+            # scales = torch.zeros_like(scales_emb[:, :3])
             scales = scales_emb[:, :3] * mask + ds
 
         if self.args_no_dr:
@@ -443,7 +450,7 @@ class Deformation(nn.Module):
         else:
             dr = self.rotations_deform(hidden)
 
-            rotations = torch.zeros_like(rotations_emb[:, :4])
+            # rotations = torch.zeros_like(rotations_emb[:, :4])
             if self.args_apply_rotation:
                 rotations = batch_quaternion_multiply(rotations_emb, dr)
             else:
@@ -454,7 +461,7 @@ class Deformation(nn.Module):
         else:
             do = self.opacity_deform(hidden)
 
-            opacity = torch.zeros_like(opacity_emb[:, :1])
+            # opacity = torch.zeros_like(opacity_emb[:, :1])
             opacity = opacity_emb[:, :1] * mask + do
         if self.args_no_dshs:
             shs = shs_emb
@@ -464,7 +471,7 @@ class Deformation(nn.Module):
             if len(shs_emb.shape) == 3:
                 dshs = dshs.reshape([shs_emb.shape[0], -1, 3])
 
-            shs = torch.zeros_like(shs_emb)
+            # shs = torch.zeros_like(shs_emb)
             # breakpoint()
             shs = shs_emb * mask.unsqueeze(-1) + dshs
 
@@ -531,7 +538,27 @@ class deform_network(nn.Module):
         self.register_buffer("opacity_poc", torch.FloatTensor([(2**i) for i in range(opacity_pe)]))
         self.apply(initialize_weights)
         # print(self)
+        
+        # zero init of all last linear layers in deformation net
+        if init_weights:
+            nn.init.zeros_(self.deformation_net.feature_out[-1].weight)
+            nn.init.zeros_(self.deformation_net.feature_out[-1].bias)
+            
+            nn.init.zeros_(self.deformation_net.pos_deform[-1].weight)
+            nn.init.zeros_(self.deformation_net.pos_deform[-1].bias)
 
+            nn.init.zeros_(self.deformation_net.scales_deform[-1].weight)
+            nn.init.zeros_(self.deformation_net.scales_deform[-1].bias)
+            
+            nn.init.zeros_(self.deformation_net.rotations_deform[-1].weight)
+            nn.init.zeros_(self.deformation_net.rotations_deform[-1].bias)
+            
+            nn.init.zeros_(self.deformation_net.opacity_deform[-1].weight)
+            nn.init.zeros_(self.deformation_net.opacity_deform[-1].bias)
+            
+            nn.init.zeros_(self.deformation_net.shs_deform[-1].weight)
+            nn.init.zeros_(self.deformation_net.shs_deform[-1].bias)
+        
         # move everything to cuda
         # self.timenet = self.timenet.cuda()
         # self.deformation_net = self.deformation_net.cuda()

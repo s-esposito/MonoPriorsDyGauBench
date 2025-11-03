@@ -1,10 +1,13 @@
 from .base import MyModelBaseClass
 from typing import Optional, List, Tuple, Callable, Dict
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import torch
+from torch.utils.checkpoint import checkpoint
+import gc
 import torch.nn as nn
 import math
 import lpips
-import os
 from jsonargparse import Namespace
 from src.utils.general_utils import (
     inverse_sigmoid,
@@ -181,9 +184,10 @@ class GS3d(MyModelBaseClass):
         
         self.using_isotropic_gaussians = using_isotropic_gaussians
         self.lambda_depth = lambda_depth
-        self.MAX_GAUSSIANS = 1400000
+#         self.MAX_GAUSSIANS = 10_000_000 # 1_400_000
         self.max_depth_weight = 1.0
         self.min_depth_weight = 0.001
+#         self.memory_tracker = MemoryTracker()
 
         # densification required tracker
         self.max_radii2D = torch.empty(0)
@@ -505,9 +509,56 @@ class GS3d(MyModelBaseClass):
                 scales_t = self.scaling_inverse_activation(torch.ones_like(self.get_scaling).cuda() * 1e-3)
                 self._scaling_t = nn.Parameter(scales_t.contiguous().requires_grad_(True))
         
-        self.save_ply(f"{self.logger.save_dir}/icp_aligned_init_gaussians.ply")
-        print("saved initial ply")
-        # exit(0)
+        init_gaussian_name = f"{self.logger.save_dir}/init_gaussians.ply"
+        # check if init_gaussian_name exists
+        if not os.path.exists(init_gaussian_name):
+            self.save_ply(init_gaussian_name)
+            print("saved initial ply")
+        else:
+            print("init ply already exists, not saving")
+        
+        # self.trainer.save_checkpoint(f"{self.logger.save_dir}/checkpoints/last.ckpt")
+        
+        # exit(0)        
+        
+        
+    def save_ply(self, path):
+        from plyfile import PlyData, PlyElement
+        from src.utils.system_utils import mkdir_p
+        mkdir_p(os.path.dirname(path))
+
+        xyz = self._xyz.detach().cpu().numpy()
+        if xyz.ndim == 3 and xyz.shape[1] > 1:
+            xyz = xyz[:, 0, :] # Take only the first channel -> shape (N,3) for EffGS
+        normals = np.zeros_like(xyz)
+        f_dc = self._features_dc.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
+        f_rest = self._features_rest.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
+        opacities = self._opacity.detach().cpu().numpy()
+        scale = self._scaling.detach().cpu().numpy()
+        rotation = self._rotation.detach().cpu().numpy()
+        if rotation.ndim == 3 and rotation.shape[1] > 1:
+            rotation = rotation[:, 0, :]  # keep only first channel -> (N,4) for EffGS
+
+        attributes = np.concatenate((xyz, normals, f_dc, f_rest, opacities, scale, rotation), axis=1)
+        l = self.construct_list_of_attributes()
+        
+        if len(l) != attributes.shape[1]:
+            print(f"Caution Attribute list mismatch: {len(l)} vs {attributes.shape[1]}, cropping")
+            l = l[:attributes.shape[1]]
+
+        dtype_full = [(name, 'f4') for name in l]
+        
+        # print("xyz:", xyz.shape)
+        # print("f_dc:", f_dc.shape)
+        # print("f_rest:", f_rest.shape)
+        # print("opacity:", opacities.shape)
+        # print("scale:", scale.shape)
+        # print("rotation:", rotation.shape)
+        elements = np.empty(xyz.shape[0], dtype=dtype_full)
+        elements[:] = list(map(tuple, attributes))
+        print("elements: ", elements, elements.shape)
+        el = PlyElement.describe(elements, 'vertex')
+        PlyData([el]).write(path)
 
     # not sure setup and configure_model which is better
     def configure_optimizers(self) -> List:
@@ -733,32 +784,7 @@ class GS3d(MyModelBaseClass):
         for i in range(self._rotation.shape[1]):
             l.append('rot_{}'.format(i))
         return l
-    
-    def save_ply(self, path):
-        from plyfile import PlyData, PlyElement
-        from src.utils.system_utils import mkdir_p
-        mkdir_p(os.path.dirname(path))
-
-        xyz = self._xyz.detach().cpu().numpy()
-        if xyz.ndim == 3 and xyz.shape[1] > 1:
-            xyz = xyz[:, 0, :] # Take only the first channel -> shape (N,3) for EffGS
-        normals = np.zeros_like(xyz)
-        f_dc = self._features_dc.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
-        f_rest = self._features_rest.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
-        opacities = self._opacity.detach().cpu().numpy()
-        scale = self._scaling.detach().cpu().numpy()
-        rotation = self._rotation.detach().cpu().numpy()
-        if rotation.ndim == 3 and rotation.shape[1] > 1:
-            rotation = rotation[:, 0, :]  # keep only first channel -> (N,4) for EffGS
-
-        dtype_full = [(attribute, 'f4') for attribute in self.construct_list_of_attributes()]
-
-        elements = np.empty(xyz.shape[0], dtype=dtype_full)
-        attributes = np.concatenate((xyz, normals, f_dc, f_rest, opacities, scale, rotation), axis=1)
-        elements[:] = list(map(tuple, attributes))
-        el = PlyElement.describe(elements, 'vertex')
-        PlyData([el]).write(path)
-
+# time here !!!!!!!!
     def deform(self, time: float) -> Dict:
         if self.motion_mode == "FourDim":
             assert False, "Not supported for now"
@@ -809,6 +835,7 @@ class GS3d(MyModelBaseClass):
                 result["shs_t"] = self.get_features_t
 
         if self.iteration < self.warm_up:
+            print("Warm up stage, no deformation applied")
             if self.post_act:
                 result_ = result
             else:
@@ -822,6 +849,8 @@ class GS3d(MyModelBaseClass):
                     "cov3D_precomp": None,
                 }
         else:
+            # print("fourier parameters before forward means3D:", result["means3D"].shape, result["means3D"])
+            # print("fourier parameters before forward rotations:", result["rotations"].shape, result["rotations"])
             d_xyz, d_rotation, d_scaling, d_opacity, d_feat = self.deform_model.forward(result, time)
             if self.motion_mode in ["MLP"]:
                 # assert d_feat == 0
@@ -1114,7 +1143,6 @@ class GS3d(MyModelBaseClass):
             tanfovy = math.tan(batch["FoVy"][idx] * 0.5)
 
             if self.rgbdecoder is not None:
-                # print("self.rgbdecoder IS NOT None")
                 raster_settings_ch3 = GaussianRasterizationSettings(
                     image_height=int(batch["image_height"][idx]),
                     image_width=int(batch["image_width"][idx]),
@@ -1145,7 +1173,6 @@ class GS3d(MyModelBaseClass):
                 rasterizer = GaussianRasterizer_ch9(raster_settings=raster_settings)
                 rasterizer_ch3 = GaussianRasterizer(raster_settings=raster_settings_ch3)
             else:
-                # print("self.rgbdecoder IS None")
                 raster_settings_ch3 = GaussianRasterizationSettings(
                     image_height=int(batch["image_height"][idx]),
                     image_width=int(batch["image_width"][idx]),
@@ -1175,45 +1202,9 @@ class GS3d(MyModelBaseClass):
                     prefiltered=False,
                     debug=False,
                 )
-                depth_raster_settings = GaussianRasterizationSettings(
-                    image_height=int(batch["image_height"][idx]),
-                    image_width=int(batch["image_width"][idx]),
-                    tanfovx=tanfovx,
-                    tanfovy=tanfovy,
-                    bg=torch.ones_like(self.bg_color.to(batch["time"].device))*0.0,
-                    scale_modifier=scaling_modifier,
-                    viewmatrix=batch["world_view_transform"][idx],
-                    projmatrix=batch["full_proj_transform"][idx],
-                    sh_degree=self.active_sh_degree,
-                    campos=batch["camera_center"][idx],
-                    prefiltered=False,
-                    debug=False,
-                )
-                raster_settings_4d = GaussianRasterizationSettings4D(
-                    image_height=int(batch["image_height"][idx]),
-                    image_width=int(batch["image_width"][idx]),
-                    tanfovx=tanfovx,
-                    tanfovy=tanfovy,
-                    bg=self.bg_color.to(batch["time"].device),
-                    scale_modifier=scaling_modifier,
-                    viewmatrix=batch["world_view_transform"][idx],
-                    projmatrix=batch["full_proj_transform"][idx],
-                    sh_degree=self.active_sh_degree,
-                    sh_degree_t=2,                     # choose a temporal SH degree (e.g., 2)
-                    campos=batch["camera_center"][idx],
-                    timestamp=0.0,                     # or set according to current frame/time
-                    time_duration=1.0,                 # temporal duration
-                    rot_4d=False,                      # only True if you want 4D rotations
-                    gaussian_dim=3,                    # usually 3D Gaussians
-                    force_sh_3d=False,                 # keep False unless forcing 3D SH
-                    prefiltered=False,
-                    debug=True
-                )
                 
                 rasterizer = GaussianRasterizer(raster_settings=raster_settings)
-                depth_rasterizer = GaussianRasterizer(raster_settings=depth_raster_settings)
                 rasterizer_ch3 = GaussianRasterizer(raster_settings=raster_settings_ch3)
-                rasterizer_4D = GaussianRasterizer4D(raster_settings=raster_settings_4d)
 
             # get corresponding Gaussian for render at this time step
             # {
@@ -1264,22 +1255,45 @@ class GS3d(MyModelBaseClass):
                 else:
                     scales = result["scales"]
 
-                # print("--------------------------------------------------------------------------")
-                # print("-------------- Current Number of Max Gaussians is: " + str(self.MAX_GAUSSIANS) + " --------------")
-                # print("--------------- Current Number of Gaussians is: " + str(self.get_xyz.shape[0]) + " ---------------")
-                # print("--------------------------------------------------------------------------")
-
+                original_bg = raster_settings.bg.clone()
                 # print("pre_render scales: ", result["scales"])
                 # 3D rasterizer call
-                rendered_image, radii, undif_depth = rasterizer(
-                    means3D=result["means3D"],
-                    means2D=means2D,
-                    shs=result["shs"],
-                    colors_precomp=result["colors_precomp"],
-                    opacities=result["opacity"],
-                    scales=scales, #result["scales"],
-                    rotations=result["rotations"],
-                    cov3D_precomp=result["cov3D_precomp"],
+#                 rendered_image, radii, undif_depth = rasterizer(
+#                     means3D=result["means3D"],
+#                     means2D=means2D,
+#                     shs=result["shs"],
+#                     colors_precomp=result["colors_precomp"],
+#                     opacities=result["opacity"],
+#                     scales=scales, #result["scales"],
+#                     rotations=result["rotations"],
+#                     cov3D_precomp=result["cov3D_precomp"],
+#                 )
+
+                memory_cleanup("BEFORE RGB RASTERIZER") if self.warm_up < self.iteration < self.warm_up+10 else None
+
+                def rasterize_color(means3D, means2D, shs, colors_precomp, opacities, scales, rotations, cov3D_precomp):
+                    color, radii, undif_depth = rasterizer(
+                        means3D=means3D,
+                        means2D=means2D,
+                        shs=shs,
+                        colors_precomp=colors_precomp,
+                        opacities=opacities,
+                        scales=scales,
+                        rotations=rotations,
+                        cov3D_precomp=cov3D_precomp,
+                    )
+                    return color, radii, undif_depth
+
+                rendered_image, radii, undif_depth = checkpoint(
+                    rasterize_color,
+                    result["means3D"],
+                    means2D,
+                    result["shs"],
+                    result["colors_precomp"],
+                    result["opacity"],
+                    result["scales"],
+                    result["rotations"],
+                    result["cov3D_precomp"]
                 )
                 
                 # -----------------------------
@@ -1315,45 +1329,62 @@ class GS3d(MyModelBaseClass):
                 # Rasterize depth
                 # -----------------------------
                 
-                rendered_depth, _, _ = depth_rasterizer(
-                    means3D=points3D,
-                    means2D=means2D,
-                    shs=None,
-                    colors_precomp=point_depths_rgb,
-                    opacities=result["opacity"],         # no detach
-                    scales=result["scales"],             # no detach
-                    rotations=result["rotations"],       # no detach
-                    cov3D_precomp=result["cov3D_precomp"]# no detach
-                )
-                rendered_depth = rendered_depth[0:1, :, :]
+                memory_cleanup("BEFORE DEPTH RASTERIZER") if self.warm_up < self.iteration < self.warm_up+10 else None
+
+                raster_settings = raster_settings._replace(bg=torch.zeros_like(original_bg))
                 
-#                 # -----------------------------
-#                 # Rasterize mask
-#                 # -----------------------------
-#                 tiny_scales = torch.full_like(result["scales"], 1e-3)
-# 
-#                 mask_img, _, _ = depth_rasterizer(
+#                 rendered_depth, _, _ = rasterizer(
 #                     means3D=points3D,
 #                     means2D=means2D,
 #                     shs=None,
 #                     colors_precomp=point_depths_rgb,
-#                     opacities=result["opacity"],
-#                     scales=tiny_scales,
-#                     rotations=result["rotations"],
-#                     cov3D_precomp=result["cov3D_precomp"]
+#                     opacities=result["opacity"],           # no detach
+#                     scales=result["scales"],               # no detach
+#                     rotations=result["rotations"],         # no detach
+#                     cov3D_precomp=result["cov3D_precomp"], # no detach
 #                 )
-# 
-#                 mask = (mask_img[0:1, :, :] > 0).float()
+                
+                def rasterize_depth(means3D, means2D, shs, colors_precomp, opacities, scales, rotations, cov3D_precomp):
+                    color, radii, undif_depth = rasterizer(
+                        means3D=means3D,
+                        means2D=means2D,
+                        shs=shs,
+                        colors_precomp=colors_precomp,
+                        opacities=opacities,
+                        scales=scales,
+                        rotations=rotations,
+                        cov3D_precomp=cov3D_precomp,
+                    )
+                    return color, radii, undif_depth
+
+                rendered_depth, _, _ = checkpoint(
+                    rasterize_depth,
+                    points3D,
+                    means2D,
+                    None,
+                    point_depths_rgb,
+                    result["opacity"],
+                    result["scales"],
+                    result["rotations"],
+                    result["cov3D_precomp"]
+                )
+                
+                memory_cleanup("AFTER DEPTH RASTERIZER") if self.warm_up < self.iteration < self.warm_up+10 else None
+                
+                rendered_depth = rendered_depth[0:1, :, :]
+                
+                raster_settings = raster_settings._replace(bg=original_bg)
+
                     
 ##################################################################################################################################################################
                 # save depth for visualization in folder depth_vis
-                if self.global_step % 2 == 0 and self.global_step < 20:
+                if (0 <= self.global_step < 150) or (self.warm_up < self.global_step < self.warm_up + 10) or (self.warm_up - 10 < self.global_step < self.warm_up): # self.global_step % 2 == 0 and self.global_step < 20:
                     # print shape and dim of depth
                     print("rendered_depth", rendered_depth.shape, rendered_depth.dim())
                     print("undif_depth", undif_depth.shape, undif_depth.dim())
-                    render_depth = rendered_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-                    undif_depth = undif_depth.squeeze(0).detach().cpu().numpy()  # shape -> [240, 320]
-                    save_dir = "/home/geiger/gwb215/MonoPriorsDyGauBench/depth_rendering_comp"
+                    render_depth = rendered_depth.squeeze(0).detach().cpu().numpy()
+                    undif_depth = undif_depth.squeeze(0).detach().cpu().numpy()
+                    rendered_rgb = rendered_image.squeeze(0).detach().cpu().permute(1,2,0).numpy()
                     
                     # --- Create figure with 2 subplots ---
                     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
@@ -1361,17 +1392,24 @@ class GS3d(MyModelBaseClass):
                     # Rendered depth
                     im0 = axes[0].imshow(render_depth, cmap="Spectral")
                     axes[0].set_title("Rendered Depth")
-                    plt.colorbar(im0, ax=axes[0])
+                    plt.colorbar(im0, ax=axes[0], format="%.2f")
 
-                    # Undifferentiated depth
-                    im1 = axes[1].imshow(undif_depth, cmap="Spectral")
-                    axes[1].set_title("Undifferentiated Depth")
-                    plt.colorbar(im1, ax=axes[1])
+                    # rendered rgb
+                    im1 = axes[1].imshow(rendered_rgb)
+                    axes[1].set_title("Rendered RGB")
+                    
+                    # --- Add global step number as figure title ---
+                    fig.suptitle(f"Step {self.global_step}", fontsize=16)
+
+#                     # Undifferentiated depth
+#                     im1 = axes[1].imshow(undif_depth, cmap="Spectral")
+#                     axes[1].set_title("Undifferentiated Depth")
+#                     plt.colorbar(im1, ax=axes[1])
 
                     # Save figure
-                    log_dir_fit = os.path.join(self.logger.save_dir, "depth_renderings")
+                    log_dir_fit = os.path.join(self.logger.save_dir, "train_renderings")
                     os.makedirs(log_dir_fit, exist_ok=True)
-                    save_path = os.path.join(log_dir_fit, f"depth_step_{self.global_step:06d}.png")
+                    save_path = os.path.join(log_dir_fit, f"_step_{self.global_step:06d}.png")
                     plt.tight_layout()
                     fig.savefig(save_path, bbox_inches="tight")
                     plt.close(fig)  # close to free memory
@@ -1623,18 +1661,16 @@ class GS3d(MyModelBaseClass):
         Ll1 /= float(batch_size)
         ssim1 /= float(batch_size)
         
-        #self.lambda_depth = max(((self.global_step-30000)/300000), 0)
         if gt_depths_available:
             depth_loss /= float(batch_size)
-            print(f"Depth lambda: {self.lambda_depth}, Global step: {self.global_step}")
         else:
             depth_loss = torch.tensor(0.0).to(Ll1.device)
             self.lambda_depth = 0.0
-        depth_weight = self.depth_weight_args(self.iteration)
+        depth_weight = self.depth_weight_args(self.iteration) # if self.iteration < 0 else 0.0   # add this if statement if you want pull loss to 0.0
         # depth_weight = self.lambda_depth # <-------------------- constant lambda
         weighted_depth_loss = depth_loss * depth_weight
         print(f"Depth loss: {depth_loss.item()} with weight {depth_weight} at iteration {self.iteration} equals to added loss of {weighted_depth_loss.item()}")
-        loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1) + weighted_depth_loss # self.lambda_depth * depth_loss
+        loss = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - ssim1) + weighted_depth_loss
         # loss = weighted_depth_loss
         if (self.motion_mode == "HexPlane") and (self.iteration >= self.warm_up):
             tv1 /= float(batch_size)
@@ -1737,6 +1773,9 @@ class GS3d(MyModelBaseClass):
             deform_optimizer = None
 
         iteration = self.iteration + 1  # has to start from 1 to prevent actions on step=0
+        
+        # Clean memory every 400 iterations after densification period except for validation iterations (memory is cleared during val anyways)
+        memory_cleanup("AFTER DENSIFICATION") if ((self.densify_until_iter < iteration) and (iteration % 200 == 0) and (iteration % 1000 != 0)) else None
 
         # Every 1000 its we increase the levels of SH up to a maximum degree
         if iteration % 1000 == 0:
@@ -2202,6 +2241,22 @@ class GS3d(MyModelBaseClass):
         # print(batch_idx, type(batch))
         # get normal render
         gt_depths_available = True if "depth" in batch else False
+        
+#         for idx in range(batch["time"].shape[0]):
+#             time_value = batch["time"][idx].item()
+#             
+#             # Get the deformed result for this batch item
+#             # First, call deform to get the result dict
+#             with torch.no_grad():
+#                 result = self.deform(time_value)
+#             
+#             # Save to PLY
+#             output_path = os.path.join(
+#                 self.logger.save_dir, 
+#                 f"gaussians_{batch_idx:05d}_time_{time_value:.4f}.ply"
+#             )
+#             self.save_ply(output_path)
+#             print(f"Saved deformed Gaussians at time {time_value:.4f} to {output_path}")
 
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
@@ -2288,6 +2343,12 @@ class GS3d(MyModelBaseClass):
                 rendered_flow_bwd[None] * (1.0 - mask.cpu()[None, None]),
                 os.path.join(self.log_dir_flow, "%05d_bwd.png" % batch_idx),
             )
+            if gt_depths_available:
+                torchvision.utils.save_image(
+                    gt_depth[None] * (1.0 - mask.cpu()[None, None]), 
+                    os.path.join(self.log_dir_gt_depth, "%05d.png" % batch_idx)
+                )
+
 
             # _, _, flow_loss_list = self.compute_loss(render_pkg, batch, mode="test")
             flow_loss_list = None
@@ -2732,23 +2793,25 @@ class GS3d(MyModelBaseClass):
             new_features_t,
         )
     
-    def n_current_gaussians(self):
-        return int(self.get_xyz.shape[0])
-
-    def n_available_slots(self):
-        if (self.global_step < 8000) and (self.motion_mode == "MLP"):
-            self.MAX_GAUSSIANS = 240000
-        else:
-            self.MAX_GAUSSIANS = 900000
-        return max(0, self.MAX_GAUSSIANS - self.n_current_gaussians())
-    
-    def n_safe_slots(self, requested):
-        return min(requested, self.n_available_slots())
+#     def n_current_gaussians(self):
+#         return int(self.get_xyz.shape[0])
+# 
+#     def n_available_slots(self):
+#         if (self.global_step < 8000) and (self.motion_mode == "MLP"):
+#             self.MAX_GAUSSIANS = 10_000_000 # 240_000
+#         elif self.motion_mode == "MLP":
+#             self.MAX_GAUSSIANS = 10_000_000 # 900_000
+#         elif self.motion_mode == "EffGS":
+#             self.MAX_GAUSSIANS = 10_000_000
+#         return max(0, self.MAX_GAUSSIANS - self.n_current_gaussians())
+#     
+#     def n_safe_slots(self, requested):
+#         return min(requested, self.n_available_slots())
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         # ACTIVATE LIMITED GAUSSIANS HERE
-        if self.n_available_slots() == 0:
-            return
+#         if self.n_available_slots() == 0:
+#             return
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
 
@@ -2771,25 +2834,25 @@ class GS3d(MyModelBaseClass):
             selected_pts_mask,
             torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent,
         )
-        print("Current num of Gaussians: ", self.n_current_gaussians())
-        # check how many gaussians can be added
-        n_requested = selected_pts_mask.sum().item()
-        print("Num of Gaussians wanting to add: ", n_requested)
-        n_allowed = self.n_safe_slots(n_requested)
-        if n_allowed == 0:
-            return
-        # get all candidate indices
-        selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
-        if selected_indices.numel() == 0:
-            return
-        # either deterministic:
-        # selected_indices = selected_indices[:n_allowed]
-        # or random:
-        perm = torch.randperm(selected_indices.shape[0], device="cuda")
-        selected_indices = selected_indices[perm[:n_allowed]]
-        # create a fresh mask with exactly n_allowed points
-        selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
-        selected_pts_mask[selected_indices] = True
+#         print("Current num of Gaussians: ", self.n_current_gaussians())
+#         # check how many gaussians can be added
+#         n_requested = selected_pts_mask.sum().item()
+#         print("Num of Gaussians wanting to add: ", n_requested)
+#         n_allowed = self.n_safe_slots(n_requested)
+#         if n_allowed == 0:
+#             return
+#         # get all candidate indices
+#         selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
+#         if selected_indices.numel() == 0:
+#             return
+#         # either deterministic:
+#         # selected_indices = selected_indices[:n_allowed]
+#         # or random:
+#         perm = torch.randperm(selected_indices.shape[0], device="cuda")
+#         selected_indices = selected_indices[perm[:n_allowed]]
+#         # create a fresh mask with exactly n_allowed points
+#         selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
+#         selected_pts_mask[selected_indices] = True
 
         new_xyz = self._xyz[selected_pts_mask]
         new_features_dc = self._features_dc[selected_pts_mask]
@@ -2866,26 +2929,26 @@ class GS3d(MyModelBaseClass):
         print("Current num of Gaussians: ", n_init_points)
         
         
-        # check how many gaussians can be added
-        n_requested = selected_pts_mask.sum().item() * N
-        print("Num of Gaussians wanting to add: ", n_requested)
-        n_allowed = self.n_safe_slots(n_requested)
-        if n_allowed == 0:
-            return
-        max_selected = n_allowed // N
-        # get all candidate indices
-        selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
-        if selected_indices.numel() == 0:
-            return
-        # either deterministic:
-        # selected_indices = selected_indices[:n_allowed]
-        # or random:
-        perm = torch.randperm(selected_indices.shape[0], device="cuda")
-        selected_indices = selected_indices[perm[:max_selected]]
-        # create a fresh mask with exactly n_allowed points
-        selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
-        selected_pts_mask[selected_indices] = True
-        
+#         # check how many gaussians can be added
+#         n_requested = selected_pts_mask.sum().item() * N
+#         print("Num of Gaussians wanting to add: ", n_requested)
+#         n_allowed = self.n_safe_slots(n_requested)
+#         if n_allowed == 0:
+#             return
+#         max_selected = n_allowed // N
+#         # get all candidate indices
+#         selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
+#         if selected_indices.numel() == 0:
+#             return
+#         # either deterministic:
+#         # selected_indices = selected_indices[:n_allowed]
+#         # or random:
+#         perm = torch.randperm(selected_indices.shape[0], device="cuda")
+#         selected_indices = selected_indices[perm[:max_selected]]
+#         # create a fresh mask with exactly n_allowed points
+#         selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
+#         selected_pts_mask[selected_indices] = True
+#         
         n_selected = selected_pts_mask.sum().item()
         n_splitted = n_selected * N
         self.log("train/n_splitted", n_splitted, prog_bar=True, on_step=True, on_epoch=True)
@@ -3231,17 +3294,226 @@ class GS3d(MyModelBaseClass):
                 optimizable_tensors[group["name"]] = group["params"][0]
         return optimizable_tensors
 
-# Deprecated:
-# #depth = torch.cat([depth, gt_depths], dim=2)
-# depth = (depth - depth.min()) / (depth.max() - depth.min() + 1e-5)
-# gt_depth = (gt_depths - gt_depths.min()) / (gt_depths.max() - gt_depths.min() + 1e-5)
-# # log as single image
+def memory_cleanup(place):
+    alloc_before = torch.cuda.memory_allocated() / (1024**3)
+    reserved_before = torch.cuda.memory_reserved() / (1024**3)
+    print("\n" + "="*80)
+    print(f"MEMORY REPORT - {place}")
+    print("="*80)
+    print(f"BEFORE cleanup: {alloc_before:.2f}GB allocated, {reserved_before:.2f}GB reserved")
+    torch.cuda.synchronize()
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+    alloc_after = torch.cuda.memory_allocated() / (1024**3)
+    reserved_after = torch.cuda.memory_reserved() / (1024**3)
+    print(f"AFTER cleanup: {alloc_after:.2f}GB allocated, {reserved_after:.2f}GB reserved")
+    
+    
+# DEPRECATED MEMORY ANALYSIS
+# class MemoryTracker:
+#     def __init__(self):
+#         self.history = []
+#     
+#     def snapshot(self, iteration, label=""):
+#         """Take a memory snapshot"""
+#         import gc
+#         # Count tensors
+#         total_tensors = 0
+#         retained_grad_tensors = 0
+#         total_size_mb = 0
+#         retained_grad_size_mb = 0
+#         
+#         for obj in gc.get_objects():
+#             try:
+#                 if torch.is_tensor(obj):
+#                     total_tensors += 1
+#                     size_mb = obj.element_size() * obj.nelement() / (1024**2)
+#                     total_size_mb += size_mb
+#                     
+#                     if hasattr(obj, 'grad') and obj.grad is not None and not obj.is_leaf:
+#                         retained_grad_tensors += 1
+#                         retained_grad_size_mb += size_mb
+#             except:
+#                 pass
+#         
+#         snapshot = {
+#             'iteration': iteration,
+#             'label': label,
+#             'cuda_allocated_gb': torch.cuda.memory_allocated() / 1e9,
+#             'cuda_reserved_gb': torch.cuda.memory_reserved() / 1e9,
+#             'total_tensors': total_tensors,
+#             'retained_grad_tensors': retained_grad_tensors,
+#             'total_size_mb': total_size_mb,
+#             'retained_grad_size_mb': retained_grad_size_mb
+#         }
+#         
+#         self.history.append(snapshot)
+#         return snapshot
+#     
+#     def print_recent(self, n=10):
+#         """Print recent snapshots"""
+#         print("\n" + "="*80)
+#         print("MEMORY HISTORY (Recent)")
+#         print("="*80)
+#         print(f"{'Iter':>6} | {'Label':20} | {'CUDA GB':>8} | {'Tensors':>8} | {'RetainGrad':>10} | {'RetainGrad MB':>12}")
+#         print("-"*80)
+#         
+#         for snap in self.history[-n:]:
+#             print(f"{snap['iteration']:6d} | {snap['label']:20} | "
+#                   f"{snap['cuda_allocated_gb']:8.2f} | "
+#                   f"{snap['total_tensors']:8d} | "
+#                   f"{snap['retained_grad_tensors']:10d} | "
+#                   f"{snap['retained_grad_size_mb']:12.2f}")
+#         print("="*80 + "\n")
+#     
+#     def check_for_leak(self, window=5):
+#         """Check if memory is consistently growing"""
+#         if len(self.history) < window + 1:
+#             return False
+#         
+#         recent = self.history[-window:]
+#         first_mem = recent[0]['cuda_allocated_gb']
+#         last_mem = recent[-1]['cuda_allocated_gb']
+#         
+#         # If memory grew by more than 1GB in the window
+#         if last_mem - first_mem > 1.0:
+#             growth_rate = (last_mem - first_mem) / window
+#             print(f"\n⚠️  POTENTIAL MEMORY LEAK DETECTED!")
+#             print(f"   Memory grew {last_mem - first_mem:.2f} GB over {window} iterations")
+#             print(f"   Growth rate: {growth_rate:.3f} GB/iteration")
+#             print(f"   Retained grad tensors grew from {recent[0]['retained_grad_tensors']} to {recent[-1]['retained_grad_tensors']}")
+#             return True
+#         
+#         return False
+#     
+# def track_gc_cleanup():
+#     """Track what garbage collection actually frees"""
+#     import gc
+#     
+#     # Snapshot BEFORE gc
+#     before_cuda = torch.cuda.memory_allocated() / 1e9
+#     before_reserved = torch.cuda.memory_reserved() / 1e9
+#     
+#     before_tensors = {}
+#     for obj in gc.get_objects():
+#         try:
+#             if torch.is_tensor(obj):
+#                 key = (obj.device.type, obj.dtype, tuple(obj.shape))
+#                 size_mb = obj.element_size() * obj.nelement() / (1024**2)
+#                 before_tensors[key] = before_tensors.get(key, {'count': 0, 'size_mb': 0})
+#                 before_tensors[key]['count'] += 1
+#                 before_tensors[key]['size_mb'] += size_mb
+#         except:
+#             pass
+#     
+#     # Run garbage collection
+#     collected = gc.collect()
+#     torch.cuda.empty_cache()
+#     
+#     # Snapshot AFTER gc
+#     after_cuda = torch.cuda.memory_allocated() / 1e9
+#     after_reserved = torch.cuda.memory_reserved() / 1e9
+#     
+#     after_tensors = {}
+#     for obj in gc.get_objects():
+#         try:
+#             if torch.is_tensor(obj):
+#                 key = (obj.device.type, obj.dtype, tuple(obj.shape))
+#                 size_mb = obj.element_size() * obj.nelement() / (1024**2)
+#                 after_tensors[key] = after_tensors.get(key, {'count': 0, 'size_mb': 0})
+#                 after_tensors[key]['count'] += 1
+#                 after_tensors[key]['size_mb'] += size_mb
+#         except:
+#             pass
+#     
+#     # Calculate differences
+#     print("\n" + "="*80)
+#     print(f"GARBAGE COLLECTION REPORT")
+#     print("="*80)
+#     print(f"Objects collected: {collected}")
+#     print(f"CUDA memory freed: {before_cuda - after_cuda:.3f} GB")
+#     print(f"CUDA reserved freed: {before_reserved - after_reserved:.3f} GB")
+#     print()
+#     
+#     # Find deleted tensor types
+#     deleted_types = []
+#     for key in before_tensors:
+#         before_count = before_tensors[key]['count']
+#         before_size = before_tensors[key]['size_mb']
+#         after_count = after_tensors.get(key, {'count': 0})['count']
+#         after_size = after_tensors.get(key, {'size_mb': 0})['size_mb']
+#         
+#         count_diff = before_count - after_count
+#         size_diff = before_size - after_size
+#         
+#         if count_diff > 0 or size_diff > 0.1:  # Only show if something was freed
+#             deleted_types.append({
+#                 'device': key[0],
+#                 'dtype': key[1],
+#                 'shape': key[2],
+#                 'count_freed': count_diff,
+#                 'size_freed_mb': size_diff
+#             })
+#     
+#     # Sort by size freed
+#     deleted_types.sort(key=lambda x: x['size_freed_mb'], reverse=True)
+#     
+#     if deleted_types:
+#         print("Tensors freed by GC:")
+#         print("-"*80)
+#         print(f"{'Device':6} | {'DType':15} | {'Shape':30} | {'Count':>6} | {'Size (MB)':>10}")
+#         print("-"*80)
+#         for item in deleted_types[:20]:  # Top 20
+#             shape_str = str(item['shape'])[:30]
+#             print(f"{item['device']:6} | {str(item['dtype']):15} | {shape_str:30} | "
+#                 f"{item['count_freed']:6} | {item['size_freed_mb']:10.2f}")
+#         
+#         total_freed = sum(item['size_freed_mb'] for item in deleted_types)
+#         print("-"*80)
+#         print(f"Total freed: {total_freed:.2f} MB ({total_freed/1024:.3f} GB)")
+#     else:
+#         print("No tensors freed by GC (nothing to collect)")
+#     
+#     print("="*80 + "\n")
+#     
+#     return deleted_types
 # 
-# self.logger.log_image(
-#     key=f"{mode}_visualizations/Depth",
-#     images=[
-#         wandb.Image(depth, caption=f"Predicted (Step: {self.global_step})"), # "Predicted"),
-#         wandb.Image(gt_depth, caption=f"Ground Truth (Step: {self.global_step})"), # "Ground Truth"),
-#     ],             # list of images
-#     step=self.global_step
-# )
+# 
+# 
+# def measure_gc_gpu_effect():
+#     import gc
+#     
+#     torch.cuda.synchronize()
+#     torch.cuda.empty_cache()  # 1️⃣ Clean baseline
+#     torch.cuda.synchronize()
+# 
+#     before_alloc = torch.cuda.memory_allocated()
+#     before_reserved = torch.cuda.memory_reserved()
+# 
+#     collected = gc.collect()  # 2️⃣ Run GC
+#     torch.cuda.synchronize()
+# 
+#     mid_alloc = torch.cuda.memory_allocated()
+#     mid_reserved = torch.cuda.memory_reserved()
+# 
+#     torch.cuda.empty_cache()  # 3️⃣ Push freed blocks to CUDA
+#     torch.cuda.synchronize()
+# 
+#     after_alloc = torch.cuda.memory_allocated()
+#     after_reserved = torch.cuda.memory_reserved()
+# 
+#     print("\n" + "="*80)
+#     print(f"GARBAGE COLLECTION REPORT")
+#     print("="*80)
+#     print(f"GC collected {collected} objects")
+#     print(f"Freed by GC (allocated): {(before_alloc - after_alloc)/1e9:.2f} GB")
+#     print(f"Freed by GC (reserved):  {(before_reserved - after_reserved)/1e9:.2f} GB")
+#     # print(f"Freed by empty_cache():  {(mid_reserved - after_reserved)/1e9:.2f} GB (cache release)")
+#     # print(f"Total released: {(before_reserved - after_reserved)/1e9:.2f} GB")
+#     print("\n" + "="*80)
+# 
+# 
+# #     print(f"GC collected {collected} unreachable objects")
+# #     print(f"GPU allocated diff: {(before_alloc - after_alloc)/1e9:.2f} GB")
+# #     print(f"GPU reserved diff:  {(before_reserved - after_reserved)/1e9:.2f} GB")

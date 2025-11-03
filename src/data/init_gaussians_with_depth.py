@@ -6,7 +6,6 @@ import math
 from scipy.spatial import cKDTree
 from src.data.utils import Camera
 import imageio.v2 as imageio
-#import open3d as o3d
 import trimesh
 from trimesh.registration import icp
 import os.path as osp
@@ -14,6 +13,9 @@ import argparse
 from tqdm import tqdm
 from glob import glob
 from sklearn.linear_model import RANSACRegressor, LinearRegression
+from src.utils.sh_utils import SH2RGB, RGB2SH
+from simple_knn._C import distCUDA2
+from src.data.Nerfies import format_hyper_data
 
 UINT16_MAX = 65535
 epsilon = 1e-6  # small value to prevent division instability
@@ -29,7 +31,7 @@ def load_camera_safe(json_path):
     cam_json["focal_length"] = focal_length
 
     # Dump to temp object and load with Camera.from_json
-    return Camera.from_json(json_path) if False else Camera(
+    return Camera(
         orientation=np.asarray(cam_json["orientation"]),
         position=np.asarray(cam_json["position"]),
         focal_length=np.array(cam_json["focal_length"]),
@@ -139,12 +141,20 @@ def run_icp_trimesh(src_pts, dst_pts, max_iter=50):
         dst_pts_sub = dst_pts
 
     # Run ICP
-    T_icp, aligned, cost = trimesh.registration.icp(
+#     T_icp, aligned, cost = trimesh.registration.icp(
+#         a=src_pts_sub,
+#         b=dst_pts_sub,
+#         scale=True,       # only rigid transform
+#         reflection=False,
+#         max_iterations=max_iter,
+#     )
+    
+    T_icp, aligned, cost = trimesh.registration.procrustes(
         a=src_pts_sub,
         b=dst_pts_sub,
-        scale=False,       # only rigid transform
+        scale=True,
         reflection=False,
-        max_iterations=max_iter,
+        translation=True,
     )
 
     # Apply transformation to source points
@@ -153,7 +163,93 @@ def run_icp_trimesh(src_pts, dst_pts, max_iter=50):
 
     return T_icp, aligned_src
 
-def logging_images(gt_depth, aligned_depth, sfm_depth, valid_mask):
+def run_icp_probreg(source_pts, target_pts, method='gmmtree', max_iterations=50):
+    """
+    Align source to target using ProbrustICP
+    
+    Args:
+        source_pts: (N, 3) numpy array - depth points to align
+        target_pts: (M, 3) numpy array - SfM reference points
+        method: 'cpd' (Coherent Point Drift) or 'filterreg' (FilterReg) or 'gmmreg'
+        max_iterations: maximum iterations
+    
+    Returns:
+        T: 4x4 transformation matrix
+        aligned_pts: transformed source points
+    """
+    from probreg import cpd, filterreg, gmmtree #, gmmreg
+    import copy
+    
+    source = copy.deepcopy(source_pts)
+    target = copy.deepcopy(target_pts)
+    
+    # Ensure float64 for numerical stability
+    source = source.astype(np.float64)
+    target = target.astype(np.float64)
+    
+    print(f"Running {method.upper()} alignment...")
+    
+    if method == 'cpd':
+        # Coherent Point Drift - best for noisy data with outliers
+        tf_param, _, _ = cpd.registration_cpd(
+            source, target,
+            tf_type_name='affine',  # or 'affine' if you want to estimate scale
+            w=0.0,  # outlier weight (0.0-1.0, higher = more outlier tolerance)
+            maxiter=max_iterations,
+            tol=1e-4
+        )
+    elif method == 'filterreg':
+        # FilterReg - fastest, good for clean data
+        tf_param = filterreg.registration_filterreg(
+            source, target,
+            objective_type='pt2pt',
+            maxiter=max_iterations,
+            tol=1e-4
+        )
+    elif method == 'gmmtree':
+        from probreg import gmmtree
+        tf_param, aligned_pts = gmmtree.registration_gmmtree(
+            source, target,
+            maxiter=max_iterations
+        )
+        #aligned_pts = (tf_param.R @ source.T).T + tf_param.t
+#     elif method == 'gmmreg':
+#         # GMM registration - good balance
+#         tf_param = gmmreg.registration_gmmreg(
+#             source, target,
+#             tf_type_name='rigid',
+#             maxiter=max_iterations,
+#             tol=1e-4
+#         )
+    else:
+        raise ValueError(f"Unknown method: {method}")
+    
+    # Transform source points
+    aligned_pts = tf_param.transform(source)
+    
+    
+    # Extract 4x4 transformation matrix
+    T = np.eye(4)
+    if hasattr(tf_param, 'rot'):
+        T[:3, :3] = tf_param.rot
+    if hasattr(tf_param, 't'):
+        T[:3, 3] = tf_param.t
+    if hasattr(tf_param, 'scale'):
+        print(f"Estimated scale: {tf_param.scale}")
+        T[:3, :3] *= tf_param.scale
+    
+    # Compute alignment quality
+    from scipy.spatial import cKDTree
+    tree = cKDTree(target)
+    distances, _ = tree.query(aligned_pts)
+    mean_dist = np.mean(distances)
+    median_dist = np.median(distances)
+    
+    print(f"Alignment quality - Mean distance: {mean_dist:.6f}, Median: {median_dist:.6f}")
+    
+    return T, aligned_pts
+
+def logging_images(gt_depth, aligned_depth, sfm_depth, valid_mask):# , projected_aligned, projected_aligned_valid, sfm_pixels_valid):
     import matplotlib.pyplot as plt
     os.makedirs("depth_map_initialization_logging", exist_ok=True)
     
@@ -191,101 +287,28 @@ def logging_images(gt_depth, aligned_depth, sfm_depth, valid_mask):
     plt.savefig("depth_map_initialization_logging/valid_mask.png", bbox_inches='tight')
     plt.close()
 
-def align_depth_to_sfm_2d(xyz_sfm, depth_path, cam_json_path, mask_path, img_path, max_depth_points=100000, logging=False):
-    """
-    Align monocular depth to SfM points using manual world→camera transform.
-    Returns:
-      pts_world: depth map unprojected + transformed to world space
-      sfm_depth_map: rasterized depth map of SfM
-    """
+def compute_scaling(pts_world, xyz_sfm, cam):
+    from simple_knn._C import distCUDA2
     
-    depth = np.load(depth_path)
+    # pts_world_length = len(depth_map_colors)
+    # sfm_length = len(sfm_colors)
 
-    #### loading stuff
-    cam = load_camera_safe(cam_json_path)
-    if mask_path is not None:
-        mask = imageio.imread(mask_path)
-        if mask.ndim == 3:  # convert RGB -> grayscale
-            mask = mask[..., 0]
-        mask = (mask > 0).astype(np.bool_)
-    else:
-        mask = np.ones_like(depth, dtype=bool)
-    img = imageio.imread(img_path)
+    # assert pts_world_length + sfm_length == xyz.shape[0], (
+    #     f"Mismatch in point counts: "
+    #     f"depth_map_colors ({pts_world_length}) + sfm_colors ({sfm_length}) != xyz ({xyz.shape[0]})"
+    # )
+    # pts_world = xyz[:pts_world_length]
+    # xyz_sfm = xyz[pts_world_length : pts_world_length + sfm_length]
 
-    # Project SfM 3D points into image
-    sfm_pixels = cam.project(xyz_sfm)  # shape [N, 2]
-    print("SfM pixels X range:", sfm_pixels[:,0].min(), sfm_pixels[:,0].max())
-    print("SfM pixels Y range:", sfm_pixels[:,1].min(), sfm_pixels[:,1].max())
-
-    # Rescale projected SfM points to match dataset resolution
-    H, W = depth.shape
-    H_cam, W_cam = cam.image_size_y, cam.image_size_x
-    sfm_pixels_rescaled = sfm_pixels.copy()
-    sfm_pixels_rescaled[:,0] *= (W / W_cam)
-    sfm_pixels_rescaled[:,1] *= (H / H_cam)
-    
-    # initialize depth map
-    sfm_depth_map = np.full((H, W), np.inf, dtype=np.float32)
-
-    # compute depths (z in camera space)
-    cam_space = cam.points_to_local_points(xyz_sfm)  # shape [N, 3]
-    depths = cam_space[:, 2]
-    print("SfM points in camera space X min/max:", cam_space[:,0].min(), cam_space[:,0].max())
-    print("SfM points in camera space Y min/max:", cam_space[:,1].min(), cam_space[:,1].max())
-    print("SfM points in camera space Z min/max:", depths.min(), depths.max())
-
-    # fill depth map (rasterization)
-    for px, d in zip(sfm_pixels_rescaled.astype(int), depths):
-        x, y = px
-        if 0 <= x < W and 0 <= y < H:
-            sfm_depth_map[y, x] = min(sfm_depth_map[y, x], d)
-    
-    # mask out areas where no sfm points are available AND depth is invalid AND foreground
-    valid_align_mask = np.isfinite(sfm_depth_map) & (sfm_depth_map > 0) & (depth > 0) & mask
-    
-    # Align monocular depth to SfM depth map
-    if np.any(valid_align_mask):
-        depth_vals = depth[valid_align_mask]
-        sfm_vals = sfm_depth_map[valid_align_mask]
-        # Simple scale + shift alignment using linear regression
-        A = np.stack([depth_vals, np.ones_like(depth_vals)], axis=1)
-        # scale, shift = np.linalg.lstsq(A, sfm_vals, rcond=None)[0]            # <----- least squares method
-        scale, shift = align_scene_with_global_ransac(depth_vals, sfm_vals)     # <----- ransac method
-        print(f"Depth alignment: scale={scale}, shift={shift}")
-        depth_aligned = depth * scale + shift
-    else:
-        depth_aligned = depth.copy()  # fallback
-    
-    # preparing unprojection
-    valid_mask = np.isfinite(depth_aligned)
-    valid_sfm_mask = np.isfinite(sfm_depth_map)
-    valid_pixels = np.argwhere(valid_mask)[:, [1, 0]].astype(np.float32)  # xy order
-    valid_depths = depth_aligned[valid_mask].astype(np.float32)
-    valid_sfm_pixels = np.argwhere(valid_sfm_mask)[:, [1, 0]].astype(np.float32)  # xy order
-    valid_sfm_depths = sfm_depth_map[valid_sfm_mask].astype(np.float32)
-    
-    sfm_scale_x = W_cam / W
-    sfm_scale_y = H_cam / H
-
-    valid_pixels[:, 0] *= sfm_scale_x  # x
-    valid_pixels[:, 1] *= sfm_scale_y  # y
-    valid_sfm_pixels[:, 0] *= sfm_scale_x  # x
-    valid_sfm_pixels[:, 1] *= sfm_scale_y  # y
-
-    # Unproject to 3D points in world space
-    pts_world = cam.pixels_to_points(valid_pixels, valid_depths)
-    sfm_pts_world = cam.pixels_to_points(valid_sfm_pixels, valid_sfm_depths)
-    
-    print(valid_pixels.shape, valid_pixels)
-    
-    # Compute scales for depth map points
     pts_camera = cam.points_to_local_points(pts_world)
     depths = pts_camera[:, 2]
-
+    print("Depths during init: ", sum(depths<0))
+    
     fx, fy = cam.focal_length
     cx, cy = cam.principal_point
     skew = cam.skew
     aspect = cam.pixel_aspect_ratio
+    
     K = np.array([
         [fx, skew, cx],
         [0,  fy * aspect, cy],
@@ -297,52 +320,48 @@ def align_depth_to_sfm_2d(xyz_sfm, depth_path, cam_json_path, mask_path, img_pat
     depths_t = torch.from_numpy(depths).float()
     K_inv_t = torch.from_numpy(K_inv).float()
 
-    scales = _compute_conegs_scaling(pts_camera_t, depths_t, K_inv_t).numpy()
-
-    # Subsample, e.g., max 100k points
-    max_depth_map_points = max_depth_points - xyz_sfm.shape[0]
-    if pts_world.shape[0] > max_depth_map_points:
-        idx = np.random.choice(pts_world.shape[0], max_depth_map_points, replace=False)
-        pts_world = pts_world[idx]
-        scales = scales[idx]
+    pts_world_scales = _compute_conegs_scaling(pts_camera_t, depths_t, K_inv_t).numpy()
     
-    # Get colors for depth map points
-    depth_map_colors = []
-    for i in range(pts_world.shape[0]):
-        loc_i = cam.project(pts_world[i:i+1])[0]
-        loc_i_rescaled = loc_i.copy()
-        loc_i_rescaled[0] *= (W / W_cam)
-        loc_i_rescaled[1] *= (H / H_cam)
-        depth_map_colors.append(img[int(loc_i_rescaled[1]), int(loc_i_rescaled[0])] / 255.0)
-            
-    # Merge SfM and depth map points
-    print(f"Depth map points: {pts_world.shape[0]}, SfM points: {xyz_sfm.shape[0]}")
-    all_xyz = np.concatenate((pts_world, xyz_sfm), axis=0)
-    all_scales = np.concatenate((scales, np.ones((xyz_sfm.shape[0], 1)) * 0.01), axis=0) # constant scales for SfM
-    all_scales = np.repeat(all_scales, 3, axis=1)
-    print("scales: ", all_scales.shape, all_scales)
-    all_colors = np.concatenate([np.array(depth_map_colors), np.random.rand(xyz_sfm.shape[0], 3).astype(np.float32)], axis=0)  # fill SfM colors with NaNs    print("all colors: ", all_colors.shape, all_colors)
-    # all_points = np.concatenate((pts_world, sfm_pts_world), axis=0)  # shape [N_depth + N_sfm, 3]
-
-    if logging:
-        logging_images(depth, depth_aligned, sfm_depth_map, valid_align_mask)
+    print("pts_world_scales: ", pts_world_scales)
+    print("scales during init: ", sum(pts_world_scales<0))
     
-    return all_xyz, all_scales, all_colors
+    dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(xyz_sfm)).float().cuda()), 0.0000001).cpu()
+    sfm_scales = torch.sqrt(dist2)[..., None]*2.0
+    # sfm_scales = 0.00027338 * np.ones((xyz_sfm.shape[0], 1), dtype=np.float32)
+    # sfm_scales *= (0.006/sfm_scales.median())
+    
+    return pts_world_scales, sfm_scales
 
-def align_depth_to_sfm_3d(xyz_sfm, depth_path, cam_json_path, mask_path, img_path, max_depth_points=100000, logging=False):
+def init_gaussians_with_depth(xyz_sfm, depth_path, cam_json_path, mask_path, img_path, ratio, train_cam_infos, max_depth_points=100000, logging=False, alignment_method="3d", use_ransac=True):
     """
     Align monocular depth to SfM points using manual world→camera transform.
     Returns:
       pts_world: depth map unprojected + transformed to world space
       sfm_depth_map: rasterized depth map of SfM
     """
-        
+    logging_quality_in_3d = True
+    
+    add_only_fg_points = True
+    use_only_depth_map = False
+    use_only_sfm_points = False
+    assign_colors_to_sfm = True
+    
+    
     ########################################################################################################
-    # loading intrinsics, mask, image and depth
+    # loading intrinsics, mask, image and depth, project SfM points into image
     ########################################################################################################
     depth = np.load(depth_path)
+    print("xyz_sfm shape: ", xyz_sfm.shape)
+    print("depth shape: ", depth.shape)
+    
+    scene_center = train_cam_infos.scene_center
+    coord_scale = train_cam_infos.coord_scale
+    print("scene_center, coord_scale: ", scene_center, coord_scale)
     
     cam = load_camera_safe(cam_json_path)
+    cam = cam.scale(ratio)
+    cam.position -= scene_center
+    cam.position *= coord_scale
     if mask_path is not None:
         mask = imageio.imread(mask_path)
         if mask.ndim == 3:  # convert RGB -> grayscale
@@ -351,21 +370,11 @@ def align_depth_to_sfm_3d(xyz_sfm, depth_path, cam_json_path, mask_path, img_pat
     else:
         mask = np.ones_like(depth, dtype=bool)
     img = imageio.imread(img_path)
-    ########################################################################################################
-    
-    
+    H, W = depth.shape
+        
 
     # Project SfM 3D points into image
     sfm_pixels = cam.project(xyz_sfm)  # shape [N, 2]
-
-    # Rescale projected SfM points to match dataset resolution
-    H, W = depth.shape
-    H_cam, W_cam = cam.image_size_y, cam.image_size_x
-    sfm_pixels_rescaled = sfm_pixels.copy()
-    sfm_pixels_rescaled[:,0] *= (W / W_cam)
-    sfm_pixels_rescaled[:,1] *= (H / H_cam)
-    
-    # initialize depth map
     sfm_depth_map = np.full((H, W), np.inf, dtype=np.float32)
 
     # compute depths (z in camera space)
@@ -373,14 +382,14 @@ def align_depth_to_sfm_3d(xyz_sfm, depth_path, cam_json_path, mask_path, img_pat
     depths = cam_space[:, 2]
 
     # fill depth map (rasterization)
-    for px, d in zip(sfm_pixels_rescaled.astype(int), depths):
+    for px, d in zip(sfm_pixels.astype(int), depths):
         x, y = px
         if 0 <= x < W and 0 <= y < H:
             sfm_depth_map[y, x] = min(sfm_depth_map[y, x], d)
             
     
     ########################################################################################################
-    # RANSAC alignment
+    # 2D alignment
     ########################################################################################################
     # mask out areas where no sfm points are available AND depth is invalid AND foreground
     valid_align_mask = np.isfinite(sfm_depth_map) & (sfm_depth_map > 0) & (depth > 0) & mask
@@ -391,9 +400,13 @@ def align_depth_to_sfm_3d(xyz_sfm, depth_path, cam_json_path, mask_path, img_pat
         sfm_vals = sfm_depth_map[valid_align_mask]
         # Simple scale + shift alignment using linear regression
         A = np.stack([depth_vals, np.ones_like(depth_vals)], axis=1)
-        scale, shift, ransac_successful = align_scene_with_global_ransac(depth_vals, sfm_vals)     # <----- ransac method
-        if not ransac_successful:
-            scale, shift = np.linalg.lstsq(A, sfm_vals, rcond=None)[0]            # <----- least squares method
+        if use_ransac:
+            scale, shift, ransac_successful = align_scene_with_global_ransac(depth_vals, sfm_vals)     # <----- ransac method
+            if not ransac_successful:
+                scale, shift = np.linalg.lstsq(A, sfm_vals, rcond=None)[0]            # <----- least squares method
+        else:
+            scale, shift = np.linalg.lstsq(A, sfm_vals, rcond=None)[0]
+        
         print(f"Depth alignment: scale={scale}, shift={shift}")
         depth_aligned = depth * scale + shift
     else:
@@ -408,78 +421,59 @@ def align_depth_to_sfm_3d(xyz_sfm, depth_path, cam_json_path, mask_path, img_pat
     valid_sfm_pixels = np.argwhere(valid_sfm_mask)[:, [1, 0]].astype(np.float32)  # xy order
     valid_sfm_depths = sfm_depth_map[valid_sfm_mask].astype(np.float32)
     
-    sfm_scale_x = W_cam / W
-    sfm_scale_y = H_cam / H
-
-    valid_pixels[:, 0] *= sfm_scale_x  # x
-    valid_pixels[:, 1] *= sfm_scale_y  # y
-    valid_sfm_pixels[:, 0] *= sfm_scale_x  # x
-    valid_sfm_pixels[:, 1] *= sfm_scale_y  # y
+    valid_fg_depth_mask = np.isfinite(depth_aligned) & ~mask
+    valid_fg_pixels = np.argwhere(valid_fg_depth_mask)[:, [1, 0]].astype(np.float32)  # xy order
+    valid_fg_depths = depth_aligned[valid_fg_depth_mask].astype(np.float32)
     
     print("are the sizes equal ???:", valid_pixels.shape, valid_depths.shape, valid_sfm_pixels.shape, valid_sfm_depths.shape)
 
     # Unproject to 3D points in world space
     pts_world = cam.pixels_to_points(valid_pixels, valid_depths)
     sfm_pts_world = cam.pixels_to_points(valid_sfm_pixels, valid_sfm_depths)
-    
+    fg_pts_world = cam.pixels_to_points(valid_fg_pixels, valid_fg_depths)
+
     
     
     ########################################################################################################
-    # ICP alignment
+        # ICP alignment
     ########################################################################################################
-    # Select pixels and depths where both SfM and depth map are valid
-    valid_icp_pixels = np.argwhere(valid_align_mask)[:, [1, 0]].astype(np.float32)  # xy order
-    valid_icp_depths = depth_aligned[valid_align_mask].astype(np.float32)
-    
-    valid_icp_pixels[:, 0] *= sfm_scale_x  # x
-    valid_icp_pixels[:, 1] *= sfm_scale_y  # y
+    if alignment_method == "3d":
+        # Select pixels and depths where both SfM and depth map are valid and unproject these pixels to 3D points in camera/world space
+        valid_icp_pixels = np.argwhere(valid_align_mask)[:, [1, 0]].astype(np.float32)  # xy order
+        valid_icp_depths = depth_aligned[valid_align_mask].astype(np.float32)
+        pts_world_to_align = cam.pixels_to_points(valid_icp_pixels, valid_icp_depths)
 
-    # Unproject these pixels to 3D points in camera/world space
-    pts_world_to_align = cam.pixels_to_points(valid_icp_pixels, valid_icp_depths)
+        # Unproject the corresponding SfM points (already valid in mask)
+        valid_icp_sfm_pixels = np.argwhere(valid_align_mask)[:, [1, 0]].astype(np.float32)
+        valid_icp_sfm_depths = sfm_depth_map[valid_align_mask].astype(np.float32)
+        sfm_pts_to_align = cam.pixels_to_points(valid_icp_sfm_pixels, valid_icp_sfm_depths)
 
-    # Unproject the corresponding SfM points (already valid in mask)
-    valid_icp_sfm_pixels = np.argwhere(valid_align_mask)[:, [1, 0]].astype(np.float32)
-    valid_icp_sfm_depths = sfm_depth_map[valid_align_mask].astype(np.float32)
-    
-    valid_icp_sfm_pixels[:, 0] *= sfm_scale_x  # x
-    valid_icp_sfm_pixels[:, 1] *= sfm_scale_y  # y
-    
-    sfm_pts_to_align = cam.pixels_to_points(valid_icp_sfm_pixels, valid_icp_sfm_depths)
+        print("Points for ICP:", pts_world_to_align.shape, sfm_pts_to_align.shape)
 
-    print("Points for ICP:", pts_world_to_align.shape, sfm_pts_to_align.shape)
-
-    # Run ICP
-    T_icp, pts_aligned = run_icp_trimesh(pts_world_to_align, sfm_pts_to_align)
+        # Run ICP
+        # T_icp, pts_aligned = run_icp_trimesh(pts_world_to_align, sfm_pts_to_align)
+        T_icp, pts_aligned = run_icp_probreg(pts_world_to_align, sfm_pts_to_align)
         
-    # Apply transformation to full resolution source points
-    src_h = np.hstack([pts_world, np.ones((pts_world.shape[0], 1))])
-    pts_world = (T_icp @ src_h.T).T[:, :3]
-    
+        if logging_quality_in_3d:
+            mse_before_alignment_3d = np.mean(np.sum((pts_world_to_align - sfm_pts_to_align) ** 2, axis=1))
+            mse_after_icp_alignment_3d = np.mean(np.sum((pts_aligned - sfm_pts_to_align) ** 2, axis=1))
+            print(f"3D MSE before alignment: {mse_before_alignment_3d}, after ICP alignment: {mse_after_icp_alignment_3d}")
+            
+        # Apply transformation to full resolution source points
+        if add_only_fg_points:
+            src_h = np.hstack([fg_pts_world, np.ones((fg_pts_world.shape[0], 1))])
+        else:
+            src_h = np.hstack([pts_world, np.ones((pts_world.shape[0], 1))])
+        pts_world = (T_icp @ src_h.T).T[:, :3]
+    # if no 3D alignment is used but only fg_points should be added
+    elif add_only_fg_points:
+        pts_world = fg_pts_world 
     
     
     ########################################################################################################
-    # Compute scales for depth map points
+    # Compute scales for depth map AND SfM points
     ########################################################################################################
-    pts_camera = cam.points_to_local_points(pts_world)
-    depths = pts_camera[:, 2]
-
-    fx, fy = cam.focal_length
-    cx, cy = cam.principal_point
-    skew = cam.skew
-    aspect = cam.pixel_aspect_ratio
-    K = np.array([
-        [fx, skew, cx],
-        [0,  fy * aspect, cy],
-        [0,  0,   1]
-    ], dtype=np.float32)
-    K_inv = np.linalg.inv(K)
-
-    pts_camera_t = torch.from_numpy(pts_camera).float()
-    depths_t = torch.from_numpy(depths).float()
-    K_inv_t = torch.from_numpy(K_inv).float()
-
-    scales = _compute_conegs_scaling(pts_camera_t, depths_t, K_inv_t).numpy()
-
+    scales, sfm_scales = compute_scaling(pts_world, xyz_sfm, cam)
 
 
     ########################################################################################################
@@ -492,83 +486,77 @@ def align_depth_to_sfm_3d(xyz_sfm, depth_path, cam_json_path, mask_path, img_pat
         scales = scales[idx]
     
     
-    
     ########################################################################################################
-    # Get colors for depth map points
+    # Get colors for depth map AND SfM points
     ########################################################################################################
     depth_map_colors = []
+    
     # re rotate pts_world with T_icp
-    unrotated_pts_world = (np.linalg.inv(T_icp) @ np.hstack([pts_world, np.ones((pts_world.shape[0], 1))]).T).T[:, :3]
+    if alignment_method == "3d":
+        unrotated_pts_world = (np.linalg.inv(T_icp) @ np.hstack([pts_world, np.ones((pts_world.shape[0], 1))]).T).T[:, :3]
+    else:
+        unrotated_pts_world = pts_world.copy()
     for i in range(pts_world.shape[0]):
         loc_i = cam.project(unrotated_pts_world[i:i+1])[0]
-        loc_i_rescaled = loc_i.copy()
-        loc_i_rescaled[0] *= (W / W_cam)
-        loc_i_rescaled[1] *= (H / H_cam)
-        x = int(round(loc_i_rescaled[0]))
-        y = int(round(loc_i_rescaled[1]))
-
-#         if 0 <= x < W and 0 <= y < H:
-#             depth_map_colors.append(img[y, x] / 255.0)
-#         else:
-#             # Skip or assign placeholder color
-#             depth_map_colors.append(np.random.rand(3).astype(np.float32))
-        depth_map_colors.append(img[int(loc_i_rescaled[1]), int(loc_i_rescaled[0])] / 255.0)
-            
-            
-            
-    ########################################################################################################
-    # Merge SfM and depth map points
-    ########################################################################################################
-    print(f"Depth map points: {pts_world.shape[0]}, SfM points: {xyz_sfm.shape[0]}")
-    all_xyz = np.concatenate((pts_world, xyz_sfm), axis=0)
-    all_scales = np.concatenate((scales, np.ones((xyz_sfm.shape[0], 1)) * 0.01), axis=0) # constant scales for SfM
-    all_scales = np.repeat(all_scales, 3, axis=1)
-    print("scales: ", all_scales.shape, all_scales)
-    all_colors = np.concatenate([np.array(depth_map_colors), np.random.rand(xyz_sfm.shape[0], 3).astype(np.float32)], axis=0)  # fill SfM colors with NaNs    print("all colors: ", all_colors.shape, all_colors)
-    # all_points = np.concatenate((pts_world, sfm_pts_world), axis=0)  # shape [N_depth + N_sfm, 3]
+        x = int(round(loc_i[0]))
+        y = int(round(loc_i[1]))
+        if (0 <= x < W and 0 <= y < H):
+            depth_map_colors.append(img[y, x] / 255.0)
+        else:
+            depth_map_colors.append(SH2RGB(np.random.random((1, 3)) / 255.0).squeeze(0))
     
-    debug = False
-    if debug:
-        # for debugging:
-        sfm_log = sfm_pts_to_align # xyz_sfm
-        depth_log = pts_aligned # pts_world_to_align
-        print(f"Depth map points: {pts_world.shape[0]}, SfM points: {xyz_sfm.shape[0]}")
-        all_xyz = np.concatenate((pts_world, sfm_log, depth_log), axis=0)
-        all_scales = np.concatenate((np.ones((pts_world.shape[0], 1)) * 0.001, np.ones((sfm_log.shape[0], 1)) * 0.001, np.ones((depth_log.shape[0], 1)) * 0.001), axis=0) # constant scales for SfM
-        all_scales = np.repeat(all_scales, 3, axis=1)
-        print("scales: ", all_scales.shape, all_scales)
-        # Assign fixed colors per group
-        colors_depth = np.ones((pts_world.shape[0], 3), dtype=np.float32)             # white
-        colors_sfm   = np.tile(np.array([[1, 0, 0]], dtype=np.float32), (sfm_log.shape[0], 1))  # red
-        colors_aligned = np.tile(np.array([[0, 0, 1]], dtype=np.float32), (depth_log.shape[0], 1))  # blue
+    count = 0
 
-        all_colors = np.concatenate([colors_depth, colors_sfm, colors_aligned], axis=0)
+    if assign_colors_to_sfm:
+        sfm_pts_camera = cam.points_to_local_points(xyz_sfm)
+        sfm_depths = sfm_pts_camera[:, 2]
+        
+        # Precompute masked depth if needed (once, not inside the loop)
+        if add_only_fg_points:
+            depth_aligned_masked = depth_aligned.copy()
+            depth_aligned_masked[mask] = np.inf
+        else:
+            depth_aligned_masked = depth_aligned  # use directly
 
-    if logging:
-        logging_images(depth, depth_aligned, sfm_depth_map, valid_align_mask)
-    
-    return all_xyz, all_scales, all_colors
+        sfm_colors = []
 
-def init_gaussians_with_depth(xyz_sfm, depth_path, cam_json_path, mask_path, img_path, max_depth_points=100000, logging=False, alignment_method="3d"):
-    """
-    Initialize 3D Gaussians from monocular depth and SfM points.
-    xyz_sfm: (N_sfm, 3) SfM points in world space
-    depth_path: path to monocular depth map (.npy)
-    cam_json_path: path to camera intrinsics (.json)
-    mask_path: path to foreground mask (.png) or None
-    img_path: path to RGB image (.png)
-    max_depth_points: maximum number of depth map points to use
-    logging: whether to save logging images
-    alignment_method: "2d" for 2D alignment, "3d" for 3D ICP alignment
-    Returns:
-      all_xyz: (N, 3) combined 3D points
-      all_scales: (N, 3) Gaussian stddevs
-      all_colors: (N, 3) RGB colors
-    """
-    
-    if alignment_method == "2d":
-        return align_depth_to_sfm_2d(xyz_sfm, depth_path, cam_json_path, mask_path, img_path, max_depth_points, logging)
-    elif alignment_method == "3d":
-        return align_depth_to_sfm_3d(xyz_sfm, depth_path, cam_json_path, mask_path, img_path, max_depth_points, logging)
+        for i in range(xyz_sfm.shape[0]):
+            # Project SfM point to image
+            loc_i = cam.project(xyz_sfm[i:i+1])[0]
+            x = int(round(loc_i[0]))
+            y = int(round(loc_i[1]))
+            
+            if not (0 <= x < W and 0 <= y < H):
+                sfm_colors.append(SH2RGB(np.random.random((1, 3)) / 255.0).squeeze(0))
+                continue  # skip invalid pixels
+
+            val = depth_aligned_masked[y, x]
+            if np.isnan(val) and not (val > 0):
+                sfm_colors.append(SH2RGB(np.random.random((1, 3)) / 255.0).squeeze(0))
+                continue  # skip invalid depths
+
+            # Depth consistency check (is SfM point in front?)
+            sfm_depth_i = sfm_depths[i]
+            depthmap_depth = val
+            
+            if sfm_depth_i < depthmap_depth:
+                sfm_colors.append(img[y, x] / 255.0)
+                count += 1
+            else:
+                sfm_colors.append(SH2RGB(np.random.random((1, 3)) / 255.0).squeeze(0))
     else:
-        raise ValueError(f"Unknown alignment method: {alignment_method}")
+        sfm_colors = SH2RGB(np.random.random((xyz_sfm.shape[0], 3)) / 255.0)
+    
+    
+    all_xyz = np.concatenate((pts_world, xyz_sfm), axis=0)
+    all_colors = np.concatenate((np.array(depth_map_colors), np.array(sfm_colors)), axis=0)
+    all_scales = np.concatenate((scales, sfm_scales), axis=0)
+    all_scales = np.repeat(all_scales, 3, axis=1)
+    # print("scales: ", scales.shape, scales)
+    
+    if logging:
+        logging_images(depth, depth_aligned, sfm_depth_map, valid_align_mask) # , projected_aligned, projected_aligned_valid, sfm_pixels_valid)
+
+    return all_xyz, all_scales, all_colors
+    # return pts_world, np.repeat(scales, 3, axis=1), np.array(depth_map_colors)
+    # return xyz_sfm, np.repeat(sfm_scales, 3, axis=1), np.array(sfm_colors)

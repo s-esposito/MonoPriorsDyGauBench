@@ -67,9 +67,9 @@ def create_from_pcd_D3G(pcd: BasicPointCloud, spatial_lr_scale: float, max_sh_de
 
 
 def create_from_pcd_EffGS(pcd: BasicPointCloud, spatial_lr_scale: float, max_sh_degree: int):
-#     points = pcd.points[:, None, :]  # Nx1x3
-#     points = np.concatenate([points, np.zeros((points.shape[0], 16, 3))], axis=1)  # Nx17x3
-    points = pcd.points
+    points = pcd.points[:, None, :]  # Nx1x3
+    points = np.concatenate([points, np.zeros((points.shape[0], 16, 3))], axis=1)  # Nx17x3
+#     points = pcd.points
 
     fused_point_cloud = torch.tensor(np.asarray(points)).float().cuda()
     fused_color_raw = torch.tensor(np.asarray(pcd.colors)).float().cuda()
@@ -86,12 +86,12 @@ def create_from_pcd_EffGS(pcd: BasicPointCloud, spatial_lr_scale: float, max_sh_
         scales = torch.log(torch.tensor(pcd.scales).float()).cuda()
     else:
         scales = torch.log(torch.sqrt(dist2))[..., None].repeat(1, 3)
-#     rots = torch.zeros((fused_point_cloud.shape[0], fused_point_cloud.shape[1], 4), device="cuda")  # Nx17x4
-#     rots[:, 0, 0] = 1
-#     # rots[:, 3, 0] = 1
+    rots = torch.zeros((fused_point_cloud.shape[0], fused_point_cloud.shape[1], 4), device="cuda")  # Nx17x4
+    rots[:, 0, 0] = 1
+    # rots[:, 3, 0] = 1
     
-    rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
-    rots[:, 0] = 1
+#     rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
+#     rots[:, 0] = 1
 
     opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))
 

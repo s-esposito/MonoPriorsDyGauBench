@@ -7,6 +7,8 @@ from src.utils.system_utils import searchForMaxIteration
 from src.utils.general_utils import get_expon_lr_func
 from typing import Dict, Optional
 
+init_weights = False
+
 
 def get_embedder(multires, i=1):
     if i == -1:
@@ -114,23 +116,41 @@ class DeformNetwork(nn.Module):
         self.is_6dof = is_6dof
 
         if is_6dof:
+            assert False, "6DOF Deformation currently not supported"
             self.branch_w = nn.Linear(W, 3)
             self.branch_v = nn.Linear(W, 3)
         else:
             self.gaussian_warp = nn.Linear(W, 3)
+            if init_weights:
+                nn.init.zeros_(self.gaussian_warp.weight)
+                nn.init.zeros_(self.gaussian_warp.bias)
+            
         self.gaussian_rotation = nn.Linear(W, 4)
+        if init_weights:
+            nn.init.zeros_(self.gaussian_rotation.weight)
+            nn.init.zeros_(self.gaussian_rotation.bias)
+        
         if deform_scale:
             self.gaussian_scaling = nn.Linear(W, 3)
+            if init_weights:
+                nn.init.zeros_(self.gaussian_scaling.weight)
+                nn.init.zeros_(self.gaussian_scaling.bias)
         else:
             self.gaussian_scaling = None
 
         if deform_opacity:
             self.gaussian_opacity = nn.Linear(W, 1)
+            if init_weights:
+                nn.init.zeros_(self.gaussian_opacity.weight)
+                nn.init.zeros_(self.gaussian_opacity.bias)
         else:
             self.gaussian_opacity = None
 
         if deform_feature:
             self.gaussian_feature = nn.Linear(W, sh_dim)
+            if init_weights:
+                nn.init.zeros_(self.gaussian_feature.weight)
+                nn.init.zeros_(self.gaussian_feature.bias)
         else:
             self.gaussian_feature = None
 
@@ -147,6 +167,7 @@ class DeformNetwork(nn.Module):
                 h = torch.cat([x_emb, t_emb, h], -1)
 
         if self.is_6dof:
+            assert False, "6DOF Deformation currently not supported"
             w = self.branch_w(h)
             v = self.branch_v(h)
             theta = torch.norm(w, dim=-1, keepdim=True)
