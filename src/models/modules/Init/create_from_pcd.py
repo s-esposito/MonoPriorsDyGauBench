@@ -21,7 +21,7 @@ def create_from_pcd_vanilla(pcd: BasicPointCloud, spatial_lr_scale: float, max_s
     dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
     if pcd.scales is not None:
         assert len(pcd.scales) == len(pcd.points), "scales length must match points"
-        scales = torch.log(torch.tensor(pcd.scales).float()).cuda()
+        scales = torch.log((torch.tensor(pcd.scales)*2.0).float()).cuda()
     else:
         scales = torch.log(torch.sqrt(dist2))[..., None].repeat(1, 3)
     rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")

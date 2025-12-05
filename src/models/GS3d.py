@@ -77,6 +77,8 @@ from diff_gaussian_rasterization_ch9 import (
 )
 from diff_gaussian_rasterization_ch9 import GaussianRasterizer as GaussianRasterizer_ch9
 
+print_gradients = False
+
 # from diff_gaussian_rasterization_ch3 import GaussianRasterizationSettings as GaussianRasterizationSettings_ch3
 # from diff_gaussian_rasterization_ch3 import GaussianRasterizer as GaussianRasterizer_ch3
 
@@ -1296,6 +1298,8 @@ class GS3d(MyModelBaseClass):
                     result["cov3D_precomp"]
                 )
                 
+                # print("radii", radii.shape, radii)
+                
                 # -----------------------------
                 # Compute screen-space depth
                 # -----------------------------
@@ -1378,7 +1382,8 @@ class GS3d(MyModelBaseClass):
                     
 ##################################################################################################################################################################
                 # save depth for visualization in folder depth_vis
-                if (0 <= self.global_step < 150) or (self.warm_up < self.global_step < self.warm_up + 10) or (self.warm_up - 10 < self.global_step < self.warm_up): # self.global_step % 2 == 0 and self.global_step < 20:
+                if (0 <= self.iteration < 150) or (self.warm_up < self.iteration < self.warm_up + 10) or (self.warm_up - 10 < self.iteration < self.warm_up): # self.global_step % 2 == 0 and self.global_step < 20:
+                    # and self.iteration % 2 != 0
                     # print shape and dim of depth
                     print("rendered_depth", rendered_depth.shape, rendered_depth.dim())
                     print("undif_depth", undif_depth.shape, undif_depth.dim())
@@ -1399,7 +1404,7 @@ class GS3d(MyModelBaseClass):
                     axes[1].set_title("Rendered RGB")
                     
                     # --- Add global step number as figure title ---
-                    fig.suptitle(f"Step {self.global_step}", fontsize=16)
+                    fig.suptitle(f"Step {self.iteration}", fontsize=16)
 
 #                     # Undifferentiated depth
 #                     im1 = axes[1].imshow(undif_depth, cmap="Spectral")
@@ -1409,7 +1414,7 @@ class GS3d(MyModelBaseClass):
                     # Save figure
                     log_dir_fit = os.path.join(self.logger.save_dir, "train_renderings")
                     os.makedirs(log_dir_fit, exist_ok=True)
-                    save_path = os.path.join(log_dir_fit, f"_step_{self.global_step:06d}.png")
+                    save_path = os.path.join(log_dir_fit, f"_step_{self.iteration:06d}.png")
                     plt.tight_layout()
                     fig.savefig(save_path, bbox_inches="tight")
                     plt.close(fig)  # close to free memory
@@ -1601,7 +1606,7 @@ class GS3d(MyModelBaseClass):
                 # for image, gt_image in zip(images, gt_images)) / float(len(images))
             # ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
             print("Image shapes of Renderings: ", images[idx].shape, "and GT: ", gt_images[idx][:3].shape)
-            if gt_depths_available:
+            if gt_depths_available and mode == "train":
                 assert depths[idx].shape == gt_depths[idx:idx+1].shape, f"Depth shape mismatch: {depths[idx].shape} vs {gt_depths[idx:idx+1].shape}"
                 print(f"Depth shapes: rendered {depths[idx].shape}, GT {gt_depths[idx:idx+1].shape}")
                 # depth_loss = l1_loss(depths[idx], gt_depths[idx:idx+1])
@@ -1661,7 +1666,7 @@ class GS3d(MyModelBaseClass):
         Ll1 /= float(batch_size)
         ssim1 /= float(batch_size)
         
-        if gt_depths_available:
+        if gt_depths_available and mode == "train":
             depth_loss /= float(batch_size)
         else:
             depth_loss = torch.tensor(0.0).to(Ll1.device)
@@ -1701,7 +1706,7 @@ class GS3d(MyModelBaseClass):
             gt_depth_inverted_np = gt_depth_inverted.squeeze().detach().cpu().numpy()
             
             # log loss map
-            if gt_depths_available:
+            if gt_depths_available and mode == "train":
                 gt_depth_inverted = 1 / (gt_depth + 1e-6)
                 # depth_loss_img = compute_depth_loss(depth, gt_depth_inverted, True).squeeze().detach().cpu().numpy()
                 depth_loss_img = get_depth_loss(depth, gt_depth_inverted, True).squeeze().detach().cpu().numpy()
@@ -1714,7 +1719,9 @@ class GS3d(MyModelBaseClass):
 
             # log gt depths
             fig, ax = plt.subplots()
-            im = ax.imshow(gt_depth_inverted_np, cmap="Spectral")
+            vmin = np.percentile(gt_depth_inverted_np, 2)   # lower 2%
+            vmax = np.percentile(gt_depth_inverted_np, 98)  # upper 2%
+            im = ax.imshow(gt_depth_inverted_np, cmap="Spectral", vmin=vmin, vmax=vmax)
             plt.colorbar(im, ax=ax)  # adds colorbar
             fig.tight_layout()
             
@@ -1818,6 +1825,17 @@ class GS3d(MyModelBaseClass):
         print(iteration, self.trainer.global_step, loss)
         # assert False, render_pkg["render"]
         self.manual_backward(loss)
+        
+        if print_gradients:
+            print("\n=== Gradients for deformation network ===")
+            for i, group in enumerate(deform_optimizer.param_groups):
+                print(f"\nParam group: {group.get('name', i)}")
+                for p in group["params"]:
+                    if p.grad is None:
+                        print("  grad: None")
+                    else:
+                        print("  grad mean:", p.grad.mean().item(),
+                            "grad norm:", p.grad.norm().item())
 
         # print([[param_group['name'], optimizer.state.get(param_group["params"][0])] for param_group in optimizer.param_groups])
 
@@ -2793,25 +2811,23 @@ class GS3d(MyModelBaseClass):
             new_features_t,
         )
     
-#     def n_current_gaussians(self):
-#         return int(self.get_xyz.shape[0])
-# 
-#     def n_available_slots(self):
-#         if (self.global_step < 8000) and (self.motion_mode == "MLP"):
-#             self.MAX_GAUSSIANS = 10_000_000 # 240_000
-#         elif self.motion_mode == "MLP":
-#             self.MAX_GAUSSIANS = 10_000_000 # 900_000
-#         elif self.motion_mode == "EffGS":
-#             self.MAX_GAUSSIANS = 10_000_000
-#         return max(0, self.MAX_GAUSSIANS - self.n_current_gaussians())
-#     
-#     def n_safe_slots(self, requested):
-#         return min(requested, self.n_available_slots())
+    def n_current_gaussians(self):
+        return int(self.get_xyz.shape[0])
+
+    def n_available_slots(self):
+        if (self.motion_mode == "MLP"):
+            self.MAX_GAUSSIANS = 2_500_000 # 3_300_000 # 3_357_822
+        else:
+            self.MAX_GAUSSIANS = 10_000_000
+        return max(0, self.MAX_GAUSSIANS - self.n_current_gaussians())
+    
+    def n_safe_slots(self, requested):
+        return min(requested, self.n_available_slots())
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         # ACTIVATE LIMITED GAUSSIANS HERE
-#         if self.n_available_slots() == 0:
-#             return
+        if self.n_available_slots() == 0:
+            return
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
 
@@ -2834,25 +2850,28 @@ class GS3d(MyModelBaseClass):
             selected_pts_mask,
             torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent,
         )
-#         print("Current num of Gaussians: ", self.n_current_gaussians())
-#         # check how many gaussians can be added
-#         n_requested = selected_pts_mask.sum().item()
-#         print("Num of Gaussians wanting to add: ", n_requested)
-#         n_allowed = self.n_safe_slots(n_requested)
-#         if n_allowed == 0:
-#             return
-#         # get all candidate indices
-#         selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
-#         if selected_indices.numel() == 0:
-#             return
-#         # either deterministic:
-#         # selected_indices = selected_indices[:n_allowed]
-#         # or random:
-#         perm = torch.randperm(selected_indices.shape[0], device="cuda")
-#         selected_indices = selected_indices[perm[:n_allowed]]
-#         # create a fresh mask with exactly n_allowed points
-#         selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
-#         selected_pts_mask[selected_indices] = True
+        ### LIMIT GAUSSIANS BLOCK
+        # check how many gaussians can be added
+        n_requested = selected_pts_mask.sum().item()
+        n_allowed = self.n_safe_slots(n_requested)
+        if n_allowed == 0:
+            print("Current num of Gaussians: ", self.n_current_gaussians())
+            print("Num of Gaussians wanting to add: ", n_requested)
+            print("No available slots to add Gaussians.")
+            return
+        # get all candidate indices
+        selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
+        if selected_indices.numel() == 0:
+            return
+        # either deterministic:
+        # selected_indices = selected_indices[:n_allowed]
+        # or random:
+        perm = torch.randperm(selected_indices.shape[0], device="cuda")
+        selected_indices = selected_indices[perm[:n_allowed]]
+        # create a fresh mask with exactly n_allowed points
+        selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
+        selected_pts_mask[selected_indices] = True
+        ### END LIMIT GAUSSIANS BLOCK
 
         new_xyz = self._xyz[selected_pts_mask]
         new_features_dc = self._features_dc[selected_pts_mask]
@@ -2926,29 +2945,31 @@ class GS3d(MyModelBaseClass):
             selected_pts_mask,
             torch.max(self.get_scaling, dim=1).values > self.percent_dense * scene_extent,
         )
-        print("Current num of Gaussians: ", n_init_points)
         
+        ### LIMIT GAUSSIANS BLOCK
+        # check how many gaussians can be added
+        n_requested = selected_pts_mask.sum().item() * N
+        n_allowed = self.n_safe_slots(n_requested)
+        if n_allowed == 0:
+            print("Current num of Gaussians: ", n_init_points)
+            print("Num of Gaussians wanting to add: ", n_requested)
+            print("No available slots to add Gaussians.")
+            return
+        max_selected = n_allowed // N
+        # get all candidate indices
+        selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
+        if selected_indices.numel() == 0:
+            return
+        # either deterministic:
+        # selected_indices = selected_indices[:n_allowed]
+        # or random:
+        perm = torch.randperm(selected_indices.shape[0], device="cuda")
+        selected_indices = selected_indices[perm[:max_selected]]
+        # create a fresh mask with exactly n_allowed points
+        selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
+        selected_pts_mask[selected_indices] = True
+        ### END LIMIT GAUSSIANS BLOCK
         
-#         # check how many gaussians can be added
-#         n_requested = selected_pts_mask.sum().item() * N
-#         print("Num of Gaussians wanting to add: ", n_requested)
-#         n_allowed = self.n_safe_slots(n_requested)
-#         if n_allowed == 0:
-#             return
-#         max_selected = n_allowed // N
-#         # get all candidate indices
-#         selected_indices = torch.nonzero(selected_pts_mask, as_tuple=False).view(-1)
-#         if selected_indices.numel() == 0:
-#             return
-#         # either deterministic:
-#         # selected_indices = selected_indices[:n_allowed]
-#         # or random:
-#         perm = torch.randperm(selected_indices.shape[0], device="cuda")
-#         selected_indices = selected_indices[perm[:max_selected]]
-#         # create a fresh mask with exactly n_allowed points
-#         selected_pts_mask = torch.zeros_like(selected_pts_mask, dtype=bool)
-#         selected_pts_mask[selected_indices] = True
-#         
         n_selected = selected_pts_mask.sum().item()
         n_splitted = n_selected * N
         self.log("train/n_splitted", n_splitted, prog_bar=True, on_step=True, on_epoch=True)

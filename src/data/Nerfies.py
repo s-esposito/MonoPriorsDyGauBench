@@ -15,6 +15,7 @@ import os
 from typing import NamedTuple, Optional
 from torch.utils.data import DataLoader
 import torch
+import matplotlib.pyplot as plt
 
 
 # difference between __init__, prepare_data and setup:
@@ -28,36 +29,67 @@ import math
 
 init_with_depth = False
 progressive_sampler = False
-min_fraction_sampler = 0.1
+# min_fraction_sampler = 0.1
 max_steps_sampler = 3_000
 
 class ProgressiveSampler(Sampler):
-    def __init__(self, data_source, max_steps, min_fraction=min_fraction_sampler):
+    def __init__(self, data_source, max_steps, batch_size): #, min_fraction=min_fraction_sampler):
         self.data_source = data_source
+        self.min_fraction = 1/len(self.data_source)
         self.max_steps = max_steps
-        self.min_fraction = min_fraction if min_fraction > 1/len(self.data_source) else 1/(len(self.data_source)-1)
+        # self.min_fraction = min_fraction if min_fraction > 1/len(self.data_source) else 1/(len(self.data_source)-1)
         self.step = 0
+        self.batch_size = batch_size
+        self.idx_list = []
 
     def __iter__(self):
         total_len = len(self.data_source)
+        m = 10 * self.batch_size # steps per increase in samples
         while True:
             frac = min(1.0, self.min_fraction + (1 - self.min_fraction) * self.step / self.max_steps)
             n = int(len(self.data_source) * frac)
-            indices = torch.arange(n)
             
-            # Logging
-            if True: #self.step % self.log_interval == 0:
-                print(
+            # n = min(total_len, self.step // m + 1)
+            # frac = n / total_len
+            
+            idx = torch.randint(0, n, (1,)).item()
+            print(
                     f"[ProgressiveSampler] Step {self.step:5d} | "
                     f"Fraction: {frac*100:6.2f}% | "
-                    f"Samples: {n:6d}/{total_len:6d}"
+                    f"Samples: {n:6d}/{total_len:6d} | "
+                    f"Chosen Index: {idx}"
                 )
-            
-            # yield from indices[torch.randperm(n)].tolist()
-            # self.step += 1
-            for idx in indices[torch.randperm(n)]:
-                yield idx
-                self.step += 1
+            self.idx_list.append(idx)
+            yield idx
+            self.step += 1
+            if self.step == (30_000*self.batch_size)-1:
+                save_path = os.path.join('/home/geiger/gwb215/MonoPriorsDyGauBench/visualize', 'progressive_sampler_distribution.pdf')
+                plt.figure(figsize=(10,4))
+                plt.hist(self.idx_list, bins=total_len, density=False, color='#982C3A')
+                plt.title('Distribution of Chosen Indices')
+                plt.xlabel('Dataset Index')
+                plt.ylabel('Total Count')
+                plt.tight_layout()
+                plt.savefig(save_path)
+                plt.close()
+                print(f"Distribution saved as '{save_path}'")
+                
+#             # old sampler
+#             indices = torch.arange(n)
+#             
+#             # Logging
+#             if True: #self.step % self.log_interval == 0:
+#                 print(
+#                     f"[ProgressiveSampler] Step {self.step:5d} | "
+#                     f"Fraction: {frac*100:6.2f}% | "
+#                     f"Samples: {n:6d}/{total_len:6d}"
+#                 )
+#             
+#             # yield from indices[torch.randperm(n)].tolist()
+#             # self.step += 1
+#             for idx in indices[torch.randperm(n)]:
+#                 yield idx
+#                 self.step += 1
 
     def __len__(self):
         return len(self.data_source)
@@ -195,8 +227,14 @@ class NerfiesDataModule(MyDataModuleBaseClass):
                 max_depth_points=max_points, 
                 logging=True, 
                 alignment_method="2d", 
-                use_ransac=False
+                use_ransac=True
             )
+            # if any of the scales are less than 0.00, print warning
+            # if np.any(scales < 0.01):
+            #     print("Warning: Some scales are less than 0.00 after init with depth.")
+            #     print("Scales min: ", np.min(scales), " Scales max: ", np.max(scales))
+            #     print("Number of negative scales: ", np.sum(scales < 0.00))
+            # scales = (scales/scales) * 0.01 # ensure no zero scale
 
         shs = np.random.random((xyz.shape[0], 3)) / 255.0
 
@@ -300,7 +338,7 @@ class NerfiesDataModule(MyDataModuleBaseClass):
         # assert False, [len(self.train_cameras), len(self.test_cameras), len(self.val_cameras)]
 
     def train_dataloader(self):
-        sampler = ProgressiveSampler(self.train_cameras, max_steps=max_steps_sampler)
+        sampler = ProgressiveSampler(self.train_cameras, max_steps=max_steps_sampler*self.batch_size, batch_size=self.batch_size)
         if progressive_sampler:
             loader = DataLoader(self.train_cameras, batch_size=self.batch_size, sampler=sampler)
         else:

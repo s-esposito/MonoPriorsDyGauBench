@@ -15,7 +15,9 @@ import time
 import functools
 import numpy as np
 
-init_weights = False
+# init_weights = False
+# mean0init_weights = False
+xavier_init_weights = True
 
 def compute_plane_smoothness(t):
     batch_size, c, h, w = t.shape
@@ -130,8 +132,10 @@ def initialize_weights(m):
     if isinstance(m, nn.Linear):
         # init.constant_(m.weight, 0)
         init.xavier_uniform_(m.weight, gain=1)
+        # init.zeros_(m.weight)
         if m.bias is not None:
             init.xavier_uniform_(m.weight, gain=1)
+            # init.zeros_(m.bias)
             # init.constant_(m.bias, 0)
 
 
@@ -426,10 +430,14 @@ class Deformation(nn.Module):
         else:
             mask = torch.ones_like(opacity_emb[:, 0]).unsqueeze(-1)
         # breakpoint()
+#         print(self.args_no_dx, self.args_no_ds, self.args_no_dr, self.args_no_do, self.args_no_dshs)
+#         exit(0)
         if self.args_no_dx:
             pts = rays_pts_emb[:, :3]
         else:
             dx = self.pos_deform(hidden)
+            print("Position Deformation dx stats: min", dx.min().item(), "max", dx.max().item(), "mean", dx.mean().item(), "std", dx.std().item())
+
             # dx should be all zeros at the beginning
             # print("Deformation dx stats: min", dx.min().item(), "max", dx.max().item(), "mean", dx.mean().item())
             # dx = torch.zeros_like(dx)  # debug check
@@ -441,6 +449,7 @@ class Deformation(nn.Module):
             scales = scales_emb[:, :3]
         else:
             ds = self.scales_deform(hidden)
+            print("Scales Deformation ds stats: min", ds.min().item(), "max", ds.max().item(), "mean", ds.mean().item(), "std", ds.std().item())
 
             # scales = torch.zeros_like(scales_emb[:, :3])
             scales = scales_emb[:, :3] * mask + ds
@@ -449,6 +458,7 @@ class Deformation(nn.Module):
             rotations = rotations_emb[:, :4]
         else:
             dr = self.rotations_deform(hidden)
+            print("Rotation Deformation dr stats: min", dr.min().item(), "max", dr.max().item(), "mean", dr.mean().item(), "std", dr.std().item())
 
             # rotations = torch.zeros_like(rotations_emb[:, :4])
             if self.args_apply_rotation:
@@ -460,7 +470,7 @@ class Deformation(nn.Module):
             opacity = opacity_emb[:, :1]
         else:
             do = self.opacity_deform(hidden)
-
+            print("Opacity Deformation dr stats: min", do.min().item(), "max", do.max().item(), "mean", do.mean().item(), "std", do.std().item())
             # opacity = torch.zeros_like(opacity_emb[:, :1])
             opacity = opacity_emb[:, :1] * mask + do
         if self.args_no_dshs:
@@ -540,24 +550,66 @@ class deform_network(nn.Module):
         # print(self)
         
         # zero init of all last linear layers in deformation net
-        if init_weights:
-            nn.init.zeros_(self.deformation_net.feature_out[-1].weight)
-            nn.init.zeros_(self.deformation_net.feature_out[-1].bias)
+#         if init_weights:
+#             nn.init.zeros_(self.deformation_net.feature_out[-1].weight)
+#             nn.init.zeros_(self.deformation_net.feature_out[-1].bias)
+#             
+#             nn.init.zeros_(self.deformation_net.pos_deform[-1].weight)
+#             nn.init.zeros_(self.deformation_net.pos_deform[-1].bias)
+# 
+#             nn.init.zeros_(self.deformation_net.scales_deform[-1].weight)
+#             nn.init.zeros_(self.deformation_net.scales_deform[-1].bias)
+#             
+#             nn.init.zeros_(self.deformation_net.rotations_deform[-1].weight)
+#             nn.init.zeros_(self.deformation_net.rotations_deform[-1].bias)
+#             
+#             nn.init.zeros_(self.deformation_net.opacity_deform[-1].weight)
+#             nn.init.zeros_(self.deformation_net.opacity_deform[-1].bias)
+# 
+#             nn.init.zeros_(self.deformation_net.shs_deform[-1].weight)
+#             nn.init.zeros_(self.deformation_net.shs_deform[-1].bias)
+#         if mean0init_weights:
+#             weight_std = 1e-5
+#             nn.init.normal_(self.deformation_net.feature_out[-1].weight, mean=0.0, std=weight_std)
+#             nn.init.zeros_(self.deformation_net.feature_out[-1].bias)
+#             
+#             nn.init.normal_(self.deformation_net.pos_deform[-1].weight, mean=0.0, std=weight_std)
+#             nn.init.zeros_(self.deformation_net.pos_deform[-1].bias)
+# 
+#             nn.init.normal_(self.deformation_net.scales_deform[-1].weight, mean=0.0, std=weight_std)
+#             nn.init.zeros_(self.deformation_net.scales_deform[-1].bias)
+#             
+#             nn.init.normal_(self.deformation_net.rotations_deform[-1].weight, mean=0.0, std=weight_std)
+#             nn.init.zeros_(self.deformation_net.rotations_deform[-1].bias)
+#             
+#             nn.init.normal_(self.deformation_net.opacity_deform[-1].weight, mean=0.0, std=weight_std)
+#             nn.init.zeros_(self.deformation_net.opacity_deform[-1].bias)
+# 
+#             nn.init.normal_(self.deformation_net.shs_deform[-1].weight, mean=0.0, std=weight_std)
+#             nn.init.zeros_(self.deformation_net.shs_deform[-1].bias)
+        if xavier_init_weights:
+            xavier_gain = 0.5
+            init.xavier_uniform_(self.deformation_net.feature_out[-1].weight, gain=xavier_gain)
+            init.zeros_(self.deformation_net.feature_out[-1].bias)
             
-            nn.init.zeros_(self.deformation_net.pos_deform[-1].weight)
-            nn.init.zeros_(self.deformation_net.pos_deform[-1].bias)
+            init.xavier_uniform_(self.deformation_net.pos_deform[-1].weight, gain=xavier_gain)
+            init.zeros_(self.deformation_net.pos_deform[-1].bias)
 
-            nn.init.zeros_(self.deformation_net.scales_deform[-1].weight)
-            nn.init.zeros_(self.deformation_net.scales_deform[-1].bias)
+            init.xavier_uniform_(self.deformation_net.scales_deform[-1].weight, gain=xavier_gain)
+            init.zeros_(self.deformation_net.scales_deform[-1].bias)
             
-            nn.init.zeros_(self.deformation_net.rotations_deform[-1].weight)
-            nn.init.zeros_(self.deformation_net.rotations_deform[-1].bias)
+            init.xavier_uniform_(self.deformation_net.rotations_deform[-1].weight, gain=xavier_gain)
+            init.zeros_(self.deformation_net.rotations_deform[-1].bias)
             
-            nn.init.zeros_(self.deformation_net.opacity_deform[-1].weight)
-            nn.init.zeros_(self.deformation_net.opacity_deform[-1].bias)
+            init.xavier_uniform_(self.deformation_net.opacity_deform[-1].weight, gain=xavier_gain)
+            init.zeros_(self.deformation_net.opacity_deform[-1].bias)
+
+            init.xavier_uniform_(self.deformation_net.shs_deform[-1].weight, gain=xavier_gain)
+            init.zeros_(self.deformation_net.shs_deform[-1].bias)
             
-            nn.init.zeros_(self.deformation_net.shs_deform[-1].weight)
-            nn.init.zeros_(self.deformation_net.shs_deform[-1].bias)
+        
+        # assert self.deformation_net.feature_out[-1].weight.requires_grad
+        
         
         # move everything to cuda
         # self.timenet = self.timenet.cuda()

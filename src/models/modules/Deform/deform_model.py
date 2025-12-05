@@ -7,7 +7,7 @@ from src.utils.system_utils import searchForMaxIteration
 from src.utils.general_utils import get_expon_lr_func
 from typing import Dict, Optional
 
-init_weights = False
+init_weights = True
 
 
 def get_embedder(multires, i=1):
