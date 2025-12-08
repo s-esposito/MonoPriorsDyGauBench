@@ -24,10 +24,12 @@ src/models/GS3d_flow_old.py
 **/*.egg-info/**
 visualize/*.pkl
 visualize/*.png
-visualize/**/*.pkl
-visualize/**/*.png
-**/*.pt
 *.png
+# visualize/**/*.pkl
+!visualize/**/*.png
+visualize/_**
+**/*.pt
+
 check_run.sh
 download_from_orion.sh
 HyperNeRF_Scenes_Motion_Masks/*
@@ -35,3 +37,6 @@ motion_iphone/*
 compress_datasets_log.txt
 .vscode
 wandb
+custom_build/*
+*.mp4
+*.so
