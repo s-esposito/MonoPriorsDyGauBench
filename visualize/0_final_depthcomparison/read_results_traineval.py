@@ -10,7 +10,13 @@ import math
 import matplotlib.cm as cm
 import multiprocessing
 
-exp_prefix = "traineval"
+evaluate_foreground = False
+if evaluate_foreground:
+    exp_prefix = "maskedtraineval"
+    mask_suffix = "_mask"
+else:
+    exp_prefix = "traineval"
+    mask_suffix = ""
 os.makedirs(exp_prefix, exist_ok=True)
 
 
@@ -20,6 +26,7 @@ sub_class = "all"
 # # datasets=["nerfds"]#, "nerfds"]#,  "hypernerf", "dnerf"]
 # for depth test
 datasets = ["iphone", "nerfies"]# , "nerfds"]  # ,  "hypernerf", "dnerf"]
+
 
 root_dir = "../../output/depth_experiment"  
 tineuvox_root_dir = "../../TiNeuVox/logs"
@@ -68,6 +75,39 @@ method_colors = (
     + [color for color in cm.Blues(np.linspace(0.3, 0.85, method_colors_count))]  # x blues
     + [color for color in cm.Reds(np.linspace(0.3, 0.85, method_colors_count))]   # x reds
 )
+
+method_name_mapping = {
+    "MLP/vanilla": "DeformableGS",
+    "MLP-DepthSupervision-videoda/vanilla": "DeformableGS + Depth Supervision (VideoDA)",
+    "MLP-DepthSupervision-depth-pro/vanilla": "DeformableGS + Depth Supervision (Depth Pro)",
+    "MLP-DepthSupervision-mega-sam/vanilla": "DeformableGS + Depth Supervision (MegaSaM)",
+    
+    "Curve/vanilla": "EffGS",
+    "Curve-DepthSupervision-videoda/vanilla": "EffGS + Depth Supervision (VideoDA)",
+    "Curve-DepthSupervision-depth-pro/vanilla": "EffGS + Depth Supervision (Depth Pro)",
+    "Curve-DepthSupervision-mega-sam/vanilla": "EffGS + Depth Supervision (MegaSaM)",
+    
+    "HexPlane/vanilla": "4D-GS",
+    "HexPlane-DepthSupervision-videoda/vanilla": "4D-GS + Depth Supervision (VideoDA)",
+    "HexPlane-DepthSupervision-depth-pro/vanilla": "4D-GS + Depth Supervision (Depth Pro)",
+    "HexPlane-DepthSupervision-mega-sam/vanilla": "4D-GS + Depth Supervision (MegaSaM)",
+}
+
+metric_name_mapping = {
+    "test_psnr": "PSNR$\\uparrow$",
+    "test_ssim": "SSIM$\\uparrow$",
+    "test_msssim": "MS-SSIM$\\uparrow$",
+    "test_lpips": "LPIPS$\\downarrow$",
+    "render_FPS": "FPS$\\uparrow$",
+    "render_FPS_train": "Train FPS$\\uparrow$",
+    "train_time": "TrainTime (s)$\\downarrow$",
+    "train-test_psnr": "PSNR-gap$\\downarrow$",
+    "train-test_msssim": "MS-SSIM-gap$\\downarrow$",
+    "train-test_lpips": "LPIPS-gap$\\uparrow$",
+    "train-test_ssim": "MS-SSIM-gap$\\downarrow$",
+    "crash": "Number of crashed runs$\\downarrow$",
+    "OOM": "Number of OOM runs$\\downarrow$",
+}
 
 """
 assert os.path.exists("vanilla.pkl"), "Must take vanilla data as base!"
@@ -172,16 +212,16 @@ def process_methods(dataset, methods_subset):
                 else:
                     assert False, f"Unknown method {big_name}!"
 
-                if not os.path.exists(os.path.join(local_path, "test.txt")):
+                if not os.path.exists(os.path.join(local_path, f"test{mask_suffix}.txt")):
                     print(
-                        "text.txt not found locally: ",
-                        os.path.join(local_path, "test.txt"),
+                        f"text{mask_suffix}.txt not found locally: ",
+                        os.path.join(local_path, f"test{mask_suffix}.txt"),
                     )
                     continue
-                if not os.path.exists(os.path.join(local_path, "train.txt")):
+                if not os.path.exists(os.path.join(local_path, f"train{mask_suffix}.txt")):
                     print(
-                        "train.txt not found locally: ",
-                        os.path.join(local_path, "train.txt"),
+                        f"train{mask_suffix}.txt not found locally: ",
+                        os.path.join(local_path, f"train{mask_suffix}.txt"),
                     )
                     continue
                 # try:
@@ -192,7 +232,7 @@ def process_methods(dataset, methods_subset):
                 #    test_lpips = float(test_run.history(keys=["test/avg_lpips"], pandas=False)[0]["test/avg_lpips"])
                 #    test_render_time = float(test_run.history(keys=["test/avg_render_time"], pandas=False)[0]["test/avg_render_time"])
                 # except:
-                with open(os.path.join(local_path, "test.txt"), "r") as f:
+                with open(os.path.join(local_path, f"test{mask_suffix}.txt"), "r") as f:
                     line = f.readline()
                     while line:
                         if line.startswith("Average PSNR:"):
@@ -207,7 +247,7 @@ def process_methods(dataset, methods_subset):
                             test_render_time = float(line.strip().split(" ")[-1])
                         line = f.readline()
 
-                with open(os.path.join(local_path, "train.txt"), "r") as f:
+                with open(os.path.join(local_path, f"train{mask_suffix}.txt"), "r") as f:
                     line = f.readline()
                     while line:
                         if line.startswith("Average PSNR:"):
@@ -443,7 +483,7 @@ error_color = "black"
 
 pops = []
 for color, method, big_name in zip(method_colors[: len(methods)], methods, big_names_list):
-    pops.append(mpatches.Patch(color=color, label=big_name))
+    pops.append(mpatches.Patch(color=color, label=method_name_mapping[method]))
 
 # lims = {
 #    "render_FPS": (None, None),
@@ -517,6 +557,10 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
         ax.set_ylim(bottom=y_min - y_padding, top=y_max + y_padding)
     else:
         ax.set_ylim(bottom=max(y_min - y_padding, 0), top=y_max + y_padding)
+        
+    # Add horizontal grid lines
+    ax.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
+    ax.set_axisbelow(True)
 
     ax.bar(
         bar_positions,
@@ -570,13 +614,16 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
         ncol=plot_columns,                       # number of columns in legend
     )
 
-    if key == "train_time":
-        plt.ylabel(key + " (second)")
-    else:
-        plt.ylabel(key)
 
-    # plt.tight_layout()
+    plt.ylabel(metric_name_mapping[key])
+
+    plt.tight_layout()
     plt.savefig(exp_prefix + "/" + exp_prefix + "_" + sub_class + "_" + key + ".pdf", bbox_inches="tight")
+    
+    # Save version without legend
+    ax.legend().set_visible(False)
+    plt.tight_layout()
+    plt.savefig(exp_prefix + "/" + exp_prefix + "_" + "nolegend" + "_" + sub_class + "_" + key + ".pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -670,6 +717,10 @@ for dataset in datasets:
             ax.set_ylim(bottom=y_min - y_padding, top=y_max + y_padding)
         else:
             ax.set_ylim(bottom=max(y_min - y_padding, 0), top=y_max + y_padding)
+            
+        # Add horizontal grid lines
+        ax.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
+        ax.set_axisbelow(True)
 
         ax.bar(
             bar_positions,
@@ -712,7 +763,7 @@ for dataset in datasets:
                 linewidth=0.5,
             )
 
-        ax.set_xlim(left=bar_positions[0] - bar_width * 2.0)
+        ax.set_xlim(left=bar_positions[0] - bar_width, right=bar_positions[-1] + bar_width)
 
         # individual scene plots
         # plt.legend(handles=pops, loc="best")
@@ -723,13 +774,15 @@ for dataset in datasets:
             ncol=plot_columns,  # number of columns in legend
         )
 
-        if key == "train_time":
-            plt.ylabel(key + " (second)")
-        else:
-            plt.ylabel(key)
+        plt.ylabel(metric_name_mapping[key])
 
         plt.title(f"{dataset}")
 
         plt.tight_layout()
-        plt.savefig(exp_prefix + "/" + exp_prefix + "_" + dataset + "_" + key + ".pdf")
+        plt.savefig(exp_prefix + "/" + exp_prefix + "_" + dataset + "_" + key + ".pdf", bbox_inches="tight")
+        
+        # Save version without legend
+        ax.legend().set_visible(False)
+        plt.tight_layout()
+        plt.savefig(exp_prefix + "/" + exp_prefix + "_" + "nolegend" + "_" + dataset + "_" + key + ".pdf", bbox_inches="tight")
         plt.close(fig)
