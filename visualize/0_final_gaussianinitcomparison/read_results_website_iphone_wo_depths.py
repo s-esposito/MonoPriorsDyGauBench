@@ -19,7 +19,8 @@ dataset_mapper = {
 scenes = {
     # "dnerf": ["bouncingballs", "standup", "trex"],
     # "hypernerf": ["espresso", "torchocolate", "vrig-peel-banana"],
-    "iphone": ["mochi-high-five"] # ["apple", "mochi-high-five", "paper-windmill"],
+    # "iphone": ["mochi-high-five"] # ["apple", "mochi-high-five", "paper-windmill"],
+    "iphone": ["paper-windmill", "pillow"] # ["apple", "backpack", "block", "creeper", "handwavy", "haru-sit", "mochi-high-five", "spin", "sriracha-tree", "teddy"] # 
     # "nerfds": ["as", "plate", "sieve"],
     # "nerfies": ["tail"], #["broom", "curls", "toby-sit"], #,
     
@@ -35,8 +36,17 @@ teleport = {
     "torchocolate": False,
     "vrig-peel-banana": True,
     "apple": False,
+    "backpack": False,
+    "block": False,
+    "creeper": False,
+    "handwavy": False,
+    "haru-sit": False,
     "mochi-high-five": False,
     "paper-windmill": False,
+    "pillow": False,
+    "spin": False,
+    "sriracha-tree": False,
+    "teddy": False,
     "curls": True,
     "broom": True,
     "tail": True,
@@ -50,49 +60,78 @@ teleport = {
 method_mapper = {
     "Curve-DepthSupervision-videoda/vanilla": "GT",
     
-    "Curve-DepthSupervision-videoda/vanilla": "EffGS + Depth Supervision (VideoDA)", # <---- it is important that a depth method is the first one here !!!
-    "Curve-DepthSupervision-depth-pro/vanilla": "EffGS + Depth Supervision (Depth Pro)",
-    "Curve-DepthSupervision-mega-sam/vanilla": "EffGS + Depth Supervision (MegaSaM)",
+    "Curve-DepthSupervision-videoda/vanilla": "Depth Supervision (VideoDA)", # <---- it is important that a depth method is the first one here !!!
+    "Curve-DepthSupervision-depth-pro/vanilla": "Depth Supervision (Depth Pro)",
+    "Curve-DepthSupervision-mega-sam/vanilla": "Depth Supervision (MegaSaM)",
+    "Curve-DepthSupervision+GaussianInit-videoda/vanilla": "GaussianInit (VideoDA)", # <---- it is important that a depth method is the first one here !!!
+    "Curve-DepthSupervision+GaussianInit-depth-pro/vanilla": "GaussianInit (Depth Pro)",
+    "Curve-DepthSupervision+GaussianInit-mega-sam/vanilla": "GaussianInit (MegaSaM)",
     "Curve/vanilla": "EffGS",
     
-    "MLP-DepthSupervision-videoda/vanilla": "DeformableGS + Depth Supervision (VideoDA)",
-    "MLP-DepthSupervision-depth-pro/vanilla": "DeformableGS + Depth Supervision (Depth Pro)",
-    "MLP-DepthSupervision-mega-sam/vanilla": "DeformableGS + Depth Supervision (MegaSaM)",
+    "MLP-DepthSupervision-videoda/vanilla": "Depth Supervision (VideoDA)",
+    "MLP-DepthSupervision-depth-pro/vanilla": "Depth Supervision (Depth Pro)",
+    "MLP-DepthSupervision-mega-sam/vanilla": "Depth Supervision (MegaSaM)",
+    "MLP-DepthSupervision+GaussianInit-videoda/vanilla": "GaussianInit (VideoDA)",
+    "MLP-DepthSupervision+GaussianInit-depth-pro/vanilla": "GaussianInit (Depth Pro)",
+    "MLP-DepthSupervision+GaussianInit-mega-sam/vanilla": "GaussianInit (MegaSaM)",
     "MLP/vanilla": "DeformableGS",
     
-    "HexPlane-DepthSupervision-videoda/vanilla": "4D-GS + Depth Supervision (VideoDA)",
-    "HexPlane-DepthSupervision-depth-pro/vanilla": "4D-GS + Depth Supervision (Depth Pro)",
-    "HexPlane-DepthSupervision-mega-sam/vanilla": "4D-GS + Depth Supervision (MegaSaM)",
+    "HexPlane-DepthSupervision-videoda/vanilla": "Depth Supervision (VideoDA)",
+    "HexPlane-DepthSupervision-depth-pro/vanilla": "Depth Supervision (Depth Pro)",
+    "HexPlane-DepthSupervision-mega-sam/vanilla": "Depth Supervision (MegaSaM)",
+    "HexPlane-DepthSupervision+GaussianInit-videoda/vanilla": "GaussianInit (VideoDA)",
+    "HexPlane-DepthSupervision+GaussianInit-depth-pro/vanilla": "GaussianInit (Depth Pro)",
+    "HexPlane-DepthSupervision+GaussianInit-mega-sam/vanilla": "GaussianInit (MegaSaM)",
     "HexPlane/vanilla": "4D-GS",
 }
 
 splits = ["1"] #, "2", "3"]
 
-old_positions = {
-    (0, 0): "GT",
-    (0, 1): "Curve/vanilla",
-    # (1, 0): "MLP/nodeform",
-    (1, 1): "MLP/vanilla",
-    (2, 0): "HexPlane/vanilla",
-    # (2, 1): "FourDim/vanilla",
-    # (3, 0): "TRBF/nodecoder",
-    # (3, 1): "TRBF/vanilla",
-}
 # Hochkant layout
-positions = {
+normal_positions = {
     (0, 0): "GT",
     (0, 1): "MLP/vanilla",
     (1, 1): "MLP-DepthSupervision-videoda/vanilla",
     (2, 1): "MLP-DepthSupervision-depth-pro/vanilla",
-    (3, 1): "MLP-DepthSupervision-mega-sam/vanilla",
+    (3, 1): "MLP-DepthSupervision+GaussianInit-videoda/vanilla",
+    (4, 1): "MLP-DepthSupervision+GaussianInit-depth-pro/vanilla",
     (0, 2): "Curve/vanilla",
     (1, 2): "Curve-DepthSupervision-videoda/vanilla",
     (2, 2): "Curve-DepthSupervision-depth-pro/vanilla",
-    (3, 2): "Curve-DepthSupervision-mega-sam/vanilla",
+    (3, 2): "Curve-DepthSupervision+GaussianInit-videoda/vanilla",
+    (4, 2): "Curve-DepthSupervision+GaussianInit-depth-pro/vanilla",
     (0, 3): "HexPlane/vanilla",
     (1, 3): "HexPlane-DepthSupervision-videoda/vanilla",
     (2, 3): "HexPlane-DepthSupervision-depth-pro/vanilla",
-    (3, 3): "HexPlane-DepthSupervision-mega-sam/vanilla",
+    (3, 3): "HexPlane-DepthSupervision+GaussianInit-videoda/vanilla",
+    (4, 3): "HexPlane-DepthSupervision+GaussianInit-depth-pro/vanilla",
+}
+
+positions = {
+    (0, 0): "GT",
+    (1, 0): "MLP/vanilla",
+    (2, 0): "MLP-DepthSupervision-videoda/vanilla",
+    (3, 0): "MLP-DepthSupervision-depth-pro/vanilla",
+    (4, 0): "MLP-DepthSupervision-mega-sam/vanilla",
+    (5, 0): "MLP-DepthSupervision+GaussianInit-videoda/vanilla",
+    (6, 0): "MLP-DepthSupervision+GaussianInit-depth-pro/vanilla",
+    (7, 0): "MLP-DepthSupervision+GaussianInit-mega-sam/vanilla",
+    (0, 1): "GT",
+    (1, 1): "Curve/vanilla",
+    (2, 1): "Curve-DepthSupervision-videoda/vanilla",
+    (3, 1): "Curve-DepthSupervision-depth-pro/vanilla",
+    (4, 1): "Curve-DepthSupervision-mega-sam/vanilla",
+    (5, 1): "Curve-DepthSupervision+GaussianInit-videoda/vanilla",
+    (6, 1): "Curve-DepthSupervision+GaussianInit-depth-pro/vanilla",
+    (7, 1): "Curve-DepthSupervision+GaussianInit-mega-sam/vanilla",
+    (0, 2): "GT",
+    (1, 2): "HexPlane/vanilla",
+    (2, 2): "HexPlane-DepthSupervision-videoda/vanilla",
+    (3, 2): "HexPlane-DepthSupervision-depth-pro/vanilla",
+    (4, 2): "HexPlane-DepthSupervision-mega-sam/vanilla",
+    (5, 2): "HexPlane-DepthSupervision+GaussianInit-videoda/vanilla",
+    (6, 2): "HexPlane-DepthSupervision+GaussianInit-depth-pro/vanilla",
+    (7, 2): "HexPlane-DepthSupervision+GaussianInit-mega-sam/vanilla",
 }
 # Quer layout
 # positions = {
@@ -105,46 +144,34 @@ positions = {
 #     (3, 1): "HexPlane-videoda/vanilla",
 # }
 
-# methods = [
-#     "MLP/vanilla",
-#     "MLP-DepthSupervision-videoda/vanilla",
-#     "MLP-DepthSupervision-depth-pro/vanilla",
-#     "MLP-DepthSupervision-mega-sam/vanilla",
-#     "MLP-DepthSupervision+GaussianInit-videoda/vanilla",
-#     "MLP-DepthSupervision+GaussianInit-depth-pro/vanilla",
-#     "MLP-DepthSupervision+GaussianInit-mega-sam/vanilla",
-    
-#     "Curve/vanilla",
-#     "Curve-DepthSupervision-videoda/vanilla",
-#     "Curve-DepthSupervision-depth-pro/vanilla",
-#     "Curve-DepthSupervision-mega-sam/vanilla",
-#     "Curve-DepthSupervision+GaussianInit-videoda/vanilla",
-#     "Curve-DepthSupervision+GaussianInit-depth-pro/vanilla",
-#     "Curve-DepthSupervision+GaussianInit-mega-sam/vanilla",
-    
-#     "HexPlane/vanilla",
-#     "HexPlane-DepthSupervision-videoda/vanilla",
-#     "HexPlane-DepthSupervision-depth-pro/vanilla",
-#     "HexPlane-DepthSupervision-mega-sam/vanilla",
-#     "HexPlane-DepthSupervision+GaussianInit-videoda/vanilla",
-#     "HexPlane-DepthSupervision+GaussianInit-depth-pro/vanilla",
-#     "HexPlane-DepthSupervision+GaussianInit-mega-sam/vanilla",
-# ]
 
 fps = {
+    # iphone
     "apple": 30,
+    "backpack": 30,
+    "block": 30,
+    "creeper": 30,
+    "handwavy": 30,
+    "haru-sit": 30,
     "mochi-high-five": 30,
     "paper-windmill": 30,
+    "pillow": 30,
+    "spin": 30,
+    "sriracha-tree": 30,
+    "teddy": 30,
+    # nerfies
     "curls": 5,
     "broom": 5,
     "tail": 15,
     "toby-sit": 15,
+    # unknown
     "espresso": 15,
     "torchocolate": 15,
     "vrig-peel-banana": 15,
     "as": 30,
     "plate": 30,
     "sieve": 30,
+    # dnerf
     "bouncingballs": 1,
     "standup": 1,
     "trex": 1,
@@ -153,7 +180,7 @@ fps = {
 
 root_dir = "../../output/depth_experiment"
 tineuvox_root_dir = "../../TiNeuVox/logs"
-exp_prefix = "website_videos"
+exp_prefix = "website_videos_wo_depth_compact"
 os.makedirs(exp_prefix, exist_ok=True)
 max_length = 100
 
@@ -171,7 +198,10 @@ for dataset in tqdm(dataset_mapper):
 # continue
         print(f"Preparing for video_path {video_path}")
         # get all video readers
+        # video_readers = {}
+        gt_video_path = os.path.join(root_dir, dataset, scene, "Curve-DepthSupervision-videoda/vanilla1", "test.mp4")
         video_readers = {}
+        video_readers["GT"] = imageio.get_reader(gt_video_path, "mp4", fps=10)
         for method in method_mapper:
             # select the video that has the highest psnr
             max_psnr = -1
@@ -191,8 +221,8 @@ for dataset in tqdm(dataset_mapper):
                     video_reader_path = os.path.join(log_path, "test.mp4")
             print(f"Selected video_reader_path {video_reader_path} with PSNR {test_psnr}")
             video_readers[method] = imageio.get_reader(video_reader_path, "mp4", fps=10)
-            if "GT" not in video_readers:
-                video_readers["GT"] = imageio.get_reader(video_reader_path, "mp4", fps=10)
+#             if "GT" not in video_readers:
+#                 video_readers["GT"] = imageio.get_reader(video_reader_path, "mp4", fps=10)
         first_video = next(iter(video_readers.values()))
         frame_width, frame_height = (
             first_video.get_next_data().shape[1],
@@ -207,7 +237,7 @@ for dataset in tqdm(dataset_mapper):
             max(positions, key=lambda x: x[1])[1] + 1,
         )
         stitched_width, stitched_height = (
-            frame_width * grid_width * 2,
+            frame_width * grid_width,
             frame_height * grid_height,
         )
 
@@ -216,28 +246,41 @@ for dataset in tqdm(dataset_mapper):
         cur_index = 0
         while True:
             stitched_frame = np.zeros((stitched_height, stitched_width, 3), dtype=np.uint8)
+            
+            # Read GT frame once and store it for reuse
+            gt_frame_cache = None
+            
             for position, video_key in positions.items():
                 col, row = position
                 video = video_readers[video_key]
                 try:
-                    frame = video.get_next_data()
-                    if teleport[scene]:
+                    # If this is GT and we already read it, use cached frame
+                    if video_key == "GT":
+                        if gt_frame_cache is None:
+                            # First GT position - read the frame
+                            frame = video.get_next_data()
+                            if teleport[scene]:
+                                frame = video.get_next_data()
+                            gt_frame_cache = frame.copy()
+                        else:
+                            # Subsequent GT positions - use cached frame
+                            frame = gt_frame_cache.copy()
+                    else:
+                        # Non-GT methods - read normally
                         frame = video.get_next_data()
-                    # print(video_key)
-                    # print(position)
-                    # print("-" in video_key)
-                    # presave depth
+                        if teleport[scene]:
+                            frame = video.get_next_data()
+                    
+                    # Extract only RGB (no depth)
                     if video_key == "GT":
                         rgb = frame[:frame_height, :frame_width]
-                        depth = frame[:frame_height, 2 * frame_width : 3 * frame_width]
                     else:
                         rgb = frame[:frame_height, frame_width : 2 * frame_width]
-                        depth = frame[:frame_height, 3 * frame_width :]    
-                    frame = np.concatenate([rgb, depth], axis=1)
+                    frame = rgb  # Use only RGB, no depth concatenation
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                     frame = cv2.resize(
                         frame,
-                        (frame_width * 2, frame_height),
+                        (frame_width, frame_height),
                         interpolation=cv2.INTER_AREA,
                     )
 
@@ -266,7 +309,7 @@ for dataset in tqdm(dataset_mapper):
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     stitched_frame[
                         row * frame_height : (row + 1) * frame_height,
-                        col * frame_width * 2 : (col + 1) * frame_width * 2,
+                        col * frame_width : (col + 1) * frame_width,
                     ] = frame
                 except (IndexError, StopIteration):
                     # If the video has ended, reset its reader
