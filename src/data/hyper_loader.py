@@ -312,6 +312,9 @@ class Load_hyper_data(Dataset):
                 depth = depth.astype(float)
                 depth = torch.from_numpy(depth.copy())
                 print("reading img depths from method ", self.depth_method)
+            else: # added for megasam case where depth might be missing
+                depth = None
+                print("no depth found for method ", self.depth_method)
         else:
             depth = None
 
