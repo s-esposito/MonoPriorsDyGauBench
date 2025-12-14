@@ -28,7 +28,7 @@ from torch.utils.data import Sampler, DataLoader
 import math
 
 # Set to True to enable depth-based initialization of Gaussians
-init_with_depth = True
+init_with_depth = False
 
 
 
