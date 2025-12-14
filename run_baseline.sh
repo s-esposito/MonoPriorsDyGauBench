@@ -73,13 +73,13 @@ for method in "${methods[@]}"; do
             variant="${base}/${name%?}1"
             output_path="./output/depth_experiment/${base}" # -SfMInit"
 
-#             echo "Processing method ${method} with dataset ${dataset} on scene ${scene} with variant ${variant} and output path ${output_path}"
-#             python main.py fit \
-#                 --config configs/${variant}.yaml \
-#                 --output ${output_path} \
-#                 --name "${scene}-${base##*/}_$name" \
-#                 --group "${group_name}" \
-#                 --data.init_args.num_pts 0
+            echo "Processing method ${method} with dataset ${dataset} on scene ${scene} with variant ${variant} and output path ${output_path}"
+            python main.py fit \
+                --config configs/${variant}.yaml \
+                --output ${output_path} \
+                --name "${scene}-${base##*/}_$name" \
+                --group "${group_name}" \
+                --data.init_args.num_pts 0
 
             python main.py test \
                 --config configs/${variant}.yaml \

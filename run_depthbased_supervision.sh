@@ -47,6 +47,10 @@ methods=(
     MLP
 )
 
+########################################################################################
+#     check src/data/Nerfies.py to disable depth-based initialization of Gaussians     #
+########################################################################################
+
 group_name="depth_experiment"
 depth_methods=("videoda") # "mega-sam" "depth-pro")    # "depth-pro", "videoda", "mega-sam"
 lambda_depth=0.01           # choose nerfies: 0.05; d-nerf: 0.005

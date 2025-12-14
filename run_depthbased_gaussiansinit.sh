@@ -37,8 +37,12 @@ methods=(
     # MLP
 )
 
+########################################################################################
+#     change src/data/Nerfies.py to enable depth-based initialization of Gaussians     #
+########################################################################################
+
 group_name="depth_experiment"
-depth_method="mega-sam"    # "depth-pro", "videoda", "mega-sam"
+depth_method="mega-sam"    # choose from: "depth-pro", "videoda", "mega-sam"
 lambda_depth=0.01
 loss_function="DepthSupervision+GaussianInit-"
 compute_mask_test=true
