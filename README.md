@@ -98,7 +98,7 @@ conda install -c nvidia/label/cuda-12.1.1 cuda-toolkit
 pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu121
 
 # pip installs
-pip install -r requirements.txt
+pip install -r requirements.txt --no-build-isolation
 
 # create wandb project following instruction
 wandb init  
