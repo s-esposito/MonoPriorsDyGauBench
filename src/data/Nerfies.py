@@ -27,7 +27,12 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Sampler, DataLoader
 import math
 
-init_with_depth = False
+init_with_depth = True
+
+
+
+
+
 progressive_sampler = False
 # min_fraction_sampler = 0.1
 max_steps_sampler = 3_000
@@ -230,11 +235,11 @@ class NerfiesDataModule(MyDataModuleBaseClass):
                 use_ransac=True
             )
             # if any of the scales are less than 0.00, print warning
-            # if np.any(scales < 0.01):
-            #     print("Warning: Some scales are less than 0.00 after init with depth.")
-            #     print("Scales min: ", np.min(scales), " Scales max: ", np.max(scales))
-            #     print("Number of negative scales: ", np.sum(scales < 0.00))
-            # scales = (scales/scales) * 0.01 # ensure no zero scale
+            if np.any(scales < 0.01):
+                print("Warning: Some scales are less than 0.01 after init with depth.")
+                print("Scales min: ", np.min(scales), " Scales max: ", np.max(scales))
+                print("Number of negative scales: ", np.sum(scales < 0.00))
+                scales = np.clip(scales, 0.0001, None)
 
         shs = np.random.random((xyz.shape[0], 3)) / 255.0
 

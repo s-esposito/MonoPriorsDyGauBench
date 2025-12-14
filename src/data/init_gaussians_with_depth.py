@@ -96,13 +96,13 @@ def align_scene_with_global_ransac(depth_vals, sfm_vals, max_points=200000, logg
         idx = np.random.choice(X.shape[0], max_points, replace=False)
         X, y = X[idx], y[idx]
 
-    residual_threshold = 0.1 * np.median(sfm_vals) # 0.3
+    residual_threshold = 0.1 * np.median(sfm_vals)
 
     # Robust fit
     ransac = RANSACRegressor(
         estimator=LinearRegression(),
         residual_threshold=residual_threshold,  # adjust depending on your depth units
-        max_trials=1000
+        max_trials=5000
     )
     ransac.fit(X, y)
 
@@ -116,7 +116,7 @@ def align_scene_with_global_ransac(depth_vals, sfm_vals, max_points=200000, logg
 
     scale = ransac.estimator_.coef_.ravel()[0]
     shift = float(ransac.estimator_.intercept_)
-    successful = ratio > 0.2  # at least 10% inliers
+    successful = ratio > 0.3  # at least 10% inliers
 
     return scale, shift, successful
 
@@ -326,7 +326,7 @@ def compute_scaling(pts_world, xyz_sfm, cam):
     print("scales during init: ", sum(pts_world_scales<0))
     
     dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(xyz_sfm)).float().cuda()), 0.0000001).cpu()
-    sfm_scales = torch.sqrt(dist2)[..., None]*2.0
+    sfm_scales = torch.sqrt(dist2)[..., None]*1.0
     # sfm_scales = 0.00027338 * np.ones((xyz_sfm.shape[0], 1), dtype=np.float32)
     # sfm_scales *= (0.006/sfm_scales.median())
     
@@ -370,6 +370,9 @@ def init_gaussians_with_depth(xyz_sfm, depth_path, cam_json_path, mask_path, img
     else:
         mask = np.ones_like(depth, dtype=bool)
     img = imageio.imread(img_path)
+    # drop alpha channel if present
+    if img.shape[2] == 4:
+        img = img[:, :, :3]
     H, W = depth.shape
         
 
@@ -403,6 +406,7 @@ def init_gaussians_with_depth(xyz_sfm, depth_path, cam_json_path, mask_path, img
         if use_ransac:
             scale, shift, ransac_successful = align_scene_with_global_ransac(depth_vals, sfm_vals)     # <----- ransac method
             if not ransac_successful:
+                print("RANSAC alignment unsuccessful, falling back to least squares.")
                 scale, shift = np.linalg.lstsq(A, sfm_vals, rcond=None)[0]            # <----- least squares method
         else:
             scale, shift = np.linalg.lstsq(A, sfm_vals, rcond=None)[0]
@@ -411,6 +415,13 @@ def init_gaussians_with_depth(xyz_sfm, depth_path, cam_json_path, mask_path, img
         depth_aligned = depth * scale + shift
     else:
         depth_aligned = depth.copy()  # fallback
+    
+    # save the depth_aligned for debugging
+    # if logging:
+    #     np.save("depth_map_initialization_logging/depth_aligned.npy", depth_aligned)
+    #     np.save("depth_map_initialization_logging/sfm_depth_map.npy", sfm_depth_map)
+    # clip small depths to 0.21
+    # depth_aligned[depth_aligned < 0.21] = 0.21
     
     # preparing unprojection
     valid_depth_mask = np.isfinite(depth_aligned)
@@ -498,6 +509,12 @@ def init_gaussians_with_depth(xyz_sfm, depth_path, cam_json_path, mask_path, img
         unrotated_pts_world = pts_world.copy()
     for i in range(pts_world.shape[0]):
         loc_i = cam.project(unrotated_pts_world[i:i+1])[0]
+
+        if math.isnan(loc_i[0]) or math.isnan(loc_i[0]):
+            depth_map_colors.append(SH2RGB(np.random.random((1, 3)) / 255.0).squeeze(0))
+            print("nan pixel location!")
+            continue
+        
         x = int(round(loc_i[0]))
         y = int(round(loc_i[1]))
         if (0 <= x < W and 0 <= y < H):

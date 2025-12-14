@@ -10,7 +10,7 @@ import math
 import matplotlib.cm as cm
 import multiprocessing
 
-evaluate_foreground = False
+evaluate_foreground = True
 if evaluate_foreground:
     exp_prefix = "maskedtraineval"
     mask_suffix = "_mask"
@@ -104,7 +104,7 @@ metric_name_mapping = {
     "train-test_psnr": "PSNR-gap$\\downarrow$",
     "train-test_msssim": "MS-SSIM-gap$\\downarrow$",
     "train-test_lpips": "LPIPS-gap$\\uparrow$",
-    "train-test_ssim": "MS-SSIM-gap$\\downarrow$",
+    "train-test_ssim": "SSIM-gap$\\downarrow$",
     "crash": "Number of crashed runs$\\downarrow$",
     "OOM": "Number of OOM runs$\\downarrow$",
 }
@@ -549,8 +549,13 @@ for key in result_final[datasets[0]][methods[0]]["all"]:
             bar_colors.append(method_colors[method_id])
 
     # Adaptively set the y-axis limits based on the minimum and maximum values of the means
-    y_min = min(means)
-    y_max = max(means)
+    non_zero_means = [m for m in means if m != 0]
+    if len(non_zero_means) > 0:
+        y_min = min(non_zero_means)
+        y_max = max(non_zero_means)
+    else:
+        y_min = 0
+        y_max = 1
     y_range = y_max - y_min
     y_padding = abs(y_range) * 0.1  # Add 10% padding to the y-axis range
     if y_min < 0:
@@ -709,8 +714,13 @@ for dataset in datasets:
 
                 bar_colors.append(method_colors[method_id])
         # Adaptively set the y-axis limits based on the minimum and maximum values of the means
-        y_min = min(means)
-        y_max = max(means)
+        non_zero_means = [m for m in means if m != 0]
+        if len(non_zero_means) > 0:
+            y_min = min(non_zero_means)
+            y_max = max(non_zero_means)
+        else:
+            y_min = 0
+            y_max = 1
         y_range = y_max - y_min
         y_padding = abs(y_range) * 0.1  # Add 10% padding to the y-axis range
         if y_min < 0:

@@ -1606,7 +1606,7 @@ class GS3d(MyModelBaseClass):
                 # for image, gt_image in zip(images, gt_images)) / float(len(images))
             # ssim1 = ssim(image[None], gt_image[None], data_range=1., size_average=True)
             print("Image shapes of Renderings: ", images[idx].shape, "and GT: ", gt_images[idx][:3].shape)
-            if gt_depths_available and mode == "train":
+            if gt_depths_available: # and mode == "train":
                 assert depths[idx].shape == gt_depths[idx:idx+1].shape, f"Depth shape mismatch: {depths[idx].shape} vs {gt_depths[idx:idx+1].shape}"
                 print(f"Depth shapes: rendered {depths[idx].shape}, GT {gt_depths[idx:idx+1].shape}")
                 # depth_loss = l1_loss(depths[idx], gt_depths[idx:idx+1])
@@ -1666,7 +1666,7 @@ class GS3d(MyModelBaseClass):
         Ll1 /= float(batch_size)
         ssim1 /= float(batch_size)
         
-        if gt_depths_available and mode == "train":
+        if gt_depths_available: # and mode == "train":
             depth_loss /= float(batch_size)
         else:
             depth_loss = torch.tensor(0.0).to(Ll1.device)
@@ -1706,7 +1706,7 @@ class GS3d(MyModelBaseClass):
             gt_depth_inverted_np = gt_depth_inverted.squeeze().detach().cpu().numpy()
             
             # log loss map
-            if gt_depths_available and mode == "train":
+            if gt_depths_available: # and mode == "train":
                 gt_depth_inverted = 1 / (gt_depth + 1e-6)
                 # depth_loss_img = compute_depth_loss(depth, gt_depth_inverted, True).squeeze().detach().cpu().numpy()
                 depth_loss_img = get_depth_loss(depth, gt_depth_inverted, True).squeeze().detach().cpu().numpy()

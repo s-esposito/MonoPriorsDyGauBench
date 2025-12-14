@@ -41,10 +41,10 @@ methods_to_show = [
     "EffGS + Depth Supervision (Depth Pro)",
     "EffGS + Depth Supervision (MegaSaM)",
     
-    "4DGS",
-    "4DGS + Depth Supervision (VideoDA)",
-    "4DGS + Depth Supervision (Depth Pro)",
-    "4DGS + Depth Supervision (MegaSaM)",
+    "4D-GS",
+    "4D-GS + Depth Supervision (VideoDA)",
+    "4D-GS + Depth Supervision (Depth Pro)",
+    "4D-GS + Depth Supervision (MegaSaM)",
 ]
 
 method_colors_count = 4
@@ -76,6 +76,8 @@ else:
 for dataset in datasets:
     for method in methods:
         if method not in result_final[dataset]:
+            # Skip if method doesn't exist in this dataset
+            print(f"Warning: Method {method} not found in dataset {dataset}, skipping...")
             continue
         result_final[dataset][method]["all"] = {}
         for scene in result_final[dataset][method]:
@@ -102,10 +104,24 @@ metric_name_mapping = {
     "test_lpips": "LPIPS$\\downarrow$",
     "render_FPS": "FPS$\\uparrow$",
     "train_time": "TrainTime (s)$\\downarrow$",
-    "train-test_psnr": "PSNR-gap$\\uparrow$",
-    "train-test_msssim": "MS-SSIM-gap$\\uparrow$",
-    "train-test_lpips": "LPIPS-gap$\\downarrow$",
-    "train-test_ssim": "MS-SSIM-gap$\\uparrow$",
+    "train-test_psnr": "PSNR-gap$\\downarrow$",
+    "train-test_msssim": "MS-SSIM-gap$\\downarrow$",
+    "train-test_lpips": "LPIPS-gap$\\uparrow$",
+    "train-test_ssim": "MS-SSIM-gap$\\downarrow$",
+}
+
+# Define precision for each metric (number of decimal places)
+metric_precision = {
+    "test_psnr": 2,
+    "test_ssim": 3,
+    "test_msssim": 3,
+    "test_lpips": 3,
+    "render_FPS": 1,
+    "train_time": 0,  # No decimals for training time
+    "train-test_psnr": 2,
+    "train-test_msssim": 3,
+    "train-test_lpips": 3,
+    "train-test_ssim": 3,
 }
 
 for key in metric_name_mapping:
@@ -116,33 +132,52 @@ for key in metric_name_mapping:
     ######################################
     #### CHANGE SIZE OF THE PLOT HERE ####
     ######################################
-    plot_width_multiplier = 0.9 # 1.0
+    plot_width_multiplier = 0.5 # 1.0
     plot_width = len(methods) * (len(datasets) * plot_width_multiplier + 1)
-    fig, ax = plt.subplots(figsize=(plot_width, 6)) # 10
+    fig, ax = plt.subplots(figsize=(plot_width, 8)) # 10
 
-    gap_ratio = 0.2
+    gap_ratio = 0.02
     gap = plot_width * gap_ratio / (len(datasets) - 1) if len(datasets) > 1 else 0
     bar_width = (plot_width - gap * (len(datasets) - 1)) / (len(methods) * len(datasets))
     bar_positions = []
     means = []
     variances = []
     bar_colors = []
+    valid_labels = []  # Track which bars actually have data
 
     for dataset_id, dataset in enumerate(datasets):
         if dataset not in result_final:
+            # Dataset not in results, add placeholders
+            for method_id, method in enumerate(methods):
+                bar_positions.append(dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width)
+                means.append(0)
+                variances.append(0)
+                bar_colors.append(method_colors[method_id])
+                valid_labels.append(False)
             continue
+            
         for method_id, method in enumerate(methods):
             bar_positions.append(dataset_id * (len(methods) * bar_width + gap) + method_id * bar_width)
+            
+            # Check if method exists in this dataset
             if method not in result_final[dataset]:
+                means.append(0)
+                variances.append(0)
+                bar_colors.append(method_colors[method_id])
+                valid_labels.append(False)
                 continue
+            
+            # Check if the specific metric exists for this method
             if (key not in result_final[dataset][method][sub_class]) or (
                 len(result_final[dataset][method][sub_class][key]) == 0
             ):
                 means.append(0)
                 variances.append(0)
+                valid_labels.append(False)
             elif key in ["crash", "OOM"]:
                 means.append(sum(result_final[dataset][method][sub_class][key]))
                 variances.append(0)
+                valid_labels.append(True)
             else:
                 mean = sum([x[0] for x in result_final[dataset][method][sub_class][key]]) / float(
                     len(result_final[dataset][method][sub_class][key])
@@ -152,12 +187,23 @@ for key in metric_name_mapping:
                 )
                 means.append(mean)
                 variances.append(variance)
+                valid_labels.append(True)
+            
             bar_colors.append(method_colors[method_id])
 
-    y_min = min(means)
-    y_max = max(means)
+    # Filter out zero values for y-axis scaling (only consider non-zero bars)
+    non_zero_means = [m for m, valid in zip(means, valid_labels) if valid and m != 0]
+    
+    if len(non_zero_means) > 0:
+        y_min = min(non_zero_means)
+        y_max = max(non_zero_means)
+    else:
+        y_min = 0
+        y_max = 1
+    
     y_range = y_max - y_min
-    y_padding = abs(y_range) * 0.1
+    y_padding = abs(y_range) * 0.1 if y_range != 0 else 0.1
+    
     if y_min < 0:
         ax.set_ylim(bottom=y_min - 3 * y_padding, top=y_max + y_padding)
     else:
@@ -171,27 +217,31 @@ for key in metric_name_mapping:
         edgecolor="white",
         linewidth=1,
     )
-#     ax.errorbar(
-#         bar_positions,
-#         means,
-#         yerr=np.sqrt(variances),
-#         fmt="none",
-#         ecolor=error_color,
-#         capsize=5,
-#         elinewidth=1,
-#     )
+    
     import matplotlib.patheffects as path_effects
-    # Add text labels (numbers) on top of bars
+    # Add text labels only for bars with valid data
+    # Use metric-specific precision
+    precision = metric_precision.get(key, 2)  # Default to 2 if not specified
+    labels = []
+    for m, valid in zip(means, valid_labels):
+        if valid and m != 0:
+            if precision == 0:
+                labels.append(f"{int(m)}")  # No decimals
+            else:
+                labels.append(f"{m:.{precision}f}")  # Custom precision
+        else:
+            labels.append("")  # Empty label for missing data
+    
     ax.bar_label(
         bars,
-        labels=[f"{m:.2f}" for m in means],  # format to 2 decimals
-        padding=-20,  # space above bar
-        fontsize=14,
-        rotation=0,  # vertical text if labels overlap
+        labels=labels,
+        padding=0, # -20,
+        fontsize=15,
+        rotation=0,
         color='black',
-        path_effects=[
-            path_effects.withStroke(linewidth=5, foreground='white')
-        ],
+        # path_effects=[
+        #     path_effects.withStroke(linewidth=5, foreground='white')
+        # ],
     )
 
     ax.spines["top"].set_visible(False)
@@ -204,11 +254,12 @@ for key in metric_name_mapping:
     ax.set_xticks(xticks_positions)
     ax.set_xticklabels(datasets)
 
-    ax.set_xlim(left=bar_positions[0] - bar_width * 1.0)
+    # Set both left and right x-axis limits
+    ax.set_xlim(left=bar_positions[0] - bar_width * 1.0, right=bar_positions[-1] + bar_width * 1.0)
 
     for i in range(1, len(datasets)):
         ax.axvline(
-            i * (len(methods) * bar_width + gap) - gap,
+            i * (len(methods) * bar_width + gap) + (len(methods) - 1) * bar_width / 2 - (0.5 * len(methods) * bar_width) - 0.5 * gap,
             linestyle="--",
             color="gray",
             linewidth=0.5,
@@ -222,19 +273,41 @@ for key in metric_name_mapping:
     legend_handles = [
         plt.Rectangle((0, 0), 1, 1, color=method_colors[i], label=methods_to_show[i]) for i in range(len(methods))
     ]
-    # ax.legend(handles=legend_handles, loc="upper right", fontsize=custom_font_size, ncol=3)
     ax.legend(
         handles=legend_handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, 1.02),   # above the plot
+        bbox_to_anchor=(0.5, 1.02),
         fontsize=custom_font_size,
-        ncol=plot_columns,                       # many columns → compact row
+        ncol=plot_columns,
         frameon=False
     )
-
-    # plt.subplots_adjust(bottom=0.15)
 
     plt.tight_layout()
     plt.savefig(exp_prefix + "/" + exp_prefix + "_" + sub_class + "_" + key + ".pdf", bbox_inches='tight', dpi=300)
     print(exp_prefix + "/" + exp_prefix + "_" + sub_class + "_" + key + ".pdf")
+    
+    # Save version without legend
+    ax.legend().set_visible(False)
+    plt.savefig(exp_prefix + "/" + exp_prefix + "_" + "nolegend" + "_" + sub_class + "_" + key + ".pdf", bbox_inches='tight', dpi=300)
+    print(exp_prefix + "/" + exp_prefix + "_" + "nolegend" + "_" + sub_class + "_" + key + ".pdf")
+    
+    # ---- SAVE ONLY LEGEND ----
+    fig_legend = plt.figure(figsize=(8, 2))   # Adjust width/height as needed
+    fig_legend.legend(
+        handles=legend_handles,
+        labels=[h.get_label() for h in legend_handles],
+        loc="center",
+        fontsize=custom_font_size,
+        ncol=plot_columns,
+        frameon=False
+    )
+
+    fig_legend.tight_layout()
+    fig_legend.savefig(
+        f"{exp_prefix}/perdataset_legend.pdf",
+        bbox_inches="tight",
+        dpi=300
+    )
+
+    plt.close(fig_legend)
     plt.close(fig)
